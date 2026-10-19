@@ -63,7 +63,13 @@ export type PlannedMeal = {
   /** Null if the recipe no longer exists in Mealie (and we have no cached copy). */
   recipe: Pick<
     CachedRecipe,
-    "mealieId" | "name" | "imagePath" | "servings" | "nutrition"
+    | "mealieId"
+    | "name"
+    | "imagePath"
+    | "servings"
+    | "nutrition"
+    | "reviewState"
+    | "nutritionSource"
   > | null;
 };
 
@@ -173,6 +179,8 @@ export async function getWeekPlan(
             imagePath: r.imagePath,
             servings: r.servings,
             nutrition: r.nutrition,
+            reviewState: r.reviewState,
+            nutritionSource: r.nutritionSource,
           }
         : null,
     };

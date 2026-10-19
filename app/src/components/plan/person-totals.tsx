@@ -94,6 +94,15 @@ export const PersonTotals = ({
             ⚠ incomplete
           </span>
         )}
+        {totals.estimatedRecipes.length > 0 && (
+          <span
+            className="text-xs text-muted"
+            title={`Estimated nutrition: ${totals.estimatedRecipes.join(", ")}`}
+            aria-label={`Includes estimated nutrition: ${totals.estimatedRecipes.join(", ")}`}
+          >
+            ≈ estimated
+          </span>
+        )}
       </div>
       {fasting && totals.mealsEaten === 0 ? (
         <p className="text-xs text-muted">Fasting day: no targets.</p>

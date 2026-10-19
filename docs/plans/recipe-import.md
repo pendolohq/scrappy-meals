@@ -127,7 +127,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
     successful save a status "Saved" and a link "Back to the plan". Errors in
     `p[role=alert]` inside `main`.
 
-- [ ] **5. Show import state in the planner.** **Complexity:** M
+- [x] **5. Show import state in the planner.** **Complexity:** M
   Depends on 2. Wherever macros show (meal rows, day/person totals), an "estimated" label when
   any recipe in the sum has `nutrition_source = estimated`. A "needs review" badge on recipes
   with `review_state = pending`, linking to the review page. A "Source" link where a recipe is

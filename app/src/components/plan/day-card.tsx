@@ -31,6 +31,7 @@ export const DayCard = ({
   const forMacros = meals.map((m) => ({
     nutrition: m.recipe?.nutrition ?? null,
     recipeName: m.recipe?.name ?? m.slug,
+    estimated: m.recipe?.nutritionSource === "estimated",
     baseServings: m.baseServings,
     portions: m.portions,
   }));
