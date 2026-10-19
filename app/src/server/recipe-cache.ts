@@ -79,6 +79,9 @@ export async function loadRecipes(
         servings: recipe.servings,
         nutrition: recipe.nutrition,
         ingredients: recipe.ingredients,
+        sourceUrl: recipe.sourceUrl,
+        reviewState: recipe.importState.review,
+        nutritionSource: recipe.importState.nutrition,
         fetchedAt: now,
       };
       const [row] = await db

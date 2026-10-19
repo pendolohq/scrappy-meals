@@ -16,6 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { ImportState } from "../mealie/import-state";
 import type { RecipeNutrition } from "../mealie/nutrition";
 import type { Ingredient } from "../mealie/recipes";
 
@@ -177,18 +178,39 @@ export const adherence = pgTable(
 );
 
 /** Local copy of the Mealie recipe fields we use, so a week renders without 28 API calls. */
-export const recipeCache = pgTable("recipe_cache", {
-  slug: text("slug").primaryKey(),
-  mealieId: uuid("mealie_id").notNull(),
-  name: text("name").notNull(),
-  imagePath: text("image_path"),
-  servings: numeric("servings", { precision: 6, scale: 2, mode: "number" }),
-  nutrition: jsonb("nutrition").$type<RecipeNutrition>().notNull(),
-  ingredients: jsonb("ingredients").$type<Ingredient[]>().notNull(),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const recipeCache = pgTable(
+  "recipe_cache",
+  {
+    slug: text("slug").primaryKey(),
+    mealieId: uuid("mealie_id").notNull(),
+    name: text("name").notNull(),
+    imagePath: text("image_path"),
+    servings: numeric("servings", { precision: 6, scale: 2, mode: "number" }),
+    nutrition: jsonb("nutrition").$type<RecipeNutrition>().notNull(),
+    ingredients: jsonb("ingredients").$type<Ingredient[]>().notNull(),
+    sourceUrl: text("source_url"),
+    // Rows cached before imports existed refresh within the hour; until then
+    // they read as plain Mealie recipes.
+    reviewState: text("review_state")
+      .$type<ImportState["review"]>()
+      .notNull()
+      .default("done"),
+    nutritionSource: text("nutrition_source").$type<ImportState["nutrition"]>(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "recipe_cache_review_state",
+      sql`${t.reviewState} in ('pending', 'done')`
+    ),
+    check(
+      "recipe_cache_nutrition_source",
+      sql`${t.nutritionSource} in ('source', 'estimated', 'reviewed')`
+    ),
+  ]
+);
 
 /** Items we created in Mealie per week, so a re-push replaces them instead of duplicating. */
 export const shoppingPushes = pgTable("shopping_pushes", {

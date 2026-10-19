@@ -38,7 +38,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   Integration tests in `mealie.int.test.ts` (import a known page served from a local fixture,
   parse, patch keeps untouched fields). Update the endpoint table in `docs/mealie-api.md`.
 
-- [ ] **2. Cache the import state.** **Complexity:** M (migration: full round)
+- [x] **2. Cache the import state.** **Complexity:** M (migration: full round)
   Depends on 1. Add `source_url`, `review_state`, `nutrition_source` to `recipe_cache` (Drizzle
   migration), filled by `loadRecipes`. `*.db.test.ts` coverage.
 
