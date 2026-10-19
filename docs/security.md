@@ -53,8 +53,8 @@ portions, servings) are household-wide on purpose.
 ## Defence in depth
 
 - `src/middleware.ts` redirects (or answers 401 under `/api/`) for everything
-  except a short public list: `/login`, `/api/auth`, `/api/health`,
-  `/manifest.webmanifest`. It's a second layer: removing a path from that list
+  except a short public list: `/login`, `/offline`, `/sw.js`, `/api/auth`,
+  `/api/health`, `/manifest.webmanifest`. None of these read user data. It's a second layer: removing a path from that list
   must never be what keeps data private.
 - Sessions are JWTs (30 days) that carry a session version. Every request
   checks it against the database, so removing a user or changing a password
