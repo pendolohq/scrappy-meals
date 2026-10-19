@@ -147,7 +147,7 @@ Decisions already taken:
   **Done when:** unit test for the classifier; with the Mealie container stopped, the shop page
   shows its "isn't reachable" banner (`next-dev-loop`).
 
-- [ ] **Task 10: Adding a meal while Mealie is down says so**
+- [x] **Task 10: Adding a meal while Mealie is down says so**
   **Complexity:** XS
   **Depends on:** Task 9
   **Do:** `loadRecipes(…, { force: true })` (`recipe-cache.ts:78-83`) stops swallowing fetch

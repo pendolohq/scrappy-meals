@@ -15,6 +15,7 @@ import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
+import { isMealieUnavailable } from "./mealie/client";
 import {
   type CachedRecipe,
   loadRecipes,
@@ -272,9 +273,18 @@ export async function addMeal(
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
-  const recipe = (
-    await loadRecipes(db, [input.slug], { ...opts, force: true })
-  ).get(input.slug);
+  const recipes = await loadRecipes(db, [input.slug], {
+    ...opts,
+    force: true,
+  }).catch((err: unknown) => {
+    if (isMealieUnavailable(err)) {
+      throw new PlanError(
+        "Mealie isn't reachable right now. Try again in a moment."
+      );
+    }
+    throw err;
+  });
+  const recipe = recipes.get(input.slug);
   if (!recipe) {
     throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
   }

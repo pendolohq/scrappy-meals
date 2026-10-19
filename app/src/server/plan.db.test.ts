@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
+import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
@@ -155,6 +156,20 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       now: later,
     });
     expect(deleted.get("soup")).toBeNull();
+  });
+
+  it("says Mealie is down rather than that the recipe doesn't exist", async () => {
+    const { a } = await twoUsers();
+    const down = async () => {
+      throw new MealieUnavailableError("refused");
+    };
+    await expect(
+      addMeal(
+        db,
+        { date: "2026-10-22", slot: "lunch", slug: "soup", createdBy: a.id },
+        { fetch: down }
+      )
+    ).rejects.toThrow(/isn't reachable/);
   });
 
   it("shows a planned recipe that disappeared from Mealie as missing", async () => {

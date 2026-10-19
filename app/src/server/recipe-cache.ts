@@ -14,7 +14,8 @@ const MAX_AGE_MS = 60 * 60 * 1000;
 /**
  * Recipes by slug, served from our cache and refreshed from Mealie when older
  * than an hour. If Mealie is unreachable, a stale entry is better than
- * nothing, so it is kept. A recipe deleted in Mealie maps to null.
+ * nothing, so it is kept. A recipe deleted in Mealie maps to null. With
+ * `force`, every slug is fetched and a failed fetch throws instead.
  */
 export async function loadRecipes(
   db: Db,
@@ -76,6 +77,9 @@ export async function loadRecipes(
           .returning();
         cached.set(slug, row);
       } catch (err) {
+        if (opts.force) {
+          throw err;
+        }
         console.warn(
           `recipe ${slug}: refresh from Mealie failed, using cached copy if any`,
           err
