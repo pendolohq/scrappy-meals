@@ -1,9 +1,22 @@
 # scrappy-meals
 
-Self-hosted meal planner for two, built on [Mealie](https://mealie.io).
+Self-hosted meal planner for a household, built on [Mealie](https://mealie.io).
 Mealie stores recipes, nutrition and shopping lists; the planner (Next.js)
-handles the shared weekly plan, per-person portions, fasting days and
-adherence, and talks to Mealie only through its REST API.
+handles the shared weekly plan and talks to Mealie only through its REST API.
+
+- **Shared week**: one plan for everyone, a column per person with daily
+  kcal / protein / carbs / fat / fibre against their own targets.
+- **Per-person portions**: pick recipes from Mealie into breakfast, lunch,
+  dinner or snacks, and set how much each person eats (0 = not eating it).
+- **Fasting days**: per person, by weekday or for one day; portions default
+  to 0 and targets are hidden.
+- **Honest numbers**: nutrition comes from Mealie only. Recipes with missing
+  data are flagged and totals marked incomplete, never estimated.
+- **Shopping list**: the week's ingredients scaled by everyone's portions,
+  merged by food and unit, and sent to a Mealie shopping list.
+- **Adherence**: one tap per meal (stuck / partly / skipped / swapped) and a
+  weekly summary.
+- **Installable**: mobile-first PWA; recently viewed weeks work offline.
 
 ## Layout
 
@@ -17,31 +30,23 @@ adherence, and talks to Mealie only through its REST API.
 | `docs/aws-backup-setup.md` | One-time S3 bucket, lifecycle and IAM setup |
 | `app/` | Next.js app; Mealie client in `app/src/server/mealie/` |
 | `docs/mealie-api.md` | What we rely on in the Mealie API, incl. nutrition semantics |
+| `docs/deploy.md` | Step-by-step deployment on a VPS |
 
 Only Caddy publishes ports. Postgres and Mealie are reachable only on the
 Compose network; the app calls Mealie at `http://mealie:9000` with a
 server-side API token.
 
-## Deploying (Hetzner VPS, ~4 GB)
+## Deploying
 
-1. Point DNS `A`/`AAAA` records for `app.<domain>` and `recipes.<domain>` at the VPS.
-2. Install Docker, then clone this repo to `/opt/scrappy-meals`.
-3. `cp .env.example .env && chmod 600 .env`, fill in the domain and the
-   secrets (`openssl rand -hex 32` for each).
-4. `docker compose up -d postgres mealie caddy`.
-5. Open `https://recipes.<domain>`, log in as `changeme@example.com` /
-   `MyPassword`, **change that account's email and password immediately**,
-   then create an API token (Profile → API Tokens) and put it in
-   `MEALIE_API_TOKEN`.
-6. Set up backups: follow `docs/aws-backup-setup.md`, run
-   `scripts/backup.sh` once by hand, then install the cron entry.
-7. Start everything: `docker compose up -d`. Migrations run automatically
-   on each app start.
-8. Create the accounts (repeat per person):
-   ```sh
-   docker compose exec app scrappy user add
-   ```
-   You'll be asked for a name, email and password (hidden, min. 12 chars).
+See **[docs/deploy.md](docs/deploy.md)** for the full guide (server, DNS,
+configuration, Mealie setup, users, backups, updates). In short:
+
+```sh
+cp .env.example .env && chmod 600 .env     # fill in domain + secrets
+docker compose up -d postgres mealie caddy # then set up Mealie + an API token
+docker compose up -d
+docker compose exec app scrappy user add   # once per person
+```
 
 ## Users
 
@@ -87,6 +92,9 @@ pnpm install
 pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
 pnpm lint && pnpm typecheck && pnpm test
 DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
+# End-to-end smoke test against a running build (empties DATABASE_URL!):
+E2E_ALLOW_RESET=1 E2E_BASE_URL=http://localhost:3000 DATABASE_URL=postgres://... \
+  MEALIE_TEST_URL=http://localhost:9000 pnpm test:e2e
 MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... pnpm test:integration
 ```
 

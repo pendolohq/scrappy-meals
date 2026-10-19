@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/auth";
+import { SignOut } from "@/components/sign-out";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +17,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/week">Plan</Link>
           <Link href="/settings">Settings</Link>
         </nav>
-        <form
+        <SignOut
+          name={session.user.name}
           action={async () => {
             "use server";
             await signOut({ redirectTo: "/login" });
           }}
-        >
-          <button type="submit" className="text-sm text-muted">
-            Sign out {session.user.name}
-          </button>
-        </form>
+        />
       </header>
       <main>{children}</main>
     </div>
