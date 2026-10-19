@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+restore-work/
+node_modules/
+.next/
+*.age
+age-identity*.txt
