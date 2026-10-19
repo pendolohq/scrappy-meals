@@ -15,6 +15,7 @@ export default async function AppLayout({
       <header className="flex items-center justify-between gap-4 py-4">
         <nav className="flex gap-4 text-sm font-medium">
           <Link href="/week">Plan</Link>
+          <Link href="/recipes/new">Add recipe</Link>
           <Link href="/settings">Settings</Link>
         </nav>
         <SignOut name={user.name} />
