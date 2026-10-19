@@ -9,6 +9,10 @@ type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 
 const CLIENT_ID = "scrappyClientId";
 
+// Mealie merges and labels every line of a week's list in one request; give it
+// time rather than give up halfway with the old items already deleted.
+const BULK_TIMEOUT_MS = 30_000;
+
 export type ShoppingList = { id: string; name: string };
 
 export type ShoppingItem = {
@@ -94,7 +98,7 @@ export async function addShoppingItems(
   if (items.length === 0) {
     return { created: [], updated: [] };
   }
-  const client = opts.client ?? mealie();
+  const client = opts.client ?? mealie(BULK_TIMEOUT_MS);
   const body: MealieItemCreate[] = items.map((item) => ({
     shoppingListId: listId,
     quantity: item.quantity,

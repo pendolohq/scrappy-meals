@@ -193,7 +193,7 @@ Decisions already taken:
 
 ## M3 — Pushing to Mealie
 
-- [ ] **Task 14: A failed push tells the truth**
+- [x] **Task 14: A failed push tells the truth**
   **Complexity:** XS
   **Do:** `shopping/actions.ts`: replace "Nothing was changed on our side" with "The list may be
   partly updated. Send it again." Give the `create-bulk` call a longer timeout (30 s).
