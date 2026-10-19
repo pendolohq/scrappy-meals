@@ -12,6 +12,12 @@ import {
   MealieError,
   unwrap,
 } from "./client";
+import {
+  findRecipeBySourceUrl,
+  importRecipeFromUrl,
+  parseIngredients,
+  patchRecipe,
+} from "./import";
 import { getRecipe, searchRecipes } from "./recipes";
 import {
   addShoppingItems,
@@ -261,5 +267,83 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       { client }
     );
     expect(await getShoppingListItems(listId, { client })).toEqual([]);
+  });
+
+  describe("importing", () => {
+    const sourceUrl = `https://example.com/it-${run}/lentil-soup`;
+    let slug = "";
+
+    beforeAll(async () => {
+      // create/url needs a page Mealie can fetch, and it refuses local
+      // addresses; create/html-or-json runs the same scraper on given HTML.
+      const page = `<script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name: `IT Imported Soup ${run}`,
+        recipeYield: "4 servings",
+        recipeIngredient: ["200 g red lentils", "a squeeze of lemon"],
+        nutrition: { "@type": "NutritionInformation", calories: "320 kcal" },
+      })}</script>`;
+      slug = unwrap(
+        await admin.POST("/api/recipes/create/html-or-json", {
+          body: { data: page, url: sourceUrl },
+        })
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      );
+    });
+
+    it("returns null when Mealie won't import from a URL", async () => {
+      expect(
+        await importRecipeFromUrl("http://127.0.0.1:1/recipe", { client })
+      ).toBeNull();
+    });
+
+    it("finds a recipe by the URL it came from", async () => {
+      expect(await findRecipeBySourceUrl(sourceUrl, { client })).toEqual({
+        slug,
+        name: `IT Imported Soup ${run}`,
+      });
+      expect(
+        await findRecipeBySourceUrl(`${sourceUrl}/other`, { client })
+      ).toBeNull();
+    });
+
+    it("reads the source URL and treats a fresh import as reviewed", async () => {
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r.sourceUrl).toBe(sourceUrl);
+      expect(r.importState).toEqual({ review: "done", nutrition: null });
+      expect(r.ingredients.every((i) => i.food === null)).toBe(true);
+    });
+
+    it("parses ingredient lines", async () => {
+      const [lentils, lemon] = await parseIngredients(
+        ["200 g red lentils", "a squeeze of lemon"],
+        { client }
+      );
+      expect(lentils).toMatchObject({
+        input: "200 g red lentils",
+        quantity: 200,
+        food: { name: "red lentils" },
+      });
+      expect(lentils.unit?.name).toBeTruthy();
+      expect(lentils.confidence).toBeGreaterThan(lemon.confidence);
+      expect(lemon.quantity).toBeNull();
+      expect(await parseIngredients([], { client })).toEqual([]);
+    });
+
+    it("patches the import state without touching other fields", async () => {
+      await patchRecipe(
+        slug,
+        { extras: { scrappyReview: "pending", scrappyNutrition: "source" } },
+        { client }
+      );
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r.importState).toEqual({ review: "pending", nutrition: "source" });
+      expect(r.sourceUrl).toBe(sourceUrl);
+      expect(r.nutrition.perServing.kcal).toBe(320);
+      expect(r.ingredients).toHaveLength(2);
+    });
   });
 });

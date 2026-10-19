@@ -1,6 +1,7 @@
 import "server-only";
 
 import { type MealieClient, mealie, unwrap } from "./client";
+import { type ImportState, readImportState } from "./import-state";
 import { normaliseNutrition, type RecipeNutrition } from "./nutrition";
 import type { components } from "./schema";
 
@@ -31,6 +32,9 @@ export type Recipe = RecipeListItem & {
   id: string;
   nutrition: RecipeNutrition;
   ingredients: Ingredient[];
+  /** The page or post the recipe was imported from (Mealie's orgURL). */
+  sourceUrl: string | null;
+  importState: ImportState;
 };
 
 export type RecipePage = { items: RecipeListItem[] };
@@ -85,6 +89,8 @@ export function toRecipe(r: MealieRecipe): Recipe {
     id: r.id,
     nutrition: normaliseNutrition(r.nutrition),
     ingredients: (r.recipeIngredient ?? []).map(toIngredient),
+    sourceUrl: r.orgURL || null,
+    importState: readImportState(r.extras),
   };
 }
 

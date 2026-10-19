@@ -27,7 +27,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
 
 ## Milestone 1: import from a web page
 
-- [ ] **1. Mealie client: import, parse, patch.** **Complexity:** M
+- [x] **1. Mealie client: import, parse, patch.** **Complexity:** M
   In `server/mealie/recipes.ts` (or a new `import.ts` there): `importRecipeFromUrl(url)`
   → slug via `create/url` (no tags/categories); a scrape failure becomes a `UserFacingError`
   ("Couldn't find a recipe on that page"), Mealie down stays a `RetryableError`.
@@ -44,9 +44,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
 
 - [ ] **3. "Add recipe" page.** **Complexity:** L (security: full round)
   Depends on 1. `/recipes/new`, linked from the header nav. One URL field;
-  `userFormAction` with zod: `http(s)` only, no credentials in the URL, no IP literals in
-  private/loopback/link-local ranges, no single-label hosts (Mealie fetches the URL from inside
-  the Compose network, so `postgres`, `app`, `mealie` must not be reachable this way).
+  `userFormAction` with zod: `http(s)` only, no credentials in the URL, no single-label hosts.
+  Mealie itself refuses loopback and private addresses (`safehttp`), so this is a second
+  layer, not the only one.
   Rate-limited per user (20 an hour, `createRateLimiter`). If a recipe with the same
   `orgURL` exists, link to it instead of importing again. On success: parse the ingredients,
   `PATCH` the parsed lines plus `extras` (`scrappyReview: pending`, `scrappyNutrition:
