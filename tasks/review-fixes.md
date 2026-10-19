@@ -436,7 +436,7 @@ They become one page.
 
 ## M10 — CI image filter that stays correct
 
-- [ ] **Task 32: Fix and test the "does this PR affect the image" check**
+- [x] **Task 32: Fix and test the "does this PR affect the image" check**
   **Complexity:** S
   **Why:** the hand-kept `PATTERN` in `ci.yml` (`changes` job) is meant to catch what the e2e
   job doesn't already exercise: the Dockerfile and its inputs, dependencies, migrations and

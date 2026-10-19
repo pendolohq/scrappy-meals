@@ -139,8 +139,8 @@ jobs:
             app/server.log
           retention-days: 7
 
-  # Decides whether a PR can affect the image or the backups; pushes to main and
-  # tags always run both.
+  # Decides whether a PR can affect the image or the server stack (compose,
+  # Caddy, backups); pushes to main and tags always run both.
   changes:
     runs-on: ubuntu-latest
     defaults:
@@ -148,7 +148,7 @@ jobs:
         working-directory: .
     outputs:
       image: ${{ steps.diff.outputs.image }}
-      backup: ${{ steps.diff.outputs.backup }}
+      stack: ${{ steps.diff.outputs.stack }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: github.event_name == 'pull_request'
@@ -157,11 +157,11 @@ jobs:
       - id: diff
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-          # Anything that goes into the image or the way CI builds it.
-          PATTERN: '^(app/(Dockerfile|\.dockerignore|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|next\.config\.ts|docker/|scripts/|drizzle/|src/cli/|src/server/db/|src/server/users\.ts)|backup/|\.github/workflows/)'
-          # Anything the backup/restore round trip exercises.
-          BACKUP_PATTERN: '^(backup/|scripts/|postgres/|docker-compose\.yml|\.github/workflows/)'
+          # What the stack job checks.
+          STACK_PATTERN: '^(backup/|scripts/|postgres/|docker-compose\.yml|Caddyfile|\.env\.example|\.github/workflows/)'
         run: |
+          # .github/image-paths: one regex per line, comments and blanks ignored.
+          IMAGE_PATTERN="^($(grep -v -e '^#' -e '^$' .github/image-paths 2>/dev/null | paste -sd'|' -))"
           check() {
             if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
               echo "$1=true" >> "$GITHUB_OUTPUT"
@@ -172,8 +172,8 @@ jobs:
               echo "$1=false" >> "$GITHUB_OUTPUT"
             fi
           }
-          check image "$PATTERN"
-          check backup "$BACKUP_PATTERN"
+          check image "$IMAGE_PATTERN"
+          check stack "$STACK_PATTERN"
 
   secrets:
     runs-on: ubuntu-latest
@@ -197,15 +197,24 @@ jobs:
       - name: Scan full history
         run: gitleaks git --redact --verbose .
 
-  backup:
+  stack:
     needs: [changes]
-    if: needs.changes.outputs.backup == 'true'
+    if: needs.changes.outputs.stack == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: .
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Compose file and Caddyfile are valid
+        run: |
+          sed -E 's/^(POSTGRES_SUPERUSER_PASSWORD|PLANNER_DB_PASSWORD|MEALIE_DB_PASSWORD|AUTH_SECRET)=$/\1=ci/' \
+            .env.example > .env
+          docker compose --profile ops config -q
+          docker run --rm -e DOMAIN=example.test -e ACME_EMAIL=ci@example.test \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            "$(sed -n 's/^ *image: \(caddy:.*\)/\1/p' docker-compose.yml)" caddy validate --config /etc/caddy/Caddyfile
+          rm .env
       - name: Backup and restore round trip
         run: scripts/test-backup-restore.sh
 
@@ -247,11 +256,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Build backup image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: backup
-          tags: scrappy-meals-ops:ci
       - name: Smoke test the app image
         # As in production: postgres/init creates the roles, and migrations run
         # as the non-superuser planner role.
