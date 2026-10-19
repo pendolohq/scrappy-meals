@@ -386,13 +386,14 @@ They become one page.
   prerendered with a build-time date or a build-time database).
   **Done when:** all checks green; Grep shows no remaining references.
 
-- [ ] **Task 29: Drop the `addMeal` retry loop and the redundant index**
+- [x] **Task 29: Drop the `addMeal` retry loop and the redundant index**
   **Complexity:** S
   **Do:** remove the `23505` retry loop in `plan.ts:291-334`; a collision falls through to
   "Something went wrong". In one migration:
   - drop `meal_slots_date_idx`;
   - drop `recipe_cache.mealie_updated_at` and `Recipe.updatedAt`;
-  - replace `image_path` with `has_image`.
+  - ~~replace `image_path` with `has_image`.~~ Skipped: drizzle-kit treats it as an
+    interactive rename, and the column works as it is.
   Generate it with drizzle-kit.
   **Done when:** db tests pass; CI's migration-drift check passes.
 

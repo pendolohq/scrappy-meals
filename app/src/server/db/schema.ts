@@ -3,7 +3,6 @@ import {
   boolean,
   check,
   date,
-  index,
   integer,
   jsonb,
   numeric,
@@ -129,7 +128,6 @@ export const mealSlots = pgTable(
     ...timestamps,
   },
   (t) => [
-    index("meal_slots_date_idx").on(t.date),
     unique("meal_slots_date_slot_position").on(t.date, t.slot, t.position),
     check("meal_slots_base_servings_positive", sql`${t.baseServings} > 0`),
   ]
@@ -187,7 +185,6 @@ export const recipeCache = pgTable("recipe_cache", {
   servings: numeric("servings", { precision: 6, scale: 2, mode: "number" }),
   nutrition: jsonb("nutrition").$type<RecipeNutrition>().notNull(),
   ingredients: jsonb("ingredients").$type<Ingredient[]>().notNull(),
-  mealieUpdatedAt: timestamp("mealie_updated_at", { withTimezone: true }),
   fetchedAt: timestamp("fetched_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

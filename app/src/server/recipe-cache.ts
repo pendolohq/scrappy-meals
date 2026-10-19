@@ -66,7 +66,6 @@ export async function loadRecipes(
         servings: recipe.servings,
         nutrition: recipe.nutrition,
         ingredients: recipe.ingredients,
-        mealieUpdatedAt: recipe.updatedAt ? new Date(recipe.updatedAt) : null,
         fetchedAt: now,
       };
       const [row] = await db

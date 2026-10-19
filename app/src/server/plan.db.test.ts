@@ -21,7 +21,6 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
   name: `Recipe ${slug}`,
   imagePath: null,
   servings: 4,
-  updatedAt: null,
   ingredients: [],
   nutrition: {
     perServing: { kcal, protein: 20, carbs: 40, fat: 15, fibre: 6 },

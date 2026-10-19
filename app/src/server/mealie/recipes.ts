@@ -31,7 +31,6 @@ export type Recipe = RecipeListItem & {
   id: string;
   nutrition: RecipeNutrition;
   ingredients: Ingredient[];
-  updatedAt: string | null;
 };
 
 export type RecipePage = { items: RecipeListItem[] };
@@ -86,7 +85,6 @@ export function toRecipe(r: MealieRecipe): Recipe {
     id: r.id,
     nutrition: normaliseNutrition(r.nutrition),
     ingredients: (r.recipeIngredient ?? []).map(toIngredient),
-    updatedAt: r.updatedAt ?? r.dateUpdated ?? null,
   };
 }
 
