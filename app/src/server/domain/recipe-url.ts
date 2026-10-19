@@ -32,10 +32,24 @@ export function normaliseRecipeUrl(input: string): RecipeUrlResult {
   if (url.username || url.password) {
     return { ok: false, error: "Remove the username and password." };
   }
-  // Single-label hosts (localhost, Compose service names) are never public pages.
-  if (!url.hostname.includes(".")) {
+  // Single-label hosts (localhost, Compose service names) are never public
+  // pages; a trailing dot ("localhost.") must not count as a second label.
+  const labels = url.hostname.split(".");
+  if (labels.length < 2 || labels.some((l) => l === "")) {
     return { ok: false, error: "That address isn't a public web page." };
   }
+  // IPv6 literals ("[::1]") have no dot and are refused above; anything else
+  // is already punycode, so only letters, digits and hyphens may remain.
+  if (!/^[a-z0-9.-]+$/.test(url.hostname)) {
+    return {
+      ok: false,
+      error: "That address has characters a host can't have.",
+    };
+  }
   url.hash = "";
+  // Non-ASCII characters grow when percent-encoded, so check the result too.
+  if (url.href.length > MAX_LENGTH) {
+    return { ok: false, error: "That address is too long." };
+  }
   return { ok: true, url: url.href };
 }

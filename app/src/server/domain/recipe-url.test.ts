@@ -84,6 +84,9 @@ describe("normaliseRecipeUrl", () => {
     "http://localhost:8080/soup",
     "http://mealie:9000/api",
     "http://postgres",
+    "http://localhost./x",
+    "http://mealie.:9000/api",
+    "http://postgres./",
   ])("rejects the single-label host in %s", (input) => {
     expect(rejected(input)).not.toBe("");
   });
@@ -91,5 +94,13 @@ describe("normaliseRecipeUrl", () => {
   it("rejects a URL over 2048 characters", () => {
     const base = "https://example.com/";
     expect(rejected(base + "a".repeat(2049 - base.length))).not.toBe("");
+  });
+
+  it("rejects a URL that grows past 2048 characters once encoded", () => {
+    expect(rejected("https://example.com/" + "é".repeat(1000))).not.toBe("");
+  });
+
+  it("rejects host names with characters a host can't have", () => {
+    expect(rejected('https://a"b.com/')).not.toBe("");
   });
 });

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { UserFacingError } from "./errors";
+import { RetryableError, UserFacingError } from "./errors";
 import { mealie, MealieError, unwrap } from "./mealie/client";
 import {
   findRecipeBySourceUrl,
@@ -34,18 +34,17 @@ type Deps = {
 // credits), so a signed-in user can't hammer it.
 const limiter = createRateLimiter({ limit: 20, windowMs: 60 * 60 * 1000 });
 
+// The cached recipe model drops raw nutrition and extras, which the import
+// state needs.
 async function getRecipe(slug: string): Promise<FetchedRecipe | null> {
-  try {
-    const recipe = unwrap(
-      await mealie().GET("/api/recipes/{slug}", { params: { path: { slug } } })
-    );
-    return { nutrition: recipe.nutrition, extras: recipe.extras };
-  } catch (err) {
-    if (err instanceof MealieError && err.notFound) {
-      return null;
-    }
-    throw err;
+  const result = await mealie().GET("/api/recipes/{slug}", {
+    params: { path: { slug } },
+  });
+  if (result.response.status === 404) {
+    return null;
   }
+  const recipe = unwrap(result);
+  return { nutrition: recipe.nutrition, extras: recipe.extras };
 }
 
 const defaults: Deps = {
@@ -56,14 +55,19 @@ const defaults: Deps = {
   limiter,
 };
 
-function isMealieDown(err: unknown): boolean {
+/** Mealie down, overloaded or unreachable: worth trying again later. */
+function isTransient(err: unknown): boolean {
   if (err instanceof MealieError) {
-    return err.status >= 500;
+    return err.status >= 500 || err.status === 429;
+  }
+  if (!(err instanceof Error)) {
+    return false;
   }
   return (
-    err instanceof TypeError ||
-    (err instanceof Error &&
-      (err.name === "TimeoutError" || err.name === "AbortError"))
+    err.name === "TimeoutError" ||
+    err.name === "AbortError" ||
+    (err instanceof TypeError &&
+      (err.message === "fetch failed" || err.cause !== undefined))
   );
 }
 
@@ -93,16 +97,20 @@ export async function importRecipe(
     const hasNutrition = Object.values(recipe?.nutrition ?? {}).some(
       (v) => typeof v === "string" && v !== ""
     );
-    await d.patch(slug, {
-      extras: withImportState(recipe?.extras, {
-        review: "pending",
-        nutrition: hasNutrition ? "source" : null,
-      }),
-    });
+    // Null: the recipe was deleted since the import, nothing left to mark.
+    if (recipe) {
+      await d.patch(slug, {
+        extras: withImportState(recipe.extras, {
+          review: "pending",
+          nutrition: hasNutrition ? "source" : null,
+        }),
+      });
+    }
     return { status: "imported", slug };
   } catch (err) {
-    if (isMealieDown(err)) {
-      throw new UserFacingError(
+    if (isTransient(err)) {
+      console.error("recipe import failed", err);
+      throw new RetryableError(
         "Mealie didn't answer. If the page was slow, the recipe may still appear: try again in a minute."
       );
     }
