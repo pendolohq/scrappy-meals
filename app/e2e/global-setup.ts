@@ -103,10 +103,32 @@ export default async function globalSetup() {
     ],
   });
 
+  // A recipe that already came from a web page, for the duplicate check on
+  // /recipes/new. Mealie won't fetch a page in CI, so it scrapes given HTML.
+  const imported = {
+    name: `E2E Imported Soup ${run}`,
+    url: `https://example.com/e2e/imported-soup-${run}`,
+  };
+  const importedSlug: string = await api(
+    "POST",
+    "/api/recipes/create/html-or-json",
+    {
+      url: imported.url,
+      data: `<html><head><script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name: imported.name,
+        recipeIngredient: ["1 onion"],
+        recipeInstructions: [{ "@type": "HowToStep", text: "Boil." }],
+      })}</script></head><body></body></html>`,
+    }
+  );
+
   await writeFile(
     STATE_FILE,
     JSON.stringify({
       recipe: { name, slug },
+      imported: { ...imported, slug: importedSlug },
       food: food.name,
       extra: `coffee ${run}`,
     })
