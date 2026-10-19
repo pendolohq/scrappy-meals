@@ -40,6 +40,8 @@ until every place names the same version (`mealie-version.test.ts`).
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
+| Find or create a food / unit | `GET /api/foods\|units?search=&orderBy=name`, else `POST` |
+| Group slug (for links) | `GET /api/groups/self` → `slug` |
 | Version | `GET /api/app/about` |
 
 ## Nutrition
@@ -77,6 +79,30 @@ until every place names the same version (`mealie-version.test.ts`).
   `scrappyReview` (`pending` | `done`; absent = done) and `scrappyNutrition`
   (`source` | `estimated` | `reviewed`). `PATCH` replaces `extras` as a
   whole, so write it with `withImportState()`, which keeps other keys.
+
+## Reviewing a recipe
+
+`/recipes/<slug>/review` (`src/server/recipe-review.ts`) is where an import is
+checked, and the planner's view of any recipe.
+
+- **Loading:** lines Mealie already has parsed (a food or unit id) are shown
+  as they are. The rest go through the parser as suggestions, unless the
+  recipe was already reviewed through the planner (`scrappyReview: done`):
+  then unparsed lines are text someone chose to keep.
+- **Saving is one `PATCH`.** It replaces `recipeIngredient` as a whole, so
+  each line carries its `referenceId` and the server copies the fields the
+  form doesn't edit from Mealie's current copy: `referenceId`,
+  `originalText`, `referencedRecipe`, `substitutions`. Lines that link
+  another recipe go back unchanged. `originalText` is filled in only for
+  lines that had no parse, so their original wording survives the save.
+- **Foods and units** the parser named but Mealie lacks are created, matched
+  first by name, plural or abbreviation, trimmed and case-insensitive, over
+  every page of search results (at most 4 lookups at a time). Two spellings
+  that match nothing ("tomato", "tomatoes") still create two foods.
+- **Nutrition:** only macros whose value changed are written; a value the
+  planner can't read ("10-12") is kept as Mealie has it and shown beside the
+  empty field. Other nutrition fields (sodium etc.) are kept.
+- **Links to Mealie** use `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`.
 
 ## Servings and ingredients
 

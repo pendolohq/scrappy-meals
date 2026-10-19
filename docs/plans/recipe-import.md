@@ -133,7 +133,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   with `review_state = pending`, linking to the review page. A "Source" link where a recipe is
   shown in detail.
 
-- [ ] **6. Docs and e2e.** **Complexity:** S
+- [x] **6. Docs and e2e.** **Complexity:** S
   Depends on 3–5. README features, `docs/mealie-api.md` (import, parser, extras keys), an e2e
   path: add a recipe from a fixture page, review it, plan it.
 
