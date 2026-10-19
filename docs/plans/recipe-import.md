@@ -83,6 +83,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   `/api/units`). Save = one `PATCH` (ingredients, servings, nutrition, `extras` →
   `scrappyReview: done`, `scrappyNutrition: reviewed` if edited/confirmed), then refresh the
   cache entry (`loadRecipes(..., { force: true })`). "Open in Mealie" for anything else.
+  The page also works for a recipe with no `scrappyReview` key: an import that timed out after
+  Mealie created the recipe leaves it unmarked, and "Already imported" links here, so the page
+  must let it be reviewed rather than assume it's done.
 
 - [ ] **5. Show import state in the planner.** **Complexity:** M
   Depends on 2. Wherever macros show (meal rows, day/person totals), an "estimated" label when
