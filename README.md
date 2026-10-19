@@ -84,10 +84,10 @@ see `docs/aws-backup-setup.md` §6.
 ```sh
 cd app
 pnpm install
-pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN
+pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
 pnpm lint && pnpm typecheck && pnpm test
 DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
-MEALIE_TEST_URL=http://localhost:9000 pnpm test:integration
+MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... pnpm test:integration
 ```
 
 CI runs all of the above, scans for committed secrets with gitleaks, builds
