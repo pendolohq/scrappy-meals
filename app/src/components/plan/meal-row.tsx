@@ -123,7 +123,7 @@ export function MealRow({
     >
       <div className="flex items-start gap-3">
         {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element -- proxied Mealie thumbnails, already small
+          // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails, already small
           <img
             src={thumb}
             alt=""

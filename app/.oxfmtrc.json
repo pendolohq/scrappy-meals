@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": false,
+  "printWidth": 80,
+  "sortPackageJson": false,
+  "sortTailwindcss": { "stylesheet": "./src/app/globals.css" },
+  "sortImports": {
+    "newlinesBetween": true,
+    "customGroups": [
+      {
+        "groupName": "react",
+        "elementNamePattern": ["react", "react/**", "react-dom", "react-dom/**"]
+      }
+    ],
+    "groups": [
+      "react",
+      { "newlinesBetween": false },
+      ["external", "builtin"],
+      "internal",
+      "side_effect",
+      "parent",
+      ["sibling", "index"],
+      "style",
+      "unknown"
+    ]
+  },
+  "ignorePatterns": [
+    "src/server/mealie/schema.d.ts",
+    "src/server/mealie/openapi.json",
+    "drizzle/**",
+    "pnpm-lock.yaml"
+  ]
+}

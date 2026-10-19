@@ -8,7 +8,7 @@ export default function Offline() {
       <p className="text-sm text-muted">
         Weeks you&apos;ve opened recently are still available. Changes need a connection.
       </p>
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full load lets the service worker serve the cached week */}
+      {/* oxlint-disable-next-line nextjs/no-html-link-for-pages -- a full load lets the service worker serve the cached week */}
       <a href="/week" className="text-sm text-accent">
         Open this week
       </a>

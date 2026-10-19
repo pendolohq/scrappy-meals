@@ -91,13 +91,23 @@ see `docs/aws-backup-setup.md` §6.
 cd app
 pnpm install
 pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
-pnpm lint && pnpm typecheck && pnpm test
+pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
+pnpm format && pnpm lint:fix                       # fix formatting and auto-fixable lint
 DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
 # End-to-end smoke test against a running build (empties DATABASE_URL!):
 E2E_ALLOW_RESET=1 E2E_BASE_URL=http://localhost:3000 DATABASE_URL=postgres://... \
   MEALIE_TEST_URL=http://localhost:9000 pnpm test:e2e
 MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... pnpm test:integration
 ```
+
+Formatting is [oxfmt](https://oxc.rs/docs/guide/usage/formatter) (`app/.oxfmtrc.json`: 80 columns,
+sorted imports, sorted Tailwind classes) and linting is
+[oxlint](https://oxc.rs/docs/guide/usage/linter) (`app/.oxlintrc.json`). The setup matches
+valtiberina.travel, plus one house rule:
+
+- braces on every `if`/`else`/loop body, even one-liners (`curly: all`).
+
+`.vscode/` sets the oxc extension (`oxc.oxc-vscode`) as formatter, with format on save.
 
 CI runs all of the above, scans for committed secrets with gitleaks, builds
 and smoke-tests the image, and pushes it to GHCR from `main` and `v*` tags.

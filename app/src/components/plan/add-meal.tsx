@@ -137,7 +137,7 @@ export function AddMeal({
                       className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-background disabled:opacity-60"
                     >
                       {r.imagePath && r.id ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- proxied Mealie thumbnails
+                        // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails
                         <img
                           src={`/api/recipe-images/${r.id}`}
                           alt=""
