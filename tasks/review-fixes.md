@@ -162,7 +162,7 @@ Decisions already taken:
   (`reset` vs `unstable_retry`).
   **Done when:** a thrown error in a page shows the boundary (`next-dev-loop`).
 
-- [ ] **Task 11b: A database blip doesn't sign everyone out**
+- [x] **Task 11b: A database blip doesn't sign everyone out**
   **Complexity:** S (auth: gets a review pass)
   **Found while verifying Task 11:** the `jwt` callback in `auth.ts` checks the session
   version against the database on every request. When that query throws (Postgres
