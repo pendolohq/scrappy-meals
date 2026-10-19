@@ -139,6 +139,35 @@ jobs:
             app/server.log
           retention-days: 7
 
+  # Decides whether a PR can affect the image; pushes to main and tags always build it.
+  changes:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    outputs:
+      image: ${{ steps.diff.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          # Anything that goes into the image or the way CI builds it.
+          PATTERN: '^(app/(Dockerfile|\.dockerignore|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|next\.config\.ts|docker/|scripts/|drizzle/|src/cli/|src/server/db/|src/server/users\.ts)|backup/|\.github/workflows/)'
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qE "$PATTERN"; then
+            git diff --name-only "$BASE" HEAD | grep -E "$PATTERN"
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No image-related changes; the image job is skipped."
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+
   secrets:
     runs-on: ubuntu-latest
     defaults:
@@ -161,8 +190,13 @@ jobs:
       - name: Scan full history
         run: gitleaks git --redact --verbose .
 
+  # Pull requests: build and smoke-test only, never push.
+  # main:          publish :main and :sha-<commit>. Never :latest.
+  # v* tags:       publish :X.Y.Z, :X.Y and :latest. Only a release moves :latest,
+  #                which is what the server runs by default (APP_TAG).
   image:
-    needs: [check, e2e, secrets]
+    needs: [changes, check, e2e, secrets]
+    if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -177,11 +211,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
           tags: |
-            type=ref,event=pr
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
       - name: Build app image
         uses: docker/build-push-action@v6
         with:
