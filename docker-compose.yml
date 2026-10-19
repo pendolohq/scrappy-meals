@@ -1,0 +1,133 @@
+name: scrappy-meals
+
+x-ops: &ops
+  build: ./backup
+  image: scrappy-meals-ops:local
+  profiles: [ops]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment: &ops-env
+    PGHOST: postgres
+    PGUSER: postgres
+    PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+    S3_BUCKET: ${S3_BUCKET:-}
+    S3_REGION: ${S3_REGION:-eu-central-1}
+    S3_ENDPOINT: ${S3_ENDPOINT:-}
+    AGE_RECIPIENT: ${AGE_RECIPIENT:-}
+    TZ: ${TZ:-UTC}
+  tmpfs:
+    - /tmp
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      PLANNER_DB_PASSWORD: ${PLANNER_DB_PASSWORD:?}
+      MEALIE_DB_PASSWORD: ${MEALIE_DB_PASSWORD:?}
+      TZ: ${TZ:-UTC}
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c max_connections=50
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 768m
+    restart: unless-stopped
+
+  mealie:
+    image: ${MEALIE_IMAGE:-ghcr.io/mealie-recipes/mealie}:v3.29.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_ENGINE: postgres
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: mealie
+      POSTGRES_USER: mealie
+      POSTGRES_PASSWORD: ${MEALIE_DB_PASSWORD:?}
+      BASE_URL: https://recipes.${DOMAIN:?}
+      ALLOW_SIGNUP: "false"
+      UVICORN_WORKERS: 1
+      TZ: ${TZ:-UTC}
+    volumes:
+      - mealie-data:/app/data
+    mem_limit: 1g
+    restart: unless-stopped
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/krustyc/scrappy-meals}:${APP_TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mealie:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://planner:${PLANNER_DB_PASSWORD:?}@postgres:5432/planner
+      MEALIE_URL: http://mealie:9000
+      MEALIE_API_TOKEN: ${MEALIE_API_TOKEN:-}
+      AUTH_SECRET: ${AUTH_SECRET:?}
+      AUTH_URL: https://app.${DOMAIN:?}
+      AUTH_TRUST_HOST: "true"
+      TZ: ${TZ:-UTC}
+    mem_limit: 512m
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    mem_limit: 128m
+    restart: unless-stopped
+
+  # Nightly backup, run from host cron: docker compose run --rm backup
+  # Write-only S3 credentials; cannot read or delete existing backups.
+  backup:
+    <<: *ops
+    command: ["backup"]
+    environment:
+      <<: *ops-env
+      AWS_ACCESS_KEY_ID: ${BACKUP_AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_AWS_SECRET_ACCESS_KEY:-}
+      BACKUP_PING_URL: ${BACKUP_PING_URL:-}
+    volumes:
+      - mealie-data:/mealie-data:ro
+
+  # Used only by scripts/restore.sh. Gets read credentials and the age
+  # identity at run time; nothing restore-related lives in .env on the VPS.
+  restore:
+    <<: *ops
+    environment:
+      <<: *ops-env
+      AWS_ACCESS_KEY_ID: ${RESTORE_AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${RESTORE_AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${RESTORE_AWS_SESSION_TOKEN:-}
+    volumes:
+      - mealie-data:/mealie-data
+      - ${RESTORE_WORKDIR:-./restore-work}:/restore
+      - ${AGE_IDENTITY_FILE:-/dev/null}:/run/age-identity:ro
+
+volumes:
+  pgdata: {}
+  mealie-data: {}
+  caddy-data: {}
+  caddy-config: {}

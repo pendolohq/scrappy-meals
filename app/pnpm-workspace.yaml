@@ -1,0 +1,9 @@
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+
+# Keep the pnpm 9 default so eslint-config-next can load its plugins.
+publicHoistPattern:
+  - "*eslint*"
+  - "*prettier*"
