@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { type FormEvent, startTransition, useActionState } from "react";
 
 import { login, type LoginState } from "./actions";
 
@@ -9,8 +9,15 @@ export const LoginForm = ({ next }: { next?: string }) => {
     login,
     {}
   );
+  // Submitted by hand rather than with <form action>: React resets a form
+  // after its action, which would clear the email after a wrong password.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    startTransition(() => action(form));
+  };
   return (
-    <form action={action} className="space-y-4">
+    <form onSubmit={submit} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}
       <label className="block">
         <span className="text-sm text-muted">Email</span>

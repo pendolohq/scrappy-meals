@@ -49,6 +49,8 @@ test("rejects a wrong password", async ({ page }) => {
   await expect(page.locator("main p[role=alert]")).toHaveText(
     "Invalid email or password."
   );
+  // The email stays, so only the password needs typing again.
+  await expect(page.getByLabel("Email")).toHaveValue(USERS.alex.email);
 });
 
 test("plans, logs and shops a meal, and keeps the week readable offline", async ({

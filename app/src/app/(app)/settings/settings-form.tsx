@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { type FormEvent, startTransition, useActionState } from "react";
 
 import type { ProfileInput } from "@/server/users";
 
@@ -9,11 +9,24 @@ import { saveSettings, type SettingsState } from "./actions";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const TARGETS = [
-  { name: "targetKcal", label: "Calories", unit: "kcal", step: "1" },
-  { name: "targetProteinG", label: "Protein", unit: "g", step: "0.1" },
-  { name: "targetCarbsG", label: "Carbs", unit: "g", step: "0.1" },
-  { name: "targetFatG", label: "Fat", unit: "g", step: "0.1" },
-  { name: "targetFibreG", label: "Fibre", unit: "g", step: "0.1" },
+  // `max` matches profileSchema in server/users.ts.
+  {
+    name: "targetKcal",
+    label: "Calories",
+    unit: "kcal",
+    step: "1",
+    max: 20_000,
+  },
+  {
+    name: "targetProteinG",
+    label: "Protein",
+    unit: "g",
+    step: "0.1",
+    max: 1_000,
+  },
+  { name: "targetCarbsG", label: "Carbs", unit: "g", step: "0.1", max: 2_000 },
+  { name: "targetFatG", label: "Fat", unit: "g", step: "0.1", max: 1_000 },
+  { name: "targetFibreG", label: "Fibre", unit: "g", step: "0.1", max: 500 },
 ] as const;
 
 const input = "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
@@ -24,8 +37,16 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
     {}
   );
 
+  // Submitted by hand rather than with <form action>: React resets a form
+  // after its action, which would undo every edit when one field is invalid.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    startTransition(() => action(form));
+  };
+
   return (
-    <form action={action} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6">
       <label className="block">
         <span className="text-sm text-muted">Name</span>
         <input
@@ -53,6 +74,7 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
                 type="number"
                 inputMode="decimal"
                 min="0"
+                max={t.max}
                 step={t.step}
                 defaultValue={profile[t.name] ?? ""}
                 className={input}

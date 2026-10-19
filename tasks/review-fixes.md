@@ -310,7 +310,7 @@ They become one page.
 
 ## M7 — Forms and accessibility
 
-- [ ] **Task 23: Forms keep what the user typed after an error**
+- [x] **Task 23: Forms keep what the user typed after an error**
   **Complexity:** S
   **Do:** login and settings actions return the submitted values with the error, and the
   fields use them as `defaultValue`. Check the bundled Next/React docs for the current
