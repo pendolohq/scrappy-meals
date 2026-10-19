@@ -12,10 +12,17 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./mealie/import";
-import { readImportState, withImportState } from "./mealie/import-state";
+import {
+  IMPORT_EXTRAS,
+  readImportState,
+  withImportState,
+} from "./mealie/import-state";
 import type { ImportState } from "./mealie/import-state";
-import type { MacroKey } from "./mealie/nutrition";
-import { normaliseNutrition } from "./mealie/nutrition";
+import {
+  MACRO_KEYS,
+  type MacroKey,
+  normaliseNutrition,
+} from "./mealie/nutrition";
 import { loadRecipes } from "./recipe-cache";
 
 type RawIngredient = {
@@ -27,6 +34,9 @@ type RawIngredient = {
   quantity?: number | null;
   unit?: { id?: string | null; name: string } | null;
   food?: { id?: string | null; name: string } | null;
+  // Carried over untouched on save, never read from the browser.
+  referencedRecipe?: unknown;
+  substitutions?: unknown[] | null;
 };
 
 type RawRecipe = {
@@ -74,8 +84,18 @@ export type ReviewDraft = {
   mealieUrl: string | null;
   importState: ImportState;
   nutrition: Record<MacroKey, number | null>;
+  /** Text Mealie has for a macro that can't be read as a number ("10-12"). */
+  unreadableNutrition: Partial<Record<MacroKey, string>>;
   lines: ReviewLine[];
 };
+
+const NUTRITION_FIELDS = {
+  kcal: "calories",
+  protein: "proteinContent",
+  carbs: "carbohydrateContent",
+  fat: "fatContent",
+  fibre: "fiberContent",
+} as const;
 
 let cachedGroupSlug: Promise<string> | undefined;
 
@@ -107,7 +127,9 @@ const defaults = (): Deps => ({
   },
 });
 
-const isParsed = (i: RawIngredient) => Boolean(i.food?.id || i.unit?.id);
+// A linked recipe has no food of its own and must stay as it is.
+const isParsed = (i: RawIngredient) =>
+  Boolean(i.food?.id || i.unit?.id || i.referencedRecipe);
 
 const originalOf = (i: RawIngredient) =>
   i.originalText || i.note || i.display || i.food?.name || "";
@@ -140,10 +162,16 @@ export async function loadReview(
       return null;
     }
     const raw = recipe.recipeIngredient ?? [];
-    const unparsed = raw.filter((i) => !isParsed(i));
-    const parsed =
+    // Once reviewed, a line without a food is the person's choice to keep it
+    // as text; the parser only makes suggestions for recipes still to review.
+    const reviewed = recipe.extras?.[IMPORT_EXTRAS.review] === "done";
+    const unparsed = reviewed
+      ? []
+      : raw.filter((i) => !isParsed(i) && originalOf(i) !== "");
+    const results =
       unparsed.length > 0 ? await d.parse(unparsed.map(originalOf)) : [];
-    let next = 0;
+    // A short answer from the parser leaves the remaining lines as text.
+    const parsedBy = new Map(unparsed.map((i, n) => [i, results[n]]));
 
     const lines = raw.map((i, index): ReviewLine => {
       const base = {
@@ -162,7 +190,19 @@ export async function loadReview(
           asText: false,
         };
       }
-      const p = parsed[next++];
+      const p = parsedBy.get(i);
+      if (!p) {
+        const confidence = reviewed ? null : 0;
+        return {
+          ...base,
+          quantity: null,
+          unit: null,
+          food: null,
+          note: base.original,
+          confidence,
+          asText: true,
+        };
+      }
       return {
         ...base,
         quantity: p.quantity,
@@ -176,6 +216,13 @@ export async function loadReview(
 
     const base = d.publicUrl?.replace(/\/$/, "");
     const { perServing } = normaliseNutrition(recipe.nutrition);
+    const unreadableNutrition: Partial<Record<MacroKey, string>> = {};
+    for (const macro of MACRO_KEYS) {
+      const text = recipe.nutrition?.[NUTRITION_FIELDS[macro]]?.trim();
+      if (text && perServing[macro] === undefined) {
+        unreadableNutrition[macro] = text;
+      }
+    }
     return {
       slug,
       name: recipe.name,
@@ -190,24 +237,19 @@ export async function loadReview(
         fat: perServing.fat ?? null,
         fibre: perServing.fibre ?? null,
       },
+      unreadableNutrition,
       lines,
     };
   });
 }
 
-const NUTRITION_FIELDS = {
-  kcal: "calories",
-  protein: "proteinContent",
-  carbs: "carbohydrateContent",
-  fat: "fatContent",
-  fibre: "fiberContent",
-} as const;
-
 const keyOf = (name: string) => name.trim().toLowerCase();
 
-/** Resolves each distinct name once; the map is keyed by trimmed lowercase. */
+const CONCURRENCY = 4;
+
+/** Resolves each distinct name once, a few at a time; keyed by trimmed lowercase. */
 async function resolveAll(
-  names: (string | null)[],
+  names: (string | null | undefined)[],
   resolve: (name: string) => Promise<{ id: string; name: string }>
 ) {
   const distinct = new Map<string, string>();
@@ -216,17 +258,32 @@ async function resolveAll(
       distinct.set(keyOf(name), name.trim());
     }
   }
-  const entries = await Promise.all(
-    [...distinct].map(
-      async ([key, name]) => [key, await resolve(name)] as const
-    )
-  );
-  return new Map(entries);
+  const pending = [...distinct];
+  const resolved = new Map<string, { id: string; name: string }>();
+  for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    await Promise.all(
+      pending.slice(i, i + CONCURRENCY).map(async ([key, name]) => {
+        resolved.set(key, await resolve(name));
+      })
+    );
+  }
+  return resolved;
 }
+
+type Named = { id?: string | null; name: string } | null | undefined;
+
+/** Mealie's own food or unit, when the line still names it. */
+const keptRef = (existing: Named, name: string | null) =>
+  existing?.id && name?.trim() && keyOf(existing.name) === keyOf(name)
+    ? { id: existing.id, name: existing.name }
+    : null;
 
 /**
  * Writes the reviewed recipe back to Mealie in one PATCH, creating the foods
- * and units the lines name that Mealie doesn't have yet.
+ * and units the lines name that Mealie doesn't have yet. A PATCH replaces the
+ * whole ingredient list, so each line that came from Mealie gets its hidden
+ * fields (id, original text, linked recipe, substitutions) copied from the
+ * stored ingredient, found by the line's reference id.
  */
 export async function saveReview(
   slug: string,
@@ -240,39 +297,78 @@ export async function saveReview(
       throw new UserFacingError("That recipe no longer exists in Mealie.");
     }
 
-    const real = input.lines.filter((l) => !l.asText && l.food?.trim());
-    const [foods, units] = await Promise.all([
-      resolveAll(
-        real.map((l) => l.food),
+    const stored = new Map(
+      (recipe.recipeIngredient ?? [])
+        .filter((i) => i.referenceId)
+        .map((i) => [i.referenceId!, i])
+    );
+    const storedFor = (l: ReviewInput["lines"][number]) =>
+      l.referenceId ? stored.get(l.referenceId) : undefined;
+    const isText = (l: ReviewInput["lines"][number]) =>
+      l.asText || !l.food?.trim();
+
+    const foodLines = input.lines.filter((l) => !isText(l));
+    const [foods, units] = [
+      await resolveAll(
+        foodLines.map((l) =>
+          keptRef(storedFor(l)?.food, l.food) ? null : l.food
+        ),
         d.findOrCreateFood
       ),
-      resolveAll(
-        real.map((l) => l.unit),
+      await resolveAll(
+        foodLines.map((l) =>
+          keptRef(storedFor(l)?.unit, l.unit) ? null : l.unit
+        ),
         d.findOrCreateUnit
       ),
-    ]);
+    ];
 
     const recipeIngredient = input.lines.map((l) => {
-      if (l.asText || !l.food?.trim()) {
-        return { title: l.title, quantity: 0, note: l.note };
+      const old = storedFor(l);
+      const carried = old
+        ? {
+            referenceId: old.referenceId!,
+            originalText: old.originalText || originalOf(old),
+            ...(old.referencedRecipe
+              ? { referencedRecipe: old.referencedRecipe }
+              : {}),
+            ...(old.substitutions?.length
+              ? { substitutions: old.substitutions }
+              : {}),
+          }
+        : {};
+      if (isText(l)) {
+        return { title: l.title, quantity: 0, note: l.note, ...carried };
       }
-      const unit = l.unit?.trim() ? units.get(keyOf(l.unit)) : undefined;
-      const food = foods.get(keyOf(l.food))!;
+      const unit =
+        keptRef(old?.unit, l.unit) ??
+        (l.unit?.trim() ? units.get(keyOf(l.unit)) : undefined);
+      const food = keptRef(old?.food, l.food) ?? foods.get(keyOf(l.food!))!;
       return {
         title: l.title,
         quantity: l.quantity ?? 0,
         unit: unit ? { id: unit.id, name: unit.name } : null,
         food: { id: food.id, name: food.name },
         note: l.note,
+        ...carried,
       };
-    });
+    }) as NonNullable<Parameters<Deps["patch"]>[1]["recipeIngredient"]>;
 
+    // Text Mealie holds but we can't read as a number ("10-12") shows as an
+    // empty field; saving that field unchanged must not wipe it.
+    const shown = normaliseNutrition(recipe.nutrition).perServing;
     const nutrition: Record<string, string | null> = {
       ...recipe.nutrition,
     };
-    for (const [macro, field] of Object.entries(NUTRITION_FIELDS)) {
-      const value = input.nutrition[macro as MacroKey];
-      nutrition[field] = value === null ? null : String(value);
+    for (const macro of MACRO_KEYS) {
+      const field = NUTRITION_FIELDS[macro];
+      const value = input.nutrition[macro];
+      nutrition[field] =
+        value === (shown[macro] ?? null)
+          ? (recipe.nutrition?.[field] ?? null)
+          : value === null
+            ? null
+            : String(value);
     }
     const anyMacro = Object.values(input.nutrition).some((v) => v !== null);
 

@@ -105,9 +105,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
       (true when the parser found no food) }`. Unparsed lines are sent to `parseIngredients` in
       one call; already-parsed lines (with a food or unit id) are not.
     - `saveReview(slug, input, deps?)`: `input` = `{ servings: number > 0, nutrition:
-      Record<MacroKey, number ≥ 0 | null>, lines: Array<{ title: string | null, asText:
+      Record<MacroKey, number ≥ 0 | null>, lines: Array<{ referenceId?: string | null, title: string | null, asText:
       boolean, quantity: number | null, unit: string | null, food: string | null, note: string
-      }> }` (in order; at most 200 lines). Lines with `asText` (or no food) become note-only
+      }> }` (in order; at most 200 lines). `referenceId` is the line's key from the page: the server finds Mealie's stored ingredient by it and carries over its `referenceId`, `originalText` (set to the displayed line when it had none), `referencedRecipe` and `substitutions`, and keeps its food/unit ids while the names are unchanged. Nutrition fields left as loaded keep Mealie's raw text. Lines with `asText` (or no food) become note-only
       ingredients (`quantity: 0`, `note` = the text); others resolve unit/food names with
       `findOrCreateUnit`/`findOrCreateFood` (each distinct name once). Then one `patchRecipe`:
       `recipeServings`, `nutrition` (numbers as strings; null → null; Mealie's other nutrition

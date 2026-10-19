@@ -121,4 +121,25 @@ describe("reviewInputSchema", () => {
       reviewInputSchema.safeParse(valid({ lines: [noNote] })).success
     ).toBe(false);
   });
+
+  it("accepts a reference id and drops fields it doesn't know", () => {
+    const result = reviewInputSchema.safeParse(
+      valid({
+        lines: [{ ...line, referenceId: "abc", originalText: "evil" }],
+      })
+    );
+    expect(result.success).toBe(true);
+    expect(result.data?.lines[0]).toEqual({ ...line, referenceId: "abc" });
+  });
+
+  it("caps servings at 1000 and amounts at 10000", () => {
+    expect(reviewInputSchema.safeParse(valid({ servings: 1001 })).success).toBe(
+      false
+    );
+    expect(
+      reviewInputSchema.safeParse(
+        valid({ lines: [{ ...line, quantity: 10_001 }] })
+      ).success
+    ).toBe(false);
+  });
 });

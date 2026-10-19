@@ -858,3 +858,248 @@ describe("saveReview", () => {
     });
   });
 });
+
+describe("hidden ingredient fields", () => {
+  const stored = {
+    referenceId: "ref-1",
+    originalText: "2 cups flour, sifted",
+    quantity: 2,
+    unit: { id: "u1", name: "cup" },
+    food: { id: "f1", name: "flour" },
+    note: "sifted",
+    referencedRecipe: { id: "r9", name: "Dough" },
+    substitutions: [{ note: "or spelt" }],
+  };
+
+  it("carries referenceId, originalText, linked recipe and substitutions over from Mealie's ingredient", async () => {
+    const { deps, getRecipe, patch, findOrCreateFood, findOrCreateUnit } =
+      makeDeps();
+    getRecipe.mockResolvedValue(recipe({ recipeIngredient: [stored] }));
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [
+          {
+            ...line({ quantity: 3, unit: "cup", food: "flour", note: "x" }),
+            referenceId: "ref-1",
+          },
+        ],
+      }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        recipeIngredient: [
+          {
+            title: null,
+            quantity: 3,
+            unit: { id: "u1", name: "cup" },
+            food: { id: "f1", name: "flour" },
+            note: "x",
+            referenceId: "ref-1",
+            originalText: "2 cups flour, sifted",
+            referencedRecipe: { id: "r9", name: "Dough" },
+            substitutions: [{ note: "or spelt" }],
+          },
+        ],
+      })
+    );
+    // Names unchanged: Mealie's own ids are kept, nothing is looked up.
+    expect(findOrCreateFood).not.toHaveBeenCalled();
+    expect(findOrCreateUnit).not.toHaveBeenCalled();
+  });
+
+  it("sets originalText to the displayed line when Mealie had none", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({ recipeIngredient: [{ referenceId: "ref-2", note: "1 onion" }] })
+    );
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [
+          { ...line({ asText: true, note: "1 onion" }), referenceId: "ref-2" },
+        ],
+      }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        recipeIngredient: [
+          expect.objectContaining({
+            referenceId: "ref-2",
+            originalText: "1 onion",
+          }),
+        ],
+      })
+    );
+  });
+
+  it("looks up a renamed food instead of keeping the stored id", async () => {
+    const { deps, getRecipe, findOrCreateFood } = makeDeps();
+    getRecipe.mockResolvedValue(recipe({ recipeIngredient: [stored] }));
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [
+          { ...line({ quantity: 1, food: "rye flour" }), referenceId: "ref-1" },
+        ],
+      }),
+      deps
+    );
+
+    expect(findOrCreateFood).toHaveBeenCalledWith("rye flour");
+  });
+
+  it("ignores a reference id Mealie doesn't have", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(recipe({ recipeIngredient: [stored] }));
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [{ ...line({ asText: true, note: "x" }), referenceId: "other" }],
+      }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        recipeIngredient: [{ title: null, quantity: 0, note: "x" }],
+      })
+    );
+  });
+
+  it("does not send a linked-recipe line to the parser", async () => {
+    const { deps, getRecipe, parse } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({
+        recipeIngredient: [
+          { referenceId: "a", note: "Dough", referencedRecipe: { id: "r9" } },
+        ],
+      })
+    );
+
+    const draft = await loadReview("soup", deps);
+
+    expect(parse).not.toHaveBeenCalled();
+    expect(draft?.lines[0]).toMatchObject({ confidence: null, asText: false });
+  });
+});
+
+describe("nutrition Mealie holds as text", () => {
+  it("keeps unreadable text when the field is left empty, and shows it", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({ nutrition: { calories: "10-12", fatContent: "3 mg" } })
+    );
+
+    const draft = await loadReview("soup", deps);
+    expect(draft?.unreadableNutrition).toEqual({ kcal: "10-12", fat: "3 mg" });
+
+    await saveReview(
+      "soup",
+      input({ nutrition: { ...NO_NUTRITION, protein: 9 } }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        nutrition: expect.objectContaining({
+          calories: "10-12",
+          fatContent: "3 mg",
+          proteinContent: "9",
+        }),
+      })
+    );
+  });
+});
+
+describe("a short answer from the parser", () => {
+  it("leaves the lines it didn't answer for as text", async () => {
+    const { deps, getRecipe, parse } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({ recipeIngredient: [{ note: "1 onion" }, { note: "salt" }] })
+    );
+    parse.mockResolvedValue([
+      parsedLine({ food: { id: null, name: "onion" } }),
+    ]);
+
+    const draft = await loadReview("soup", deps);
+
+    expect(draft?.lines[1]).toMatchObject({
+      original: "salt",
+      food: null,
+      note: "salt",
+      asText: true,
+    });
+  });
+});
+
+describe("loadReview after the recipe was reviewed", () => {
+  const lines = [
+    {
+      referenceId: "a",
+      originalText: "1 onion, chopped",
+      note: "1 onion, chopped",
+    },
+    {
+      referenceId: "b",
+      quantity: 1,
+      food: { id: "f1", name: "flour" },
+      note: "",
+    },
+  ];
+
+  it("loads unparsed lines as text without asking the parser", async () => {
+    const { deps, getRecipe, parse } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({
+        extras: { scrappyReview: "done" },
+        recipeIngredient: lines,
+      })
+    );
+
+    const draft = await loadReview("soup", deps);
+
+    expect(parse).not.toHaveBeenCalled();
+    expect(draft?.lines[0]).toEqual({
+      key: "a",
+      original: "1 onion, chopped",
+      title: null,
+      quantity: null,
+      unit: null,
+      food: null,
+      note: "1 onion, chopped",
+      confidence: null,
+      asText: true,
+    });
+    expect(draft?.lines[1]).toMatchObject({ food: "flour", asText: false });
+  });
+
+  it.each([
+    ["pending", { scrappyReview: "pending" }],
+    ["no key", {}],
+  ])("still parses unparsed lines when review is %s", async (_l, extras) => {
+    const { deps, getRecipe, parse } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({ extras, recipeIngredient: [lines[0]] })
+    );
+    parse.mockResolvedValue([
+      parsedLine({ food: { id: null, name: "onion" } }),
+    ]);
+
+    await loadReview("soup", deps);
+
+    expect(parse).toHaveBeenCalledWith(["1 onion, chopped"]);
+  });
+});

@@ -23,18 +23,25 @@ const SOURCE_LABELS = {
 
 const LOW_CONFIDENCE = 0.8;
 
-const input = "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
+const inputClass =
+  "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
 
 /** Empty is "not set" (null); anything unreadable becomes NaN and is refused. */
 const toNumber = (text: string): number | null =>
   text.trim() === "" ? null : Number(text.trim().replace(",", "."));
 
+const macroTexts = (draft: ReviewDraft) =>
+  Object.fromEntries(
+    MACROS.map((m) => [m.key, String(draft.nutrition[m.key] ?? "")])
+  );
+
 export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
   const [servings, setServings] = useState(String(draft.servings ?? ""));
-  const [nutrition, setNutrition] = useState(
-    Object.fromEntries(
-      MACROS.map((m) => [m.key, String(draft.nutrition[m.key] ?? "")])
-    )
+  const [nutrition, setNutrition] = useState(macroTexts(draft));
+  // What the fields held when loaded or last saved, to tell edits apart.
+  const [baseline, setBaseline] = useState(macroTexts(draft));
+  const [nutritionSource, setNutritionSource] = useState(
+    draft.importState.nutrition
   );
   const [lines, setLines] = useState(
     draft.lines.map((l) => ({
@@ -42,11 +49,11 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
       quantity: String(l.quantity ?? ""),
       unit: l.unit ?? "",
       food: l.food ?? "",
-      note: l.note,
+      // The parser's leftover words ("pinches") would lose the rest of a
+      // plain-text line, so those start from the whole line.
+      note: l.asText ? l.original : l.note,
+      noteEdited: false,
     }))
-  );
-  const [nutritionSource, setNutritionSource] = useState(
-    draft.importState.nutrition
   );
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
@@ -56,10 +63,23 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
     setLines((all) => all.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   };
 
+  const toggleText = (i: number, asText: boolean) => {
+    const line = draft.lines[i];
+    setLine(i, {
+      asText,
+      ...(lines[i].noteEdited
+        ? {}
+        : { note: asText ? line.original : line.note }),
+    });
+  };
+
   const anyMacro = Object.values(nutrition).some((v) => v.trim() !== "");
-  const nutritionLabel = anyMacro
-    ? SOURCE_LABELS[nutritionSource ?? "source"]
-    : "Missing";
+  const edited = MACROS.some((m) => nutrition[m.key] !== baseline[m.key]);
+  const nutritionLabel = !anyMacro
+    ? "Missing"
+    : edited
+      ? "Edited"
+      : SOURCE_LABELS[nutritionSource ?? "source"];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,13 +88,15 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
     startTransition(async () => {
       const result = await saveReviewAction({
         slug: draft.slug,
-        servings: toNumber(servings) as number,
+        // NaN is refused by the server with a message about servings.
+        servings: toNumber(servings) ?? Number.NaN,
         nutrition: Object.fromEntries(
           MACROS.map((m) => [m.key, toNumber(nutrition[m.key])])
         ) as Record<(typeof MACROS)[number]["key"], number | null>,
         lines: lines.map((l, i) => {
           const asText = l.asText || l.food.trim() === "";
           return {
+            referenceId: draft.lines[i].key,
             title: draft.lines[i].title,
             asText,
             quantity: toNumber(l.quantity),
@@ -92,47 +114,21 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
         return;
       }
       setNutritionSource(anyMacro ? "reviewed" : null);
+      setBaseline(nutrition);
       setSaved(true);
     });
   };
 
   return (
     <form onSubmit={submit} noValidate className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold">{draft.name}</h1>
-        <p className="mt-1 flex gap-4 text-sm">
-          {draft.sourceUrl && (
-            <a
-              href={draft.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              Source
-            </a>
-          )}
-          {draft.mealieUrl && (
-            <a
-              href={draft.mealieUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              Open in Mealie
-            </a>
-          )}
-        </p>
-      </div>
-
       <label className="block">
         <span className="text-sm text-muted">Servings</span>
         <input
-          type="number"
+          type="text"
           inputMode="decimal"
-          step="any"
           value={servings}
           onChange={(e) => setServings(e.target.value)}
-          className={input}
+          className={inputClass}
         />
       </label>
 
@@ -144,15 +140,19 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
             <label key={m.key} className="block">
               <span className="text-sm text-muted">{m.label}</span>
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
-                step="any"
                 value={nutrition[m.key]}
                 onChange={(e) =>
                   setNutrition((n) => ({ ...n, [m.key]: e.target.value }))
                 }
-                className={input}
+                className={inputClass}
               />
+              {draft.unreadableNutrition[m.key] && (
+                <span className="text-xs text-muted">
+                  Mealie has: {draft.unreadableNutrition[m.key]}
+                </span>
+              )}
             </label>
           ))}
         </div>
@@ -164,6 +164,7 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
           const state = lines[i];
           const low =
             line.confidence !== null && line.confidence < LOW_CONFIDENCE;
+          const hint = low ? `check-${i}` : undefined;
           return (
             <div key={line.key}>
               {line.title && (
@@ -176,36 +177,41 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
               >
                 <legend className="px-1 text-sm">{line.original}</legend>
                 {low && (
-                  <p className="mb-2 text-sm text-danger">Check this line</p>
+                  <p id={hint} className="mb-2 text-sm text-danger">
+                    Check this line
+                  </p>
                 )}
                 {!state.asText && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <label className="block">
                       <span className="text-sm text-muted">Amount</span>
                       <input
                         type="text"
                         inputMode="decimal"
+                        aria-describedby={hint}
                         value={state.quantity}
                         onChange={(e) =>
                           setLine(i, { quantity: e.target.value })
                         }
-                        className={input}
+                        className={inputClass}
                       />
                     </label>
                     <label className="block">
                       <span className="text-sm text-muted">Unit</span>
                       <input
+                        aria-describedby={hint}
                         value={state.unit}
                         onChange={(e) => setLine(i, { unit: e.target.value })}
-                        className={input}
+                        className={inputClass}
                       />
                     </label>
-                    <label className="block">
+                    <label className="col-span-2 block sm:col-span-1">
                       <span className="text-sm text-muted">Food</span>
                       <input
+                        aria-describedby={hint}
                         value={state.food}
                         onChange={(e) => setLine(i, { food: e.target.value })}
-                        className={input}
+                        className={inputClass}
                       />
                     </label>
                   </div>
@@ -213,16 +219,19 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                 <label className="mt-2 block">
                   <span className="text-sm text-muted">Note</span>
                   <input
+                    aria-describedby={hint}
                     value={state.note}
-                    onChange={(e) => setLine(i, { note: e.target.value })}
-                    className={input}
+                    onChange={(e) =>
+                      setLine(i, { note: e.target.value, noteEdited: true })
+                    }
+                    className={inputClass}
                   />
                 </label>
                 <label className="mt-2 flex items-center gap-1.5">
                   <input
                     type="checkbox"
                     checked={state.asText}
-                    onChange={(e) => setLine(i, { asText: e.target.checked })}
+                    onChange={(e) => toggleText(i, e.target.checked)}
                   />
                   <span className="text-sm">Keep as text</span>
                 </label>
@@ -237,7 +246,8 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
           {error}
         </p>
       )}
-      {saved && <output className="block text-sm">Saved</output>}
+      {/* Always in the page so screen readers announce "Saved" when it appears. */}
+      <output className="block text-sm">{saved ? "Saved" : ""}</output>
       <div className="flex items-center gap-4">
         <button
           type="submit"

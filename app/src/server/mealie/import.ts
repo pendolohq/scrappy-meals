@@ -120,6 +120,7 @@ export async function getRawRecipe(
 }
 
 const SEARCH_PAGE = 50;
+const MAX_SEARCH_PAGES = 10;
 
 type Named = {
   id: string;
@@ -128,6 +129,8 @@ type Named = {
   abbreviation?: string | null;
   pluralAbbreviation?: string | null;
 };
+
+type Page = { items: Named[]; total_pages?: number };
 
 const normalise = (text: string) => text.trim().toLowerCase();
 
@@ -141,6 +144,24 @@ function pick(items: Named[], wanted: string, fields: (keyof Named)[]) {
   return hit ? { id: hit.id, name: hit.name } : null;
 }
 
+/** Looks through the search results page by page; a common word can match many. */
+async function searchAll(
+  fetchPage: (page: number) => Promise<Page>,
+  wanted: string,
+  fields: (keyof Named)[]
+) {
+  let totalPages = 1;
+  for (let page = 1; page <= Math.min(totalPages, MAX_SEARCH_PAGES); page++) {
+    const result = await fetchPage(page);
+    const found = pick(result.items, wanted, fields);
+    if (found) {
+      return found;
+    }
+    totalPages = result.total_pages ?? 1;
+  }
+  return null;
+}
+
 /** An existing food with this name (or plural), else a new one. */
 export async function findOrCreateFood(
   name: string,
@@ -148,12 +169,23 @@ export async function findOrCreateFood(
 ): Promise<{ id: string; name: string }> {
   const client = opts.client ?? mealie();
   const wanted = normalise(name);
-  const page = unwrap(
-    await client.GET("/api/foods", {
-      params: { query: { search: wanted, perPage: SEARCH_PAGE } },
-    })
+  const found = await searchAll(
+    async (page) =>
+      unwrap(
+        await client.GET("/api/foods", {
+          params: {
+            query: {
+              search: wanted,
+              orderBy: "name",
+              page,
+              perPage: SEARCH_PAGE,
+            },
+          },
+        })
+      ),
+    wanted,
+    ["name", "pluralName"]
   );
-  const found = pick(page.items, wanted, ["name", "pluralName"]);
   if (found) {
     return found;
   }
@@ -170,17 +202,23 @@ export async function findOrCreateUnit(
 ): Promise<{ id: string; name: string }> {
   const client = opts.client ?? mealie();
   const wanted = normalise(name);
-  const page = unwrap(
-    await client.GET("/api/units", {
-      params: { query: { search: wanted, perPage: SEARCH_PAGE } },
-    })
+  const found = await searchAll(
+    async (page) =>
+      unwrap(
+        await client.GET("/api/units", {
+          params: {
+            query: {
+              search: wanted,
+              orderBy: "name",
+              page,
+              perPage: SEARCH_PAGE,
+            },
+          },
+        })
+      ),
+    wanted,
+    ["name", "pluralName", "abbreviation", "pluralAbbreviation"]
   );
-  const found = pick(page.items, wanted, [
-    "name",
-    "pluralName",
-    "abbreviation",
-    "pluralAbbreviation",
-  ]);
   if (found) {
     return found;
   }
