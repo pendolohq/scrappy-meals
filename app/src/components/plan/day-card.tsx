@@ -1,0 +1,91 @@
+import { formatDay } from "@/lib/format";
+import { personDayTotals } from "@/server/domain/macros";
+import type { Member, PlannedMeal, SlotType } from "@/server/plan";
+
+import { AddMeal } from "./add-meal";
+import { MealRow } from "./meal-row";
+import { PersonTotals } from "./person-totals";
+
+const SLOTS: { slot: SlotType; label: string }[] = [
+  { slot: "breakfast", label: "Breakfast" },
+  { slot: "lunch", label: "Lunch" },
+  { slot: "dinner", label: "Dinner" },
+  { slot: "snack", label: "Snack" },
+];
+
+export function DayCard({
+  date,
+  meals,
+  members,
+  isToday,
+}: {
+  date: string;
+  meals: PlannedMeal[];
+  members: Member[];
+  isToday: boolean;
+}) {
+  const forMacros = meals.map((m) => ({
+    nutrition: m.recipe?.nutrition ?? null,
+    recipeName: m.recipe?.name ?? m.slug,
+    baseServings: m.baseServings,
+    portions: m.portions,
+  }));
+  const cols = {
+    gridTemplateColumns: `repeat(${Math.max(members.length, 1)}, minmax(0, 1fr))`,
+  };
+
+  return (
+    <section
+      id={date}
+      aria-label={formatDay(date)}
+      className={`rounded-xl border bg-card p-3 ${isToday ? "border-accent" : "border-border"}`}
+    >
+      <h2 className="mb-3 flex items-center gap-2 font-semibold">
+        {formatDay(date)}
+        {isToday && (
+          <span className="rounded-full bg-accent px-2 text-xs text-white dark:text-stone-900">
+            Today
+          </span>
+        )}
+      </h2>
+
+      {members.length > 0 && (
+        <div
+          className="mb-3 grid gap-3 border-b border-border pb-3"
+          style={cols}
+        >
+          {members.map((m) => (
+            <PersonTotals
+              key={m.id}
+              member={m}
+              totals={personDayTotals(forMacros, m.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {SLOTS.map(({ slot, label }) => {
+          const inSlot = meals.filter((m) => m.slot === slot);
+          return (
+            <div key={slot}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
+                  {label}
+                </h3>
+                <AddMeal date={date} slot={slot} label={label} />
+              </div>
+              {inSlot.length > 0 && (
+                <ul className="divide-y divide-border">
+                  {inSlot.map((meal) => (
+                    <MealRow key={meal.id} meal={meal} members={members} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

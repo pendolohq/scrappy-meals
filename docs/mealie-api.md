@@ -26,7 +26,7 @@ then run `pnpm typecheck` and `pnpm test:integration`.
 |---|---|
 | Search / list recipes | `GET /api/recipes?search=&page=&perPage=` (paginated: `items`, `total`, `total_pages`) |
 | Recipe detail | `GET /api/recipes/{slug}` (404 if unknown) |
-| Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` |
+| Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` (proxied by the app at `/api/recipe-images/{id}`, signed-in users only) |
 | Find list by name | `GET /api/households/shopping/lists?queryFilter=name = "..."` |
 | Create list | `POST /api/households/shopping/lists` |
 | List items | `GET /api/households/shopping/lists/{id}` (`listItems`) |
