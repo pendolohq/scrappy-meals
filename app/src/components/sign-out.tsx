@@ -2,7 +2,7 @@
 
 import { clearCachedPages } from "./pwa";
 
-export function SignOut({ action, name }: { action: () => Promise<void>; name: string }) {
+export const SignOut = ({ action, name }: { action: () => Promise<void>; name: string }) => {
   return (
     <form action={action} onSubmit={clearCachedPages}>
       <button type="submit" className="text-sm text-muted">
@@ -10,4 +10,4 @@ export function SignOut({ action, name }: { action: () => Promise<void>; name: s
       </button>
     </form>
   );
-}
+};

@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { login, type LoginState } from "./actions";
 
-export function LoginForm({ next }: { next?: string }) {
+export const LoginForm = ({ next }: { next?: string }) => {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, {});
   return (
     <form action={action} className="space-y-4">
@@ -43,4 +43,4 @@ export function LoginForm({ next }: { next?: string }) {
       </button>
     </form>
   );
-}
+};

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** Registers the service worker (production only) and shows a banner while offline. */
-export function Pwa() {
+export const Pwa = () => {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
@@ -22,13 +22,13 @@ export function Pwa() {
 
   if (!offline) return null;
   return (
-    <div role="status" className="sticky top-0 z-10 bg-danger px-4 py-1.5 text-center text-sm text-white">
+    <output className="sticky top-0 block z-10 bg-danger px-4 py-1.5 text-center text-sm text-white">
       Offline: showing the last saved copy. Changes won&apos;t save until you&apos;re back online.
-    </div>
+    </output>
   );
-}
+};
 
 /** Asks the service worker to drop cached pages (call on sign-out). */
-export function clearCachedPages() {
+export const clearCachedPages = () => {
   navigator.serviceWorker?.controller?.postMessage("clear-pages");
-}
+};

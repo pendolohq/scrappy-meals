@@ -18,7 +18,7 @@ const TARGETS = [
 
 const input = "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
 
-export function SettingsForm({ profile }: { profile: ProfileInput }) {
+export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettings, {});
 
   return (
@@ -87,4 +87,4 @@ export function SettingsForm({ profile }: { profile: ProfileInput }) {
       </button>
     </form>
   );
-}
+};

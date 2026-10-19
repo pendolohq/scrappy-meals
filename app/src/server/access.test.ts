@@ -7,8 +7,8 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const touched = vi.hoisted(() => vi.fn());
-vi.mock("@/auth", () => ({ auth: async () => null, signIn: vi.fn(), signOut: vi.fn() }));
+const touched = vi.hoisted(() => vi.fn<(what: string) => void>());
+vi.mock("@/auth", () => ({ auth: async () => null, signIn: vi.fn<() => void>(), signOut: vi.fn<() => void>() }));
 vi.mock("@/server/db/client", () => ({
   getDb: () => {
     touched("database");
@@ -22,7 +22,7 @@ vi.mock("@/server/mealie/client", async (original) => ({
     throw new Error("Mealie used without a session");
   },
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn<() => void>() }));
 
 import { SIGNED_OUT } from "./action";
 
@@ -60,7 +60,7 @@ describe("server actions", () => {
         // Called both ways: (input) for plain actions, (prevState, formData) for forms.
         for (const args of [[{}], [{}, new FormData()]]) {
           const result = await (fn as (...a: unknown[]) => Promise<unknown>)(...args);
-          expect(result, name).toEqual({ error: SIGNED_OUT });
+          expect({ name, result }).toEqual({ name, result: { error: SIGNED_OUT } });
         }
       }
       expect(touched).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe("route handlers", () => {
         const req = new NextRequest("http://localhost/x?q=soup", { method });
         const ctx = { params: Promise.resolve({ id: "7b0c1c9e-4c1a-4f55-9a0e-2f4d8d6f2a10" }) };
         const res = await (mod[method] as (r: Request, c: unknown) => Promise<Response>)(req, ctx);
-        expect(res.status, method).toBe(401);
+        expect({ method, status: res.status }).toEqual({ method, status: 401 });
       }
       expect(touched).not.toHaveBeenCalled();
     });

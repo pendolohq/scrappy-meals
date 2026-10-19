@@ -12,7 +12,7 @@ type SearchState = {
   error?: string;
 };
 
-function useRecipeSearch(query: string, enabled: boolean): SearchState {
+const useRecipeSearch = (query: string, enabled: boolean): SearchState => {
   const [state, setState] = useState<SearchState>({
     status: "idle",
     items: [],
@@ -45,9 +45,9 @@ function useRecipeSearch(query: string, enabled: boolean): SearchState {
     };
   }, [query, enabled]);
   return state;
-}
+};
 
-export function AddMeal({
+export const AddMeal = ({
   date,
   slot,
   label,
@@ -55,7 +55,7 @@ export function AddMeal({
   date: string;
   slot: SlotType;
   label: string;
-}) {
+}) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -174,4 +174,4 @@ export function AddMeal({
       </dialog>
     </>
   );
-}
+};

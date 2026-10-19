@@ -4,8 +4,9 @@ import { defineConfig } from "vitest/config";
 
 const alias = {
   "@": fileURLToPath(new URL("./src", import.meta.url)),
-  // `server-only` throws outside React Server Components; tests run in plain Node.
-  "server-only": fileURLToPath(new URL("./test/server-only-stub.ts", import.meta.url)),
+  // `server-only` throws outside React Server Components; tests run in plain Node,
+  // so they get the package's own no-op build (what the react-server condition picks).
+  "server-only": fileURLToPath(new URL("./node_modules/server-only/empty.js", import.meta.url)),
 };
 
 export default defineConfig({

@@ -10,7 +10,7 @@ type Log = { status: AdherenceStatus; note: string | null } | undefined;
 const BUTTONS: AdherenceStatus[] = ["stuck", "partial", "skipped", "swapped"];
 
 /** Your own one-tap log for a meal (tap the active one again to clear). */
-export function AdherenceButtons({
+export const AdherenceButtons = ({
   mealId,
   mealName,
   log,
@@ -18,7 +18,7 @@ export function AdherenceButtons({
   mealId: string;
   mealName: string;
   log: Log;
-}) {
+}) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [current, setOptimistic] = useOptimistic(
@@ -54,9 +54,8 @@ export function AdherenceButtons({
 
   return (
     <div className="space-y-1">
-      <div
-        className="flex justify-center gap-1"
-        role="group"
+      <fieldset
+        className="flex min-w-0 justify-center gap-1"
         aria-label={`How did ${mealName} go?`}
       >
         {BUTTONS.map((s) => {
@@ -84,7 +83,7 @@ export function AdherenceButtons({
             </button>
           );
         })}
-      </div>
+      </fieldset>
       {current?.status === "swapped" && current.note && (
         <p className="truncate text-center text-xs text-muted">
           Had: {current.note}
@@ -97,10 +96,10 @@ export function AdherenceButtons({
       )}
     </div>
   );
-}
+};
 
 /** Someone else's log, read-only. */
-export function AdherenceBadge({ log }: { log: Log }) {
+export const AdherenceBadge = ({ log }: { log: Log }) => {
   if (!log) return null;
   const { icon, label } = STATUS_LABEL[log.status];
   return (
@@ -112,4 +111,4 @@ export function AdherenceBadge({ log }: { log: Log }) {
       {log.note ? `: ${log.note}` : ""}
     </p>
   );
-}
+};

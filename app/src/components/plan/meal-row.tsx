@@ -14,7 +14,7 @@ import type { Member, PlannedMeal } from "@/server/plan";
 
 const STEP = 0.25;
 
-function Flags({ meal }: { meal: PlannedMeal }) {
+const Flags = ({ meal }: { meal: PlannedMeal }) => {
   const flags: string[] = [];
   if (!meal.recipe) flags.push("Not found in Mealie");
   else {
@@ -32,9 +32,9 @@ function Flags({ meal }: { meal: PlannedMeal }) {
       ))}
     </ul>
   );
-}
+};
 
-function Stepper({
+const Stepper = ({
   label,
   value,
   onChange,
@@ -44,13 +44,12 @@ function Stepper({
   value: number;
   onChange: (v: number) => void;
   min?: number;
-}) {
+}) => {
   const btn =
     "h-8 w-8 rounded-full border border-border text-lg leading-none disabled:opacity-40";
   return (
-    <div
-      className="flex items-center justify-center gap-1.5"
-      role="group"
+    <fieldset
+      className="flex min-w-0 items-center justify-center gap-1.5"
       aria-label={label}
     >
       <button
@@ -77,11 +76,11 @@ function Stepper({
       >
         +
       </button>
-    </div>
+    </fieldset>
   );
-}
+};
 
-export function MealRow({
+export const MealRow = ({
   meal,
   members,
   currentUserId,
@@ -92,7 +91,7 @@ export function MealRow({
   currentUserId: string;
   /** True from the meal's day onwards: adherence can't be logged in advance. */
   canLog: boolean;
-}) {
+}) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [open, setOpen] = useState(false);
@@ -225,4 +224,4 @@ export function MealRow({
       )}
     </li>
   );
-}
+};

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-const auth = vi.hoisted(() => vi.fn());
+const auth = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 vi.mock("@/auth", () => ({ auth }));
 
 import { SIGNED_OUT, userAction, userFormAction } from "./action";
@@ -10,7 +10,9 @@ import { UserFacingError } from "./errors";
 const alex = { id: "7b0c1c9e-4c1a-4f55-9a0e-2f4d8d6f2a10", name: "Alex", email: "alex@example.test" };
 
 describe("userAction", () => {
-  const handler = vi.fn(async (input: { n: number }, user: { id: string }) => ({ n: input.n, by: user.id }));
+  const handler = vi.fn<(input: { n: number }, user: { id: string }) => Promise<{ n: number; by: string }>>(
+    async (input, user) => ({ n: input.n, by: user.id }),
+  );
   const action = userAction(z.object({ n: z.number().int() }), handler);
 
   beforeEach(() => {

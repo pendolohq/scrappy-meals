@@ -13,7 +13,7 @@ const SLOTS: { slot: SlotType; label: string }[] = [
   { slot: "snack", label: "Snack" },
 ];
 
-export function DayCard({
+export const DayCard = ({
   date,
   meals,
   members,
@@ -29,7 +29,7 @@ export function DayCard({
   currentUserId: string;
   isToday: boolean;
   isPastOrToday: boolean;
-}) {
+}) => {
   const forMacros = meals.map((m) => ({
     nutrition: m.recipe?.nutrition ?? null,
     recipeName: m.recipe?.name ?? m.slug,
@@ -106,4 +106,4 @@ export function DayCard({
       </div>
     </section>
   );
-}
+};

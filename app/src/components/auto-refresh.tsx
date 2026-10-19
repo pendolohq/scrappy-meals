@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 /** Picks up the other person's changes: refreshes on focus and every `seconds` while visible. */
-export function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
+export const AutoRefresh = ({ seconds = 30 }: { seconds?: number }) => {
   const router = useRouter();
   useEffect(() => {
     const refresh = () => {
@@ -20,4 +20,4 @@ export function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
     };
   }, [router, seconds]);
   return null;
-}
+};

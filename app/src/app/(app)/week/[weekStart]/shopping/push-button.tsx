@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { pushShoppingAction, type PushState } from "./actions";
 
-export function PushButton({
+export const PushButton = ({
   weekStart,
   disabled,
   pushedBefore,
@@ -12,7 +12,7 @@ export function PushButton({
   weekStart: string;
   disabled: boolean;
   pushedBefore: boolean;
-}) {
+}) => {
   const [state, action, pending] = useActionState<PushState, FormData>(
     pushShoppingAction,
     {},
@@ -43,7 +43,7 @@ export function PushButton({
         </p>
       )}
       {state.ok && (
-        <p className="text-sm" role="status">
+        <output className="block text-sm">
           Added {state.ok.added} item{state.ok.added === 1 ? "" : "s"} to “
           {state.ok.listName}”
           {state.ok.replaced ? `, replacing ${state.ok.replaced}` : ""}.{" "}
@@ -57,8 +57,8 @@ export function PushButton({
               Open in Mealie
             </a>
           )}
-        </p>
+        </output>
       )}
     </form>
   );
-}
+};

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { testDbUrl, useTestDb } from "../../test/db";
 import type { Recipe } from "./mealie/recipes";
 import { addMeal, getWeekPlan, PlanError, removeMeal, setBaseServings, setPortion } from "./plan";
-import { loadRecipes } from "./recipe-cache";
+import { loadRecipes, type RecipeFetcher } from "./recipe-cache";
 import { createUser } from "./users";
 
 const recipe = (slug: string, kcal = 400): Recipe => ({
@@ -19,7 +19,7 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
 
 describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
   const db = useTestDb();
-  const fetch = vi.fn(async (slug: string) => (slug === "gone" ? null : recipe(slug)));
+  const fetch = vi.fn<RecipeFetcher>(async (slug: string) => (slug === "gone" ? null : recipe(slug)));
   const pw = "correct horse battery";
 
   async function twoUsers() {
@@ -80,12 +80,12 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
 
   it("caches recipes, refreshes stale ones, and keeps stale copies when Mealie is down", async () => {
     const t0 = new Date("2026-10-19T10:00:00Z");
-    const f = vi.fn(async (slug: string) => recipe(slug, 300));
+    const f = vi.fn<RecipeFetcher>(async (slug: string) => recipe(slug, 300));
     await loadRecipes(db, ["soup"], { fetch: f, now: t0 });
     await loadRecipes(db, ["soup"], { fetch: f, now: new Date(t0.getTime() + 30 * 60_000) });
     expect(f).toHaveBeenCalledTimes(1); // fresh enough
 
-    const down = vi.fn(async () => {
+    const down = vi.fn<RecipeFetcher>(async () => {
       throw new Error("ECONNREFUSED");
     });
     const later = new Date(t0.getTime() + 2 * 3600_000);
