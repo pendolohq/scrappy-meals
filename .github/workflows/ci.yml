@@ -60,6 +60,7 @@ jobs:
       - run: pnpm test:integration
         env:
           MEALIE_TEST_URL: http://localhost:9000
+          DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
       - name: Migrations match the schema
         run: |
           DATABASE_URL=unused pnpm drizzle-kit generate --name ci-check

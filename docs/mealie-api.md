@@ -69,3 +69,16 @@ then run `pnpm typecheck` and `pnpm test:integration`.
   combines its own lines.
 - `recipeReferences: [{ recipeId }]` links an item to the recipes it came from;
   Mealie shows these on the item.
+
+## How the planner pushes a week
+
+- One Mealie list per week, named `Scrappy Meals · week of <d Mon yyyy>`.
+  Its id and the ids of the items the planner created are kept in
+  `shopping_pushes`.
+- Pushing again deletes those items (ticked or not) and adds the new set, so
+  the list always matches the plan. Items added by hand in Mealie stay. If
+  the list was deleted in Mealie, a new one is created.
+- Parsed lines go in with `foodId`/`unitId` and a recipe reference; unparsed
+  lines go in as notes ("a squeeze of lemon (×2) · Red Lentil Soup").
+- Links to the list use `MEALIE_PUBLIC_URL` (`https://recipes.<domain>` in
+  compose) + `/shopping-lists/<id>`.

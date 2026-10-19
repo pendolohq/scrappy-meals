@@ -44,6 +44,12 @@ export default async function WeekPage({
             {formatRange(weekStart, addDays(weekStart, 6))}
           </h1>
           <Link
+            href={`/week/${weekStart}/shopping`}
+            className="mr-3 text-xs text-accent"
+          >
+            Shopping
+          </Link>
+          <Link
             href={`/week/${weekStart}/adherence`}
             className="mr-3 text-xs text-accent"
           >
