@@ -7,7 +7,7 @@ import { userFormAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { isIsoDate, weekStartOf } from "@/server/domain/week";
 import { UserFacingError } from "@/server/errors";
-import { MealieError } from "@/server/mealie/client";
+import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
 import { pushShoppingList } from "@/server/shopping";
 
 export type PushState = {
@@ -38,13 +38,16 @@ export const pushShoppingAction = userFormAction(
       revalidatePath(`/week/${weekStart}/shop`);
       return { ok: res };
     } catch (err) {
-      if (
-        err instanceof MealieError ||
-        (err as Error).name === "TimeoutError"
-      ) {
+      if (isMealieUnavailable(err)) {
         console.error("shopping push failed", err);
         throw new UserFacingError(
-          "Mealie didn't accept the list. Is it running? Nothing was changed on our side."
+          "Mealie didn't answer. Is it running? Nothing was changed on our side."
+        );
+      }
+      if (err instanceof MealieError) {
+        console.error("Mealie refused the shopping list", err);
+        throw new UserFacingError(
+          "Mealie didn't accept the list. Nothing was changed on our side."
         );
       }
       throw err;

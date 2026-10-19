@@ -134,7 +134,7 @@ Decisions already taken:
 
 ## M2 — When Mealie is down
 
-- [ ] **Task 9: One "Mealie unavailable" check**
+- [x] **Task 9: One "Mealie unavailable" check**
   **Complexity:** S
   **Do:** in `server/mealie/client.ts`, catch network and abort errors in the fetch wrapper and
   rethrow them as `MealieUnavailableError` (with the original as `cause`). Only undici's

@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 
-import { MealieError } from "@/server/mealie/client";
+import { MealieError, MealieUnavailableError } from "@/server/mealie/client";
 import { searchRecipes } from "@/server/mealie/recipes";
 import { userRoute } from "@/server/session";
 
@@ -16,7 +16,9 @@ export const GET = userRoute(async (req: NextRequest) => {
     return Response.json(await searchRecipes(q, { page, perPage: 20 }));
   } catch (err) {
     console.error("recipe search failed", err);
-    const status = err instanceof MealieError ? 502 : 500;
+    const fromMealie =
+      err instanceof MealieError || err instanceof MealieUnavailableError;
+    const status = fromMealie ? 502 : 500;
     return Response.json(
       { error: "Mealie is not reachable right now" },
       { status }

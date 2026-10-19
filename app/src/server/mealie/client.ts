@@ -26,6 +26,20 @@ export class MealieError extends Error {
   }
 }
 
+/**
+ * Mealie couldn't be reached at all: connection refused, name not resolving,
+ * or no answer before the timeout. Thrown by the client's fetch, so it never
+ * wraps a bug in our own code.
+ */
+export class MealieUnavailableError extends Error {
+  name = "MealieUnavailableError";
+}
+
+/** Mealie is down, overloaded or unreachable: worth trying again later. */
+export const isMealieUnavailable = (err: unknown) =>
+  err instanceof MealieUnavailableError ||
+  (err instanceof MealieError && (err.status >= 500 || err.status === 429));
+
 function describe(detail: unknown): string {
   if (typeof detail === "string") {
     return detail;
@@ -54,10 +68,18 @@ export function createMealieClient(opts: {
 
   const client = createClient<paths>({
     baseUrl: opts.baseUrl.replace(/\/$/, ""),
-    fetch: (req) =>
-      (opts.fetch ?? fetch)(
-        new Request(req, { signal: AbortSignal.timeout(timeoutMs) })
-      ),
+    fetch: async (req) => {
+      try {
+        return await (opts.fetch ?? fetch)(
+          new Request(req, { signal: AbortSignal.timeout(timeoutMs) })
+        );
+      } catch (err) {
+        throw new MealieUnavailableError(
+          `Mealie ${new URL(req.url).pathname} unreachable`,
+          { cause: err }
+        );
+      }
+    },
   });
   client.use(auth);
   return client;
