@@ -48,16 +48,37 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   Mealie itself refuses loopback and private addresses (`safehttp`), so this is a second
   layer, not the only one.
   Rate-limited per user (20 an hour, `createRateLimiter`). If a recipe with the same
-  `orgURL` exists, link to it instead of importing again. On success: parse the ingredients,
-  `PATCH` the parsed lines plus `extras` (`scrappyReview: pending`, `scrappyNutrition:
-  source` when the page had nutrition), then redirect to the review page. Follow
+  `orgURL` exists, link to it instead of importing again. On success: `PATCH` only `extras`
+  (`scrappyReview: pending`, `scrappyNutrition: source` when the page had any nutrition), then
+  redirect to the review page. Ingredients are parsed by the review page, not here: the parser
+  names foods and units Mealie may not have yet, which only the review's save creates. Follow
   `docs/security.md`; `access.test.ts` must pass unchanged.
+
+  Interfaces:
+  - `src/server/domain/recipe-url.ts` (pure): `normaliseRecipeUrl(input: string)` →
+    `{ ok: true, url: string } | { ok: false, error: string }`. Trims; at most 2048 chars;
+    `http:`/`https:` only; no username/password; hostname must contain a dot; drops the
+    `#fragment`; returns `new URL(...).href`.
+  - `src/server/recipe-import.ts` (server-only): `importRecipe(url, userId, deps?)` →
+    `{ status: "imported", slug } | { status: "exists", slug, name }`. `deps` (all optional,
+    for tests): `find`, `importFromUrl`, `getRecipe`, `patch`, `limiter`. Throws
+    `UserFacingError` for: over the rate limit ("Too many imports. Try again in a while."), no
+    recipe found ("Couldn't find a recipe on that page."), Mealie unreachable / timeout / 5xx
+    ("Mealie didn't answer. If the page was slow, the recipe may still appear: try again in a
+    minute."). Rate limit is counted before calling Mealie, keyed by `userId`.
+  - `src/app/(app)/recipes/new/page.tsx` + `actions.ts` (`importRecipeAction`, a
+    `userFormAction` with field `url`; invalid URL → the `normaliseRecipeUrl` error; success →
+    `redirect("/recipes/<slug>/review")`; exists → `{ exists: { slug, name } }`, shown as
+    "Already imported: <name>" linking to `/recipes/<slug>/review`). Header nav gets
+    "Add recipe".
 
 - [ ] **4. Review page.** **Complexity:** L
   Depends on 2, 3. `/recipes/[slug]/review`: name, servings (required, shopping scaling needs
   it), source link, nutrition per serving (editable, with its source label), and each
   ingredient as original text beside the parsed amount/unit/food, low-confidence lines
-  highlighted. Per line: keep parsed, edit, or keep as a plain note. Foods and units the
+  highlighted (lines already parsed in Mealie are shown as they are; only unparsed lines go
+  through `parseIngredients` when the page loads). Per line: keep parsed, edit, or keep as a
+  plain note. Foods and units the
   parser found that don't exist in Mealie are created on save (`POST /api/foods`,
   `/api/units`). Save = one `PATCH` (ingredients, servings, nutrition, `extras` →
   `scrappyReview: done`, `scrappyNutrition: reviewed` if edited/confirmed), then refresh the
