@@ -199,7 +199,7 @@ Decisions already taken:
   partly updated. Send it again." Give the `create-bulk` call a longer timeout (30 s).
   **Done when:** the message is updated and the timeout is set.
 
-- [ ] **Task 15: Re-push doesn't inflate hand-added items**
+- [x] **Task 15: Re-push doesn't inflate hand-added items**
   **Complexity:** S
   **Do:** Mealie merges a pushed line into an existing unchecked item with the same food and
   unit and returns it in `updated`, which `pushShoppingList` (`server/shopping.ts:153`) ignores.

@@ -15,6 +15,7 @@ export type PushState = {
   ok?: {
     added: number;
     replaced: number;
+    merged: number;
     listName: string;
   };
 };

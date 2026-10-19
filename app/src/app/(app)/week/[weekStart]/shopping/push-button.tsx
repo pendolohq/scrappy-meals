@@ -56,6 +56,14 @@ export const PushButton = ({
           </Link>
         </output>
       )}
+      {state.ok && state.ok.merged > 0 && (
+        <p className="text-sm text-danger">
+          {state.ok.merged === 1
+            ? "1 item was added to a line already on the list in Mealie"
+            : `${state.ok.merged} items were added to lines already on the list in Mealie`}
+          . Check those quantities: sending the list again adds to them again.
+        </p>
+      )}
     </form>
   );
 };

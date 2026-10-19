@@ -67,8 +67,10 @@ then run `pnpm typecheck` and `pnpm test:integration`.
 - **Mealie merges server-side:** an item with the same food and unit as an
   existing unchecked item on the list increases that item's quantity, and comes
   back in `updatedItems`, not `createdItems`. Free-text items (no food) are not
-  merged. The planner pushes to its own list per week, so merging only ever
-  combines its own lines.
+  merged. The planner pushes to its own list per week, but a line someone added
+  by hand with the same food and unit gets merged too. The planner only owns
+  the items it created, so such a merged item keeps growing with every push;
+  the push reports these merges and the page asks to check their quantities.
 - `recipeReferences: [{ recipeId }]` links an item to the recipes it came from;
   Mealie shows these on the item.
 

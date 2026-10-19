@@ -87,6 +87,12 @@ export type PushResult = {
   listName: string;
   added: number;
   replaced: number;
+  /**
+   * Lines Mealie merged into an unticked item already on the list (same food
+   * and unit), most likely one added by hand. The planner doesn't own those,
+   * so pushing again adds its share once more.
+   */
+  merged: number;
 };
 
 /**
@@ -145,7 +151,7 @@ export async function pushShoppingList(
       recipeIds: [f.recipeId],
     })),
   ];
-  const { created } = await addShoppingItems(listId, items, mealie);
+  const { created, updated } = await addShoppingItems(listId, items, mealie);
 
   const row = {
     weekStart,
@@ -158,7 +164,13 @@ export async function pushShoppingList(
     .values(row)
     .onConflictDoUpdate({ target: shoppingPushes.weekStart, set: row });
 
-  return { listId, listName: name, added: created.length, replaced };
+  return {
+    listId,
+    listName: name,
+    added: created.length,
+    replaced,
+    merged: updated.length,
+  };
 }
 
 export async function lastPush(db: Db, weekStart: string) {
