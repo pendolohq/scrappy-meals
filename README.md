@@ -93,6 +93,23 @@ MEALIE_TEST_URL=http://localhost:9000 pnpm test:integration
 CI runs all of the above, scans for committed secrets with gitleaks, builds
 and smoke-tests the image, and pushes it to GHCR from `main` and `v*` tags.
 
+### Moving or forking the repository
+
+Nothing in the repo is tied to one GitHub account. CI publishes the image to
+`ghcr.io/<owner>/<repo>` using the built-in `GITHUB_TOKEN`; no secrets need
+to be configured. After transferring the repo to another user or organisation:
+
+1. In the new owner's settings, allow GitHub Actions to run and set workflow
+   permissions to allow the `packages: write` the image job requests
+   (organisations can restrict this; *Settings → Actions → General*).
+2. Push to `main` once so CI publishes `ghcr.io/<new-owner>/scrappy-meals`.
+   Make the package public (or log the server in to GHCR) under the
+   package's settings. Images under the old owner stay where they were.
+3. On the server, set `APP_IMAGE=ghcr.io/<new-owner>/scrappy-meals` in `.env`
+   and `docker compose pull app && docker compose up -d app`.
+4. Third-party apps (e.g. a secret scanner) are installed per account and
+   need installing again under the new owner if you want them.
+
 ## License
 
 [AGPL-3.0-or-later](LICENSE). You can use, modify and self-host it freely;

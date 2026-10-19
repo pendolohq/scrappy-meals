@@ -1,12 +1,19 @@
-const dayFormat = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-const rangeFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+// Hand-rolled rather than Intl: browsers and Node ship different locale data
+// ("Thu, 22 Oct" vs "Thu 22 Oct"), which would make server and client disagree.
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const utc = (date: string) => new Date(`${date}T00:00:00Z`);
+const dayMonth = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 
 /** "Tue 20 Oct" for 2026-10-20. */
-export const formatDay = (date: string) => dayFormat.format(new Date(`${date}T00:00:00Z`));
+export const formatDay = (date: string) => {
+  const d = utc(date);
+  return `${WEEKDAYS[d.getUTCDay()]} ${dayMonth(d)}`;
+};
 
 /** "19 Oct – 25 Oct". */
-export const formatRange = (start: string, end: string) =>
-  `${rangeFormat.format(new Date(`${start}T00:00:00Z`))} – ${rangeFormat.format(new Date(`${end}T00:00:00Z`))}`;
+export const formatRange = (start: string, end: string) => `${dayMonth(utc(start))} – ${dayMonth(utc(end))}`;
 
 const FRACTIONS: Record<number, string> = { 0.25: "¼", 0.5: "½", 0.75: "¾" };
 

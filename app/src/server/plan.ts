@@ -1,7 +1,8 @@
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 
 import type { Db } from "./db/client";
-import { mealSlots, mealSlotType, slotPortions, users } from "./db/schema";
+import { dayOverrides, mealSlots, mealSlotType, slotPortions, users } from "./db/schema";
+import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
 import { type CachedRecipe, loadRecipes, type RecipeFetcher } from "./recipe-cache";
 
@@ -34,7 +35,8 @@ export type PlannedMeal = {
 export type WeekPlan = {
   weekStart: string;
   members: Member[];
-  days: { date: string; meals: PlannedMeal[] }[];
+  /** `fasting` maps member id -> whether they fast that day (default weekdays or a day override). */
+  days: { date: string; meals: PlannedMeal[]; fasting: Record<string, boolean> }[];
 };
 
 export async function listMembers(db: Db): Promise<Member[]> {
@@ -55,7 +57,7 @@ export async function listMembers(db: Db): Promise<Member[]> {
 
 export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: RecipeFetcher } = {}): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
-  const [members, slots, portions] = await Promise.all([
+  const [members, slots, portions, overrides] = await Promise.all([
     listMembers(db),
     db
       .select()
@@ -67,6 +69,10 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
       .from(slotPortions)
       .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
       .where(and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end))),
+    db
+      .select()
+      .from(dayOverrides)
+      .where(and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))),
   ]);
 
   const recipes = await loadRecipes(
@@ -97,14 +103,68 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
     };
   });
 
+  const override = new Map(overrides.map((o) => [`${o.userId}|${o.date}`, o.isFasting]));
   return {
     weekStart,
     members,
-    days: weekDays(weekStart).map((date) => ({ date, meals: meals.filter((m) => m.date === date) })),
+    days: weekDays(weekStart).map((date) => ({
+      date,
+      meals: meals.filter((m) => m.date === date),
+      fasting: Object.fromEntries(
+        members.map((m) => [m.id, isFasting(m.defaultFastingDays, date, override.get(`${m.id}|${date}`))]),
+      ),
+    })),
   };
 }
 
-/** Adds a recipe to a day's slot, with a portion of 1 for every member. */
+/** Whether `userId` fasts on `date`. */
+export async function isUserFasting(db: Db, userId: string, date: string): Promise<boolean> {
+  const [user] = await db.select({ days: users.defaultFastingDays }).from(users).where(eq(users.id, userId));
+  if (!user) throw new PlanError("Unknown user");
+  const [o] = await db
+    .select({ isFasting: dayOverrides.isFasting })
+    .from(dayOverrides)
+    .where(and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date)));
+  return isFasting(user.days, date, o?.isFasting);
+}
+
+/**
+ * Sets whether a person fasts on a day. Starting a fast sets their portions
+ * for that day to 0; ending one leaves portions as they are, to adjust by hand.
+ * Returns how many portions were zeroed.
+ */
+export async function setFasting(db: Db, userId: string, date: string, fasting: boolean): Promise<number> {
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select({ days: users.defaultFastingDays }).from(users).where(eq(users.id, userId));
+    if (!user) throw new PlanError("Unknown user");
+
+    // Matching the weekday default needs no override row; keeps defaults editable later.
+    if (isFasting(user.days, date) === fasting) {
+      await tx.delete(dayOverrides).where(and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date)));
+    } else {
+      await tx
+        .insert(dayOverrides)
+        .values({ userId, date, isFasting: fasting })
+        .onConflictDoUpdate({ target: [dayOverrides.userId, dayOverrides.date], set: { isFasting: fasting } });
+    }
+
+    if (!fasting) return 0;
+    const zeroed = await tx
+      .update(slotPortions)
+      .set({ multiplier: 0 })
+      .where(
+        and(
+          eq(slotPortions.userId, userId),
+          sql`${slotPortions.multiplier} > 0`,
+          sql`${slotPortions.mealSlotId} IN (SELECT ${mealSlots.id} FROM ${mealSlots} WHERE ${mealSlots.date} = ${date})`,
+        ),
+      )
+      .returning({ id: slotPortions.mealSlotId });
+    return zeroed.length;
+  });
+}
+
+/** Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone fasting that day. */
 export async function addMeal(
   db: Db,
   input: { date: string; slot: SlotType; slug: string; createdBy: string },
@@ -114,7 +174,9 @@ export async function addMeal(
   const recipe = (await loadRecipes(db, [input.slug], { ...opts, force: true })).get(input.slug);
   if (!recipe) throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
 
-  const members = await db.select({ id: users.id }).from(users);
+  const members = await db.select({ id: users.id, days: users.defaultFastingDays }).from(users);
+  const overrides = await db.select().from(dayOverrides).where(eq(dayOverrides.date, input.date));
+  const override = new Map(overrides.map((o) => [o.userId, o.isFasting]));
 
   // Two people adding to the same slot at once can collide on position; retry.
   for (let attempt = 0; ; attempt++) {
@@ -135,7 +197,13 @@ export async function addMeal(
           })
           .returning({ id: mealSlots.id });
         if (members.length > 0) {
-          await tx.insert(slotPortions).values(members.map((m) => ({ mealSlotId: slot.id, userId: m.id, multiplier: 1 })));
+          await tx.insert(slotPortions).values(
+            members.map((m) => ({
+              mealSlotId: slot.id,
+              userId: m.id,
+              multiplier: isFasting(m.days, input.date, override.get(m.id)) ? 0 : 1,
+            })),
+          );
         }
         return slot.id;
       });
