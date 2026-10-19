@@ -14,10 +14,10 @@ const trim = async (cache, max) => {
 
 // "/week" and "/" only redirect, so they're never cached themselves. Offline,
 // open this week's page (computed in local time, like the phone's calendar).
+const pad = (n) => String(n).padStart(2, "0");
 const thisWeek = () => {
   const d = new Date();
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  const pad = (n) => String(n).padStart(2, "0");
   return `/week/${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
