@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ${APP_IMAGE:-ghcr.io/krustyc/scrappy-meals}:${APP_TAG:-latest}
+    image: ${APP_IMAGE:?set APP_IMAGE, e.g. ghcr.io/<owner>/scrappy-meals}:${APP_TAG:-latest}
     depends_on:
       postgres:
         condition: service_healthy
