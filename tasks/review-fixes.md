@@ -317,7 +317,7 @@ They become one page.
   recommended pattern first. Add `max` attributes matching the zod bounds in settings.
   **Done when:** e2e: a wrong password keeps the email.
 
-- [ ] **Task 24: Touch targets, contrast, loading state**
+- [x] **Task 24: Touch targets, contrast, loading state**
   **Complexity:** S
   **Do:**
   - Adherence buttons, steppers and the `⋯` menu get touch targets of about 40–44 px.

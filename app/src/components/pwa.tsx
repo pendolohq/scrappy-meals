@@ -28,7 +28,7 @@ export const Pwa = () => {
     return null;
   }
   return (
-    <output className="sticky top-0 z-10 block bg-danger px-4 py-1.5 text-center text-sm text-white">
+    <output className="sticky top-0 z-10 block bg-danger px-4 py-1.5 text-center text-sm text-white dark:text-stone-900">
       Offline: showing the last saved copy. Changes won&apos;t save until
       you&apos;re back online.
     </output>

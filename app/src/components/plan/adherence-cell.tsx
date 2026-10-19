@@ -77,7 +77,7 @@ export const AdherenceButtons = ({
                   : STATUS_LABEL[s].label
               }
               onClick={() => choose(s)}
-              className={`h-7 w-8 rounded-md border text-sm disabled:opacity-60 ${
+              className={`h-10 w-10 rounded-md border text-sm disabled:opacity-60 ${
                 active
                   ? "border-accent bg-accent text-white dark:text-stone-900"
                   : "border-border text-muted"
