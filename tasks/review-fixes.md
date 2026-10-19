@@ -69,7 +69,7 @@ Decisions already taken:
     what is and isn't protected.
   **Done when:** Task 6 passes.
 
-- [ ] **Task 5: Deploy docs that actually deploy**
+- [x] **Task 5: Deploy docs that actually deploy**
   **Complexity:** S
   **Do:** in `docs/deploy.md` §7 and `docs/README.md`:
   - Deploy is `git fetch --tags && git checkout vX.Y.Z && docker compose pull && docker compose

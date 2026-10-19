@@ -73,15 +73,33 @@ that has `read:packages`: `docker login ghcr.io -u <github-user>`.
 
 ## 4. Mealie first
 
+Mealie starts with a well-known admin login (`changeme@example.com` /
+`MyPassword`). Bots find new HTTPS hosts within minutes of their certificate
+being issued, so set Mealie up **before** Caddy publishes it:
+
 ```sh
-docker compose up -d postgres mealie caddy
+docker compose up -d postgres mealie
 docker compose logs -f mealie   # wait for "Application startup complete"
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+  "$(docker compose ps -q mealie)"   # Mealie's address on the Docker network
 ```
 
-Open `https://recipes.example.com` and sign in as `changeme@example.com` /
-`MyPassword`. **Immediately** change that account's email and password
-(Profile → Edit). Then create an API token (Profile → API Tokens), put it in
-`MEALIE_API_TOKEN` in `.env`, and add or import a few recipes.
+From your own machine, tunnel to it and open `http://localhost:9000`:
+
+```sh
+ssh -L 9000:<that address>:9000 deploy@<server>
+```
+
+1. Sign in as `changeme@example.com` / `MyPassword` and **change that
+   account's email and password** (Profile → Edit).
+2. Create a second, non-admin user for the planner (Admin → Users, in the same
+   household). Sign in as it and create an API token (Profile → API Tokens).
+   Put the token in `MEALIE_API_TOKEN` in `.env`. The planner only reads
+   recipes and writes shopping lists, so if the token leaks it can't manage
+   users or Mealie's settings.
+3. Add or import a few recipes.
+
+Then publish it: `docker compose up -d caddy`.
 
 Recipes work best in the planner when they have:
 - a **servings** count (needed to scale the shopping list),
@@ -115,6 +133,14 @@ echo '15 3 * * * deploy /opt/scrappy-meals/scripts/backup.sh >> /var/log/scrappy
 sudo touch /var/log/scrappy-meals-backup.log && sudo chown deploy /var/log/scrappy-meals-backup.log
 ```
 
+**Get told when a night fails.** Nobody reads that log. Create a check on
+healthchecks.io (daily, 1 h grace) and put its ping URL in `BACKUP_PING_URL`:
+you get an email when a backup fails or doesn't run.
+
+The first backup of each month is also kept as the monthly copy (for a
+year). If the backup on the 1st fails, run `scripts/backup.sh` by hand that
+day so the month still gets one.
+
 Do a test restore on a throwaway server once, so you know it works before
 you need it.
 
@@ -141,9 +167,17 @@ and then publishes). **Then update the server:**
 
 ```sh
 cd /opt/scrappy-meals
-git checkout v0.2.0               # compose file, Caddyfile, scripts of that release
-docker compose pull app && docker compose up -d app
+git fetch --tags && git checkout v0.2.0   # compose file, Caddyfile, scripts of that release
+docker compose pull                       # app and any other image the release bumped
+docker compose --profile ops build        # backup/restore image, if backup/ changed
+docker compose up -d --wait               # recreates what changed, waits until healthy
+docker compose restart caddy              # only if the Caddyfile changed
 ```
+
+`--wait` fails if a container doesn't come up healthy (e.g. a migration
+failed): check `docker compose logs app`. The Caddyfile is mounted as a single
+file, so a running Caddy keeps reading the old one after `git checkout` until
+it is restarted.
 
 `APP_TAG` in `.env` decides which image that pulls:
 
@@ -174,11 +208,19 @@ docker compose logs --since 1h app mealie
 Pointing an uptime monitor (e.g. healthchecks.io, Uptime Kuma) at
 `/api/health` catches outages; it returns 503 when the database is down.
 
+## 9. Rebuilding from scratch
+
+When the server is lost, or to practise a restore:
+
+1. Sections 1–3 on a new server. Take `.env` from your password manager (keep
+   a copy there next to the age identity) instead of writing a new one.
+2. `docker compose up -d postgres`, then restore the latest backup:
+   [aws-backup-setup.md](aws-backup-setup.md) §6.
+3. `docker compose up -d --wait`. Mealie's own secrets come back with its data
+   volume, so the existing `MEALIE_API_TOKEN` keeps working, and the users and
+   their passwords come back with the planner database.
+
 ## Users
 
-| Command | |
-|---|---|
-| `docker compose exec app scrappy user add` | create a user |
-| `docker compose exec app scrappy user passwd EMAIL` | new password; signs them out everywhere |
-| `docker compose exec app scrappy user list` | list users |
-| `docker compose exec app scrappy user remove EMAIL` | delete a user and their portions/logs |
+See [Users](../README.md#users) in the README for the `scrappy user` commands
+(run them with `docker compose exec app scrappy ...`).

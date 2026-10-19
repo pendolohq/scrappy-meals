@@ -49,7 +49,7 @@ configuration, Mealie setup, users, backups, updates). In short:
 
 ```sh
 cp .env.example .env && chmod 600 .env     # fill in domain + secrets
-docker compose up -d postgres mealie caddy # then set up Mealie + an API token
+docker compose up -d postgres mealie       # set up Mealie + an API token first (docs/deploy.md §4)
 docker compose up -d
 docker compose exec app scrappy user add   # once per person
 ```

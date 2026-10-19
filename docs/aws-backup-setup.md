@@ -15,7 +15,7 @@ equal `AWS_REGION` here.
 
 ```sh
 age-keygen -o age-identity.txt
-grep 'public key' age-identity.txt     # -> AGE_RECIPIENT in the VPS .env
+age-keygen -y age-identity.txt         # -> AGE_RECIPIENT in the VPS .env
 ```
 
 Store `age-identity.txt` in your password manager, then delete the local file.
@@ -121,15 +121,9 @@ aws iam create-access-key --user-name scrappy-meals-backup
 
 ## 5. Schedule on the VPS
 
-```sh
-echo '15 3 * * * root /opt/scrappy-meals/scripts/backup.sh >> /var/log/scrappy-meals-backup.log 2>&1' \
-  | sudo tee /etc/cron.d/scrappy-meals
-```
-
-Run one by hand first: `scripts/backup.sh`, then check the bucket.
-
-Optional: create a check on healthchecks.io (daily, 1 h grace) and put its
-ping URL in `BACKUP_PING_URL`. You get an email if a night is missed or fails.
+Set up the nightly cron job and the failure alert as in
+[deploy.md](deploy.md) §6. Run one by hand first (`scripts/backup.sh`), then
+check the bucket.
 
 ## 6. Restoring
 

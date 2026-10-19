@@ -48,8 +48,8 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
 2. **Merge to `main`:** the same checks, then the image is published as
    `ghcr.io/<owner>/scrappy-meals:main` and `:sha-<commit>`. The server doesn't pick these up.
 3. **Release:** tagging `vX.Y.Z` runs CI again and publishes `:X.Y.Z`, `:X.Y` and `:latest`.
-4. **Deploy:** on the server, `git checkout vX.Y.Z` and
-   `docker compose pull app && docker compose up -d app`. `APP_TAG` in `.env` picks the image
+4. **Deploy:** on the server, check out the tag, pull, and `docker compose up -d --wait`
+   ([deploy.md](deploy.md) §7 has the exact commands). `APP_TAG` in `.env` picks the image
    (pinned version recommended). The app runs database migrations itself on start.
 
 Details, rollback and the first-time setup are in [deploy.md](deploy.md) (sections 7 and 1–6).
