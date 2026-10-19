@@ -36,7 +36,6 @@ export const pushShoppingAction = userFormAction(
     try {
       const res = await pushShoppingList(getDb(), weekStart);
       revalidatePath(`/week/${weekStart}/shopping`);
-      revalidatePath(`/week/${weekStart}/shop`);
       return { ok: res };
     } catch (err) {
       if (isMealieUnavailable(err)) {

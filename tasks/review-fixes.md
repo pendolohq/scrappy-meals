@@ -262,7 +262,7 @@ Today:
 
 They become one page.
 
-- [ ] **Task 19: Merge Shopping and Shop**
+- [x] **Task 19: Merge Shopping and Shop**
   **Complexity:** L
   **Depends on:** Tasks 9, 16, 17
   **Do:** one route, `/week/X/shopping`.

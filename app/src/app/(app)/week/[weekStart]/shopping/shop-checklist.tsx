@@ -27,7 +27,7 @@ import {
   addShopItemAction,
   checkShopItemAction,
   removeShopItemAction,
-} from "./actions";
+} from "./checklist-actions";
 
 const RETRY_MS = 10_000;
 

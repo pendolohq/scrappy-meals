@@ -9,7 +9,7 @@ import { isDbUnreachable } from "@/server/db/errors";
 import { isIsoDate, weekStartOf } from "@/server/domain/week";
 import { RetryableError, UserFacingError } from "@/server/errors";
 import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
-import { addShopItem, checkShopItem, removeShopItem } from "@/server/shopping";
+import { addShopItem, checkShopItem, removeShopItem } from "@/server/shop";
 
 const weekStart = z
   .string()
@@ -23,7 +23,7 @@ const itemId = z.uuid();
 async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
   try {
     const result = await work();
-    revalidatePath(`/week/${week}/shop`);
+    revalidatePath(`/week/${week}/shopping`);
     return result;
   } catch (err) {
     // Errors that go away on their own keep the device's queue; dropping the

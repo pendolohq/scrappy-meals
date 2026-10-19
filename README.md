@@ -14,9 +14,9 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
   data are flagged and totals marked incomplete, never estimated.
 - **Shopping list**: the week's ingredients scaled by everyone's portions,
   merged by food and unit, and sent to a Mealie shopping list.
-- **Shop from the planner**: a checklist over that Mealie list, grouped by
-  aisle, with quick-add; ticks made without signal save once you're back
-  online, and both phones see each other's ticks.
+- **Shop from the planner**: once sent, the same page is a checklist over that
+  Mealie list, grouped by aisle, with quick-add; ticks made without signal
+  save once you're back online, and both phones see each other's ticks.
 - **Adherence**: one tap per meal (stuck / partly / skipped / swapped) and a
   weekly summary.
 - **Installable**: mobile-first PWA; recently viewed weeks work offline.
