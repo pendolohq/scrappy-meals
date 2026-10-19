@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
+import { addDays, weekStartOf } from "./domain/week";
 import { createMealieClient, type MealieClient, unwrap } from "./mealie/client";
 import { getRecipe } from "./mealie/recipes";
 import { addShoppingItems, getShoppingListItems } from "./mealie/shopping";
@@ -18,7 +19,11 @@ import { createUser } from "./users";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
 const run = randomUUID().slice(0, 8);
-const WEEK = "2026-10-19";
+// Each test gets its own far-future week, so its Mealie list name is unique: the
+// push falls back to finding the week's list by name, and a same-named list left
+// by another run would otherwise be picked up.
+const uniqueWeek = () =>
+  weekStartOf(`${2100 + Math.floor(Math.random() * 800)}-06-15`);
 
 describe.skipIf(!baseUrl || !testDbUrl)(
   "shopping push (Mealie + Postgres)",
@@ -99,6 +104,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
     });
 
     it("pushes the scaled, merged list, then replaces it on re-push", async () => {
+      const WEEK = uniqueWeek();
       const pw = "correct horse battery";
       const a = await createUser(db, {
         name: "A",
@@ -113,7 +119,12 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       const opts = { client: admin };
       const lunch = await addMeal(
         db,
-        { date: "2026-10-20", slot: "lunch", slug: ids.slug, createdBy: a.id },
+        {
+          date: addDays(WEEK, 1),
+          slot: "lunch",
+          slug: ids.slug,
+          createdBy: a.id,
+        },
         { fetch: fromMealie },
       );
       await setPortion(db, lunch, b.id, 0.5); // 1 + 0.5 = 1.5 of 4 servings
@@ -168,6 +179,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
     });
 
     it("starts a new list if the old one was deleted in Mealie", async () => {
+      const WEEK = uniqueWeek();
       const a = await createUser(db, {
         name: "A",
         email: "a@example.test",
@@ -175,7 +187,12 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       });
       await addMeal(
         db,
-        { date: "2026-10-21", slot: "dinner", slug: ids.slug, createdBy: a.id },
+        {
+          date: addDays(WEEK, 2),
+          slot: "dinner",
+          slug: ids.slug,
+          createdBy: a.id,
+        },
         { fetch: fromMealie },
       );
       const first = await pushShoppingList(db, WEEK, { client: admin });
