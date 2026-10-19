@@ -85,7 +85,47 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   cache entry (`loadRecipes(..., { force: true })`). "Open in Mealie" for anything else.
   The page also works for a recipe with no `scrappyReview` key: an import that timed out after
   Mealie created the recipe leaves it unmarked, and "Already imported" links here, so the page
-  must let it be reviewed rather than assume it's done.
+  must let it be reviewed rather than assume it's done. Any recipe can be opened here; the
+  page doubles as the planner's recipe detail view.
+
+  Interfaces:
+  - `src/server/mealie/import.ts` gains `findOrCreateFood(name)` and `findOrCreateUnit(name)`
+    → `{ id, name }`. Match an existing one case-insensitively and trimmed (foods: `name` or
+    `pluralName`; units: `name`, `pluralName` or `abbreviation`) via `GET /api/foods|units`
+    with `search`, else `POST`. Integration-tested.
+  - `src/server/recipe-review.ts` (server-only):
+    - `loadReview(slug, deps?)` → `ReviewDraft | null` (null for an unknown slug):
+      `{ slug, name, servings: number | null, sourceUrl, mealieUrl (MEALIE_PUBLIC_URL +
+      /g/<group slug>/r/<slug>, group slug from `GET /api/groups/self`, cached per process;
+      null without the variable), importState, nutrition: Record<MacroKey,
+      number | null>, lines: ReviewLine[] }`. `ReviewLine`: `{ key: string (referenceId, else
+      the index), original: string (originalText || note || display), title: string | null,
+      quantity: number | null, unit: string | null, food: string | null, note: string,
+      confidence: number | null (null for lines Mealie already had parsed), asText: boolean
+      (true when the parser found no food) }`. Unparsed lines are sent to `parseIngredients` in
+      one call; already-parsed lines (with a food or unit id) are not.
+    - `saveReview(slug, input, deps?)`: `input` = `{ servings: number > 0, nutrition:
+      Record<MacroKey, number ≥ 0 | null>, lines: Array<{ title: string | null, asText:
+      boolean, quantity: number | null, unit: string | null, food: string | null, note: string
+      }> }` (in order; at most 200 lines). Lines with `asText` (or no food) become note-only
+      ingredients (`quantity: 0`, `note` = the text); others resolve unit/food names with
+      `findOrCreateUnit`/`findOrCreateFood` (each distinct name once). Then one `patchRecipe`:
+      `recipeServings`, `nutrition` (numbers as strings; null → null; Mealie's other nutrition
+      fields kept), `recipeIngredient`, `extras` via `withImportState` (`review: "done"`,
+      `nutrition: "reviewed"` when any macro is set, else null). Then refresh the cache entry
+      (`loadRecipes(db, [slug], { force: true })`). Mealie down → `RetryableError`, like the
+      import.
+  - `src/app/(app)/recipes/[slug]/review/page.tsx` (`requireUser`, `notFound()` for an unknown
+    slug) + `actions.ts` (`saveReviewAction`, a `userAction` taking `{ slug, ...input }`; plan
+    edits are household-wide, so any signed-in user may review) + a client form.
+    UI text the tests rely on: the recipe name as the page heading; a "Source" link (when
+    there is one) and "Open in Mealie"; inputs labelled "Servings", "Calories (kcal)",
+    "Protein (g)", "Carbs (g)", "Fat (g)", "Fibre (g)"; the nutrition label "From the page",
+    "Estimated", "Reviewed" or "Missing"; each ingredient a `fieldset` whose legend is the
+    original line, with inputs "Amount", "Unit", "Food", "Note" and a checkbox "Keep as text";
+    lines with confidence below 0.8 show "Check this line"; a "Save recipe" button; after a
+    successful save a status "Saved" and a link "Back to the plan". Errors in
+    `p[role=alert]` inside `main`.
 
 - [ ] **5. Show import state in the planner.** **Complexity:** M
   Depends on 2. Wherever macros show (meal rows, day/person totals), an "estimated" label when
