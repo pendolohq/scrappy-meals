@@ -178,7 +178,7 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                 <legend className="px-1 text-sm">{line.original}</legend>
                 {line.linked && (
                   <p className="text-sm text-muted">
-                    Linked recipe — edit in Mealie
+                    Linked recipe: edit it in Mealie
                   </p>
                 )}
                 {low && (

@@ -72,7 +72,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
     "Already imported: <name>" linking to `/recipes/<slug>/review`). Header nav gets
     "Add recipe".
 
-- [ ] **4. Review page.** **Complexity:** L
+- [x] **4. Review page.** **Complexity:** L
   Depends on 2, 3. `/recipes/[slug]/review`: name, servings (required, shopping scaling needs
   it), source link, nutrition per serving (editable, with its source label), and each
   ingredient as original text beside the parsed amount/unit/food, low-confidence lines
