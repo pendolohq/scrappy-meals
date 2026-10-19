@@ -14,7 +14,7 @@ export type ImportFormState = {
 
 const urlField = z
   .string()
-  .max(4096)
+  .max(4096, "That address is too long.")
   .transform((text, ctx) => {
     const checked = normaliseRecipeUrl(text);
     if (!checked.ok) {

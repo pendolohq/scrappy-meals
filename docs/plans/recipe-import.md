@@ -42,7 +42,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   Depends on 1. Add `source_url`, `review_state`, `nutrition_source` to `recipe_cache` (Drizzle
   migration), filled by `loadRecipes`. `*.db.test.ts` coverage.
 
-- [ ] **3. "Add recipe" page.** **Complexity:** L (security: full round)
+- [x] **3. "Add recipe" page.** **Complexity:** L (security: full round)
   Depends on 1. `/recipes/new`, linked from the header nav. One URL field;
   `userFormAction` with zod: `http(s)` only, no credentials in the URL, no single-label hosts.
   Mealie itself refuses loopback and private addresses (`safehttp`), so this is a second
