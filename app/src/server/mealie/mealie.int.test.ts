@@ -183,6 +183,31 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     expect(await getRecipe(`does-not-exist-${run}`, { client })).toBeNull();
   });
 
+  // The planner keys meals by slug and relies on this to follow a rename
+  // (recipe-cache.ts): if a Mealie upgrade changes it, this says so.
+  it("gives a renamed recipe a new slug, and still finds it by id", async () => {
+    const slug = unwrap(
+      await admin.POST("/api/recipes", {
+        body: { name: `IT Rename ${run}` },
+      })
+    );
+    const before = (await getRecipe(slug, { client }))!;
+    unwrap(
+      await admin.PATCH("/api/recipes/{slug}", {
+        params: { path: { slug } },
+        body: { name: `IT Renamed ${run}` },
+      })
+    );
+    const after = (await getRecipe(before.id, { client }))!;
+    cleanup.push(() =>
+      admin.DELETE("/api/recipes/{slug}", {
+        params: { path: { slug: after.slug } },
+      })
+    );
+    expect(after.slug).not.toBe(slug);
+    expect(await getRecipe(slug, { client })).toBeNull();
+  });
+
   it("creates, fills, finds and empties a shopping list", async () => {
     const name = `IT Week ${run}`;
     const listId = await createShoppingList(name, { client });

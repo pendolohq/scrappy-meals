@@ -397,7 +397,7 @@ They become one page.
   Generate it with drizzle-kit.
   **Done when:** db tests pass; CI's migration-drift check passes.
 
-- [ ] **Task 30: Rare correctness quirks**
+- [x] **Task 30: Rare correctness quirks**
   **Complexity:** S
   **Do:**
   - `nutrition.ts`: a comma followed by exactly three digits ("1,200") is treated as missing,

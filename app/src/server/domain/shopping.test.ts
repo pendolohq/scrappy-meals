@@ -115,6 +115,20 @@ describe("buildShoppingList", () => {
     ]);
   });
 
+  it("counts a free-text line once per meal, even if the recipe repeats it", () => {
+    const stew = {
+      id: "stew",
+      name: "Stew",
+      servings: 2,
+      ingredients: [ing({ display: "salt" }), ing({ display: "salt" })],
+    };
+    const list = buildShoppingList([
+      meal(stew, { a: 1 }),
+      meal(stew, { a: 1 }),
+    ]);
+    expect(list.freeText).toMatchObject([{ text: "salt", times: 2 }]);
+  });
+
   it("reports recipes that are gone from Mealie", () => {
     expect(buildShoppingList([meal(null, { a: 1 })]).missing).toEqual(["gone"]);
   });

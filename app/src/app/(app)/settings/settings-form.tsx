@@ -87,8 +87,10 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
       <fieldset>
         <legend className="mb-2 font-medium">Fasting days</legend>
         <p className="mb-3 text-sm text-muted">
-          On these weekdays your portions default to 0 and your targets are
-          hidden. You can still change single days in the plan.
+          Meals added on these weekdays start with your portion at 0, and your
+          targets are hidden. Changing them also applies to past weeks, and
+          doesn&apos;t change meals already planned. Single days can still be
+          changed in the plan.
         </p>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((day, i) => (
