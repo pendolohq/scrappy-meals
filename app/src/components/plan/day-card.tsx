@@ -17,11 +17,15 @@ export function DayCard({
   date,
   meals,
   members,
+  fasting,
+  currentUserId,
   isToday,
 }: {
   date: string;
   meals: PlannedMeal[];
   members: Member[];
+  fasting: Record<string, boolean>;
+  currentUserId: string;
   isToday: boolean;
 }) {
   const forMacros = meals.map((m) => ({
@@ -59,6 +63,12 @@ export function DayCard({
               key={m.id}
               member={m}
               totals={personDayTotals(forMacros, m.id)}
+              date={date}
+              fasting={fasting[m.id] ?? false}
+              isSelf={m.id === currentUserId}
+              plannedPortions={
+                meals.filter((meal) => (meal.portions[m.id] ?? 0) > 0).length
+              }
             />
           ))}
         </div>
