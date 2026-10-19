@@ -35,14 +35,14 @@ Decisions already taken:
   **Done when:** no `.env.example` line has `=` followed by whitespace and `#`; `docker compose
   config` with a copy of `.env.example` shows empty values.
 
-- [ ] **Task 2: Backup tolerates files changing under it**
+- [x] **Task 2: Backup tolerates files changing under it**
   **Complexity:** XS
   **Do:** `backup/ops.sh:52`: add `--warning=no-file-changed --warning=no-file-removed` and treat
   tar's exit code 1 as success (`|| [ $? -eq 1 ]`). Add `set -o pipefail` (BusyBox ash supports
   it) so a failing `aws` in the `fetch` pipeline doesn't show up as "no backup found".
   **Done when:** `sh -n backup/ops.sh` passes; the reasoning is in a one-line comment.
 
-- [ ] **Task 3: Backup work dir on disk, not in RAM**
+- [x] **Task 3: Backup work dir on disk, not in RAM**
   **Complexity:** XS
   **Do:** in `docker-compose.yml`, replace the ops services' `tmpfs: /tmp` with an anonymous
   volume (e.g. `/work`) and `TMPDIR=/work`. Encrypt by streaming (`tar … | age -o …`, `pg_dump |
@@ -51,7 +51,7 @@ Decisions already taken:
   and update `restore` to match.
   **Done when:** a backup and restore round trip works (see Task 6).
 
-- [ ] **Task 4: Restore can't pick a partial run, is atomic, and cleans up on Ctrl-C**
+- [x] **Task 4: Restore can't pick a partial run, is atomic, and cleans up on Ctrl-C**
   **Complexity:** S
   **Do:**
   - `ops.sh backup`: upload a `COMPLETE` marker last. `fetch latest` only considers runs that
