@@ -5,7 +5,10 @@ import { useActionState } from "react";
 import { login, type LoginState } from "./actions";
 
 export const LoginForm = ({ next }: { next?: string }) => {
-  const [state, action, pending] = useActionState<LoginState, FormData>(login, {});
+  const [state, action, pending] = useActionState<LoginState, FormData>(
+    login,
+    {}
+  );
   return (
     <form action={action} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}

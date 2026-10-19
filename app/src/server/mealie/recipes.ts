@@ -46,7 +46,7 @@ export type RecipePage = {
 
 export async function searchRecipes(
   query: string,
-  opts: { page?: number; perPage?: number; client?: MealieClient } = {},
+  opts: { page?: number; perPage?: number; client?: MealieClient } = {}
 ): Promise<RecipePage> {
   const client = opts.client ?? mealie();
   const search = query.trim();
@@ -56,12 +56,14 @@ export async function searchRecipes(
         query: {
           search: search || undefined,
           // Mealie ranks by relevance when searching; otherwise list alphabetically.
-          ...(search ? {} : { orderBy: "name", orderDirection: "asc" as const }),
+          ...(search
+            ? {}
+            : { orderBy: "name", orderDirection: "asc" as const }),
           page: opts.page ?? 1,
           perPage: opts.perPage ?? 20,
         },
       },
-    }),
+    })
   );
   return {
     items: page.items.map(toListItem),
@@ -72,15 +74,24 @@ export async function searchRecipes(
 }
 
 /** Full recipe with normalised nutrition and ingredients; null if the slug doesn't exist. */
-export async function getRecipe(slug: string, opts: { client?: MealieClient } = {}): Promise<Recipe | null> {
+export async function getRecipe(
+  slug: string,
+  opts: { client?: MealieClient } = {}
+): Promise<Recipe | null> {
   const client = opts.client ?? mealie();
-  const result = await client.GET("/api/recipes/{slug}", { params: { path: { slug } } });
-  if (result.response.status === 404) return null;
+  const result = await client.GET("/api/recipes/{slug}", {
+    params: { path: { slug } },
+  });
+  if (result.response.status === 404) {
+    return null;
+  }
   return toRecipe(unwrap(result));
 }
 
 export function toRecipe(r: MealieRecipe): Recipe {
-  if (!r.id) throw new Error(`Mealie recipe ${r.slug} has no id`);
+  if (!r.id) {
+    throw new Error(`Mealie recipe ${r.slug} has no id`);
+  }
   return {
     ...toListItem(r),
     id: r.id,
@@ -95,17 +106,28 @@ function toListItem(r: MealieSummary | MealieRecipe): RecipeListItem {
     id: r.id ?? null,
     slug: r.slug ?? "",
     name: r.name || r.slug || "Untitled",
-    imagePath: r.id && r.image ? `/api/media/recipes/${r.id}/images/min-original.webp` : null,
+    imagePath:
+      r.id && r.image
+        ? `/api/media/recipes/${r.id}/images/min-original.webp`
+        : null,
     // recipeYield is free text ("1 loaf"), so only recipeServings counts as servings.
-    servings: r.recipeServings && r.recipeServings > 0 ? r.recipeServings : null,
+    servings:
+      r.recipeServings && r.recipeServings > 0 ? r.recipeServings : null,
   };
 }
 
 function toIngredient(i: MealieIngredient): Ingredient {
-  const food = i.food && "id" in i.food && i.food.id ? { id: i.food.id, name: i.food.name } : null;
+  const food =
+    i.food && "id" in i.food && i.food.id
+      ? { id: i.food.id, name: i.food.name }
+      : null;
   const unit =
     i.unit && "id" in i.unit && i.unit.id
-      ? { id: i.unit.id, name: i.unit.name, abbreviation: i.unit.abbreviation ?? "" }
+      ? {
+          id: i.unit.id,
+          name: i.unit.name,
+          abbreviation: i.unit.abbreviation ?? "",
+        }
       : null;
   return {
     referenceId: i.referenceId ?? "",

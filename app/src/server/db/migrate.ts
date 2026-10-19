@@ -1,10 +1,13 @@
-import "server-only";
-
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+
+import "server-only";
 
 import { createDb } from "./client";
 
-export async function runMigrations(url: string, migrationsFolder: string): Promise<void> {
+export async function runMigrations(
+  url: string,
+  migrationsFolder: string
+): Promise<void> {
   const { db, pool } = createDb(url, { max: 1 });
   try {
     await migrate(db, { migrationsFolder });

@@ -23,7 +23,7 @@ export const AdherenceButtons = ({
   const [error, setError] = useState<string>();
   const [current, setOptimistic] = useOptimistic(
     log,
-    (_: Log, next: Log) => next,
+    (_: Log, next: Log) => next
   );
 
   const choose = (status: AdherenceStatus) => {
@@ -33,9 +33,11 @@ export const AdherenceButtons = ({
     } else if (status === "swapped") {
       const note = window.prompt(
         `What did you have instead of ${mealName}?`,
-        current?.note ?? "",
+        current?.note ?? ""
       );
-      if (!note?.trim()) return;
+      if (!note?.trim()) {
+        return;
+      }
       next = { status, note: note.trim() };
     } else {
       next = { status, note: null };
@@ -48,7 +50,9 @@ export const AdherenceButtons = ({
         status: next?.status ?? null,
         note: next?.note ?? null,
       });
-      if (res.error) setError(res.error);
+      if (res.error) {
+        setError(res.error);
+      }
     });
   };
 
@@ -100,7 +104,9 @@ export const AdherenceButtons = ({
 
 /** Someone else's log, read-only. */
 export const AdherenceBadge = ({ log }: { log: Log }) => {
-  if (!log) return null;
+  if (!log) {
+    return null;
+  }
   const { icon, label } = STATUS_LABEL[log.status];
   return (
     <p

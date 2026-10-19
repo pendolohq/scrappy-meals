@@ -39,7 +39,7 @@ const fromForm = z.preprocess(
           defaultFastingDays: form.getAll("fastingDays").map(Number),
         }
       : form,
-  profileSchema,
+  profileSchema
 );
 
 // Each person edits only their own profile.
@@ -56,5 +56,5 @@ export const saveSettings = userFormAction(
       const field = String(issue.path[0] ?? "");
       return `${LABELS[field] ?? "Input"}: ${issue.message}`;
     },
-  },
+  }
 );

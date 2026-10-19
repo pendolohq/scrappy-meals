@@ -24,7 +24,7 @@ export const FastingToggle = ({
       next &&
       plannedPortions > 0 &&
       !window.confirm(
-        `Fast on ${formatDay(date)}? Your ${plannedPortions} planned portion${plannedPortions === 1 ? "" : "s"} that day will be set to 0.`,
+        `Fast on ${formatDay(date)}? Your ${plannedPortions} planned portion${plannedPortions === 1 ? "" : "s"} that day will be set to 0.`
       )
     ) {
       return;
@@ -32,7 +32,9 @@ export const FastingToggle = ({
     startTransition(async () => {
       setError(undefined);
       const res = await setFastingAction({ date, fasting: next });
-      if (res.error) setError(res.error);
+      if (res.error) {
+        setError(res.error);
+      }
     });
   };
 

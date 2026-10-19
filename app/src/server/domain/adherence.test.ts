@@ -13,7 +13,7 @@ describe("summariseAdherence", () => {
         { date: "2026-10-20", portion: 1, status: "swapped" },
         { date: "2026-10-20", portion: 1, status: "skipped" },
       ],
-      TODAY,
+      TODAY
     );
     expect(s.counts).toEqual({ stuck: 1, partial: 1, swapped: 1, skipped: 1 });
     expect(s.score).toBe(0.5);
@@ -28,13 +28,21 @@ describe("summariseAdherence", () => {
         { date: "2026-10-22", portion: 1, status: null }, // future
         { date: "2026-10-20", portion: 0, status: null }, // not eating it
       ],
-      TODAY,
+      TODAY
     );
-    expect(s).toEqual({ counts: { stuck: 0, partial: 0, skipped: 0, swapped: 0 }, due: 2, unlogged: 2, score: null });
+    expect(s).toEqual({
+      counts: { stuck: 0, partial: 0, skipped: 0, swapped: 0 },
+      due: 2,
+      unlogged: 2,
+      score: null,
+    });
   });
 
   it("still counts a logged meal that wasn't planned (e.g. ate it after all)", () => {
-    const s = summariseAdherence([{ date: "2026-10-20", portion: 0, status: "stuck" }], TODAY);
+    const s = summariseAdherence(
+      [{ date: "2026-10-20", portion: 0, status: "stuck" }],
+      TODAY
+    );
     expect(s).toMatchObject({ due: 0, score: 1, counts: { stuck: 1 } });
   });
 });

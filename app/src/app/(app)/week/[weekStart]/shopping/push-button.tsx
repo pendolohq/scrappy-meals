@@ -15,7 +15,7 @@ export const PushButton = ({
 }) => {
   const [state, action, pending] = useActionState<PushState, FormData>(
     pushShoppingAction,
-    {},
+    {}
   );
   return (
     <form action={action} className="space-y-2">

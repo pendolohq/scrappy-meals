@@ -19,18 +19,29 @@ const TARGETS = [
 const input = "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
 
 export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
-  const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettings, {});
+  const [state, action, pending] = useActionState<SettingsState, FormData>(
+    saveSettings,
+    {}
+  );
 
   return (
     <form action={action} className="space-y-6">
       <label className="block">
         <span className="text-sm text-muted">Name</span>
-        <input name="name" defaultValue={profile.name} required maxLength={80} className={input} />
+        <input
+          name="name"
+          defaultValue={profile.name}
+          required
+          maxLength={80}
+          className={input}
+        />
       </label>
 
       <fieldset>
         <legend className="mb-2 font-medium">Daily targets</legend>
-        <p className="mb-3 text-sm text-muted">Leave a field empty to not track it.</p>
+        <p className="mb-3 text-sm text-muted">
+          Leave a field empty to not track it.
+        </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {TARGETS.map((t) => (
             <label key={t.name} className="block">
@@ -54,12 +65,15 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
       <fieldset>
         <legend className="mb-2 font-medium">Fasting days</legend>
         <p className="mb-3 text-sm text-muted">
-          On these weekdays your portions default to 0 and your targets are hidden. You can still change single days in
-          the plan.
+          On these weekdays your portions default to 0 and your targets are
+          hidden. You can still change single days in the plan.
         </p>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((day, i) => (
-            <label key={day} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2">
+            <label
+              key={day}
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2"
+            >
               <input
                 type="checkbox"
                 name="fastingDays"

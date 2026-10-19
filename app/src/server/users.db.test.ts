@@ -1,8 +1,7 @@
+import { eq } from "drizzle-orm";
 // Runs against a real Postgres: DATABASE_TEST_URL=postgres://... pnpm test:db
 // The database is migrated and its users table emptied, so point it at a throwaway DB.
 import path from "node:path";
-
-import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createDb } from "./db/client";
@@ -37,8 +36,16 @@ describe.skipIf(!url)("users (Postgres)", () => {
   });
 
   it("creates a user with a normalised email and an argon2id hash", async () => {
-    const u = await createUser(db, { name: " Alex ", email: " Alex@Example.TEST ", password: pw });
-    expect(u).toMatchObject({ name: "Alex", email: "alex@example.test", sessionVersion: 0 });
+    const u = await createUser(db, {
+      name: " Alex ",
+      email: " Alex@Example.TEST ",
+      password: pw,
+    });
+    expect(u).toMatchObject({
+      name: "Alex",
+      email: "alex@example.test",
+      sessionVersion: 0,
+    });
     expect(u.passwordHash).toMatch(/^\$argon2id\$/);
     expect(u.passwordHash).not.toContain(pw);
     expect(await countUsers(db)).toBe(1);
@@ -54,15 +61,19 @@ describe.skipIf(!url)("users (Postgres)", () => {
 
   it("rejects a duplicate email regardless of case", async () => {
     await createUser(db, { name: "A", email: "a@example.test", password: pw });
-    await expect(createUser(db, { name: "B", email: "A@EXAMPLE.test", password: pw })).rejects.toBeInstanceOf(
-      UserError,
-    );
+    await expect(
+      createUser(db, { name: "B", email: "A@EXAMPLE.test", password: pw })
+    ).rejects.toBeInstanceOf(UserError);
   });
 
   it("verifies credentials", async () => {
     await createUser(db, { name: "A", email: "a@example.test", password: pw });
-    expect((await verifyCredentials(db, "A@example.test", pw))?.email).toBe("a@example.test");
-    expect(await verifyCredentials(db, "a@example.test", "wrong password!!")).toBeNull();
+    expect((await verifyCredentials(db, "A@example.test", pw))?.email).toBe(
+      "a@example.test"
+    );
+    expect(
+      await verifyCredentials(db, "a@example.test", "wrong password!!")
+    ).toBeNull();
     expect(await verifyCredentials(db, "nobody@example.test", pw)).toBeNull();
   });
 
@@ -70,9 +81,15 @@ describe.skipIf(!url)("users (Postgres)", () => {
     await createUser(db, { name: "A", email: "a@example.test", password: pw });
     await setPassword(db, "a@example.test", "a different long one");
     expect(await verifyCredentials(db, "a@example.test", pw)).toBeNull();
-    const u = await verifyCredentials(db, "a@example.test", "a different long one");
+    const u = await verifyCredentials(
+      db,
+      "a@example.test",
+      "a different long one"
+    );
     expect(u?.sessionVersion).toBe(1);
-    await expect(setPassword(db, "nobody@example.test", "a different long one")).rejects.toThrow("No user");
+    await expect(
+      setPassword(db, "nobody@example.test", "a different long one")
+    ).rejects.toThrow("No user");
   });
 
   it("removes a user", async () => {
@@ -83,7 +100,11 @@ describe.skipIf(!url)("users (Postgres)", () => {
   });
 
   it("updates the profile, de-duplicating and sorting fasting days", async () => {
-    const u = await createUser(db, { name: "A", email: "a@example.test", password: pw });
+    const u = await createUser(db, {
+      name: "A",
+      email: "a@example.test",
+      password: pw,
+    });
     await updateProfile(db, u.id, {
       name: "Alex",
       targetKcal: 2100,
@@ -102,8 +123,14 @@ describe.skipIf(!url)("users (Postgres)", () => {
       defaultFastingDays: [1, 5],
     });
     await expect(
-      updateProfile(db, u.id, { ...row, targetKcal: 2100.5, defaultFastingDays: [] } as never),
+      updateProfile(db, u.id, {
+        ...row,
+        targetKcal: 2100.5,
+        defaultFastingDays: [],
+      } as never)
     ).rejects.toThrow("whole number");
-    expect((await findUserByEmail(db, "a@example.test"))?.targetKcal).toBe(2100);
+    expect((await findUserByEmail(db, "a@example.test"))?.targetKcal).toBe(
+      2100
+    );
   });
 });

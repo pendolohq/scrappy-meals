@@ -1,4 +1,8 @@
-import { MACRO_KEYS, type Macros, type RecipeNutrition } from "../mealie/nutrition";
+import {
+  MACRO_KEYS,
+  type Macros,
+  type RecipeNutrition,
+} from "../mealie/nutrition";
 
 export type MealForMacros = {
   /** Null when the recipe is gone from Mealie. */
@@ -20,26 +24,46 @@ export type PersonDayTotals = {
   mealsEaten: number;
 };
 
-export const servingsEaten = (meal: Pick<MealForMacros, "baseServings" | "portions">, userId: string) =>
-  meal.baseServings * (meal.portions[userId] ?? 0);
+export const servingsEaten = (
+  meal: Pick<MealForMacros, "baseServings" | "portions">,
+  userId: string
+) => meal.baseServings * (meal.portions[userId] ?? 0);
 
-export function personDayTotals(meals: MealForMacros[], userId: string): PersonDayTotals {
+export function personDayTotals(
+  meals: MealForMacros[],
+  userId: string
+): PersonDayTotals {
   const macros: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 };
   const incompleteRecipes = new Set<string>();
   let mealsEaten = 0;
 
   for (const meal of meals) {
     const servings = servingsEaten(meal, userId);
-    if (servings <= 0) continue;
+    if (servings <= 0) {
+      continue;
+    }
     mealsEaten += 1;
-    if (!meal.nutrition || meal.nutrition.status !== "complete") incompleteRecipes.add(meal.recipeName);
-    if (!meal.nutrition) continue;
+    if (!meal.nutrition || meal.nutrition.status !== "complete") {
+      incompleteRecipes.add(meal.recipeName);
+    }
+    if (!meal.nutrition) {
+      continue;
+    }
     for (const key of MACRO_KEYS) {
       const perServing = meal.nutrition.perServing[key];
-      if (perServing !== undefined) macros[key] += perServing * servings;
+      if (perServing !== undefined) {
+        macros[key] += perServing * servings;
+      }
     }
   }
 
-  for (const key of MACRO_KEYS) macros[key] = Math.round(macros[key] * 10) / 10;
-  return { macros, incomplete: incompleteRecipes.size > 0, incompleteRecipes: [...incompleteRecipes], mealsEaten };
+  for (const key of MACRO_KEYS) {
+    macros[key] = Math.round(macros[key] * 10) / 10;
+  }
+  return {
+    macros,
+    incomplete: incompleteRecipes.size > 0,
+    incompleteRecipes: [...incompleteRecipes],
+    mealsEaten,
+  };
 }

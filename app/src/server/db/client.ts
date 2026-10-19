@@ -1,7 +1,7 @@
-import "server-only";
-
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+
+import "server-only";
 
 import * as schema from "./schema";
 
@@ -13,12 +13,16 @@ export function createDb(url: string, opts: { max?: number } = {}) {
 }
 
 // One pool per process; reused across Next.js hot reloads in dev.
-const globalForDb = globalThis as unknown as { __db?: ReturnType<typeof createDb> };
+const globalForDb = globalThis as unknown as {
+  __db?: ReturnType<typeof createDb>;
+};
 
 export function getDb(): Db {
   if (!globalForDb.__db) {
     const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL must be set");
+    if (!url) {
+      throw new Error("DATABASE_URL must be set");
+    }
     globalForDb.__db = createDb(url);
   }
   return globalForDb.__db.db;

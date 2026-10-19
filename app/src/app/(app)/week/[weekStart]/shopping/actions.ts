@@ -21,10 +21,13 @@ export type PushState = {
 };
 
 const fromForm = z.preprocess(
-  (form) => (form instanceof FormData ? { weekStart: form.get("weekStart") } : form),
+  (form) =>
+    form instanceof FormData ? { weekStart: form.get("weekStart") } : form,
   z.object({
-    weekStart: z.string().refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week"),
-  }),
+    weekStart: z
+      .string()
+      .refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week"),
+  })
 );
 
 export const pushShoppingAction = userFormAction(
@@ -35,15 +38,23 @@ export const pushShoppingAction = userFormAction(
       revalidatePath(`/week/${weekStart}/shopping`);
       const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
       return {
-        ok: { ...res, url: base ? `${base}/shopping-lists/${res.listId}` : null },
+        ok: {
+          ...res,
+          url: base ? `${base}/shopping-lists/${res.listId}` : null,
+        },
       };
     } catch (err) {
-      if (err instanceof MealieError || (err as Error).name === "TimeoutError") {
+      if (
+        err instanceof MealieError ||
+        (err as Error).name === "TimeoutError"
+      ) {
         console.error("shopping push failed", err);
-        throw new UserFacingError("Mealie didn't accept the list. Is it running? Nothing was changed on our side.");
+        throw new UserFacingError(
+          "Mealie didn't accept the list. Is it running? Nothing was changed on our side."
+        );
       }
       throw err;
     }
   },
-  { invalid: () => "Invalid week" },
+  { invalid: () => "Invalid week" }
 );

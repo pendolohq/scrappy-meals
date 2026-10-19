@@ -1,14 +1,16 @@
-import "server-only";
-
 import { unstable_rethrow } from "next/navigation";
 import type { z } from "zod";
+
+import "server-only";
 
 import { UserFacingError } from "./errors";
 import { currentUser, type SessionUser } from "./session";
 
 export const SIGNED_OUT = "You are signed out. Reload the page.";
 
-export type ActionResult<R extends object = object> = (R & { error?: undefined }) | { error: string };
+export type ActionResult<R extends object = object> =
+  | (R & { error?: undefined })
+  | { error: string };
 
 type Options = { invalid?: (err: z.ZodError) => string };
 
@@ -22,7 +24,7 @@ type Options = { invalid?: (err: z.ZodError) => string };
 export function userAction<S extends z.ZodType, R extends object>(
   schema: S,
   handler: (input: z.output<S>, user: SessionUser) => Promise<R>,
-  opts: Options = {},
+  opts: Options = {}
 ): (input: z.input<S>) => Promise<ActionResult<R>> {
   return async (input) => {
     const user = await currentUser();
@@ -54,7 +56,7 @@ export function userAction<S extends z.ZodType, R extends object>(
 export function userFormAction<S extends z.ZodType, R extends object>(
   schema: S,
   handler: (input: z.output<S>, user: SessionUser) => Promise<R>,
-  opts: Options = {},
+  opts: Options = {}
 ): (prev: unknown, form: FormData) => Promise<ActionResult<R>> {
   const run = userAction(schema, handler, opts);
   return (_prev, form) => run(form as z.input<S>);

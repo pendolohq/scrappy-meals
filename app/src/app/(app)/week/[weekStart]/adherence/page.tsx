@@ -28,9 +28,12 @@ export default async function AdherencePage({
 }) {
   await requireUser();
   const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) redirect("/week");
-  if (weekStartOf(weekStart) !== weekStart)
+  if (!isIsoDate(weekStart)) {
+    redirect("/week");
+  }
+  if (weekStartOf(weekStart) !== weekStart) {
     redirect(`/week/${weekStartOf(weekStart)}/adherence`);
+  }
 
   const plan = await getWeekPlan(getDb(), weekStart);
   const now = today();
@@ -76,7 +79,7 @@ export default async function AdherencePage({
             portion: meal.portions[m.id] ?? 0,
             status: meal.adherence[m.id]?.status ?? null,
           })),
-          now,
+          now
         );
         const notable = meals.filter((meal) => {
           const s = meal.adherence[m.id]?.status;
@@ -84,7 +87,7 @@ export default async function AdherencePage({
         });
         const logged = ADHERENCE_STATUSES.reduce(
           (n, s) => n + summary.counts[s],
-          0,
+          0
         );
 
         return (

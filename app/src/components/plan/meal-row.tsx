@@ -8,23 +8,30 @@ import {
   setServingsAction,
 } from "@/app/(app)/week/actions";
 import { formatPortion } from "@/lib/format";
+import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
-import type { Member, PlannedMeal } from "@/server/plan";
 
 const STEP = 0.25;
 
 const Flags = ({ meal }: { meal: PlannedMeal }) => {
   const flags: string[] = [];
-  if (!meal.recipe) flags.push("Not found in Mealie");
-  else {
-    if (meal.recipe.nutrition.status === "missing")
+  if (!meal.recipe) {
+    flags.push("Not found in Mealie");
+  } else {
+    if (meal.recipe.nutrition.status === "missing") {
       flags.push("No nutrition data");
-    if (meal.recipe.nutrition.status === "partial")
+    }
+    if (meal.recipe.nutrition.status === "partial") {
       flags.push(`No ${meal.recipe.nutrition.missing.join(", ")} data`);
-    if (!meal.recipe.servings) flags.push("No servings count in Mealie");
+    }
+    if (!meal.recipe.servings) {
+      flags.push("No servings count in Mealie");
+    }
   }
-  if (flags.length === 0) return null;
+  if (flags.length === 0) {
+    return null;
+  }
   return (
     <ul className="text-xs text-danger">
       {flags.map((f) => (
@@ -99,15 +106,17 @@ export const MealRow = ({
     meal.portions,
     (
       current,
-      { userId, multiplier }: { userId: string; multiplier: number },
-    ) => ({ ...current, [userId]: multiplier }),
+      { userId, multiplier }: { userId: string; multiplier: number }
+    ) => ({ ...current, [userId]: multiplier })
   );
 
   const act = (work: () => Promise<{ error?: string }>) =>
     startTransition(async () => {
       setError(undefined);
       const res = await work();
-      if (res.error) setError(res.error);
+      if (res.error) {
+        setError(res.error);
+      }
     });
 
   const name = meal.recipe?.name ?? meal.slug;
@@ -202,7 +211,7 @@ export const MealRow = ({
                 const baseServings = Number(e.currentTarget.value);
                 if (baseServings > 0 && baseServings !== meal.baseServings) {
                   act(() =>
-                    setServingsAction({ mealId: meal.id, baseServings }),
+                    setServingsAction({ mealId: meal.id, baseServings })
                   );
                 }
               }}

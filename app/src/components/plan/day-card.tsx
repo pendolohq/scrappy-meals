@@ -82,7 +82,7 @@ export const DayCard = ({
           return (
             <div key={slot}>
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
+                <h3 className="text-xs font-medium tracking-wide text-muted uppercase">
                   {label}
                 </h3>
                 <AddMeal date={date} slot={slot} label={label} />

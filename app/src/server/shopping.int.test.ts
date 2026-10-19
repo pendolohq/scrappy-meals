@@ -1,10 +1,10 @@
 // Needs both a live Mealie and a throwaway Postgres:
 //   MEALIE_TEST_URL=... DATABASE_TEST_URL=... pnpm test:integration
 import { randomUUID } from "node:crypto";
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
+
 import { addDays, weekStartOf } from "./domain/week";
 import { createMealieClient, type MealieClient, unwrap } from "./mealie/client";
 import { getRecipe } from "./mealie/recipes";
@@ -47,19 +47,19 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       admin = createMealieClient({ baseUrl: baseUrl!, token: access_token });
 
       const lentils = unwrap(
-        await admin.POST("/api/foods", { body: { name: `it-lentils-${run}` } }),
+        await admin.POST("/api/foods", { body: { name: `it-lentils-${run}` } })
       );
       const gram = unwrap(
         await admin.POST("/api/units", {
           body: { name: `it-gram-${run}`, abbreviation: "g" },
-        }),
+        })
       );
       ids.lentils = lentils.id;
       ids.gram = gram.id;
       ids.slug = unwrap(
         await admin.POST("/api/recipes", {
           body: { name: `IT Shopping Soup ${run}` },
-        }),
+        })
       );
       unwrap(
         await admin.PATCH("/api/recipes/{slug}", {
@@ -80,27 +80,29 @@ describe.skipIf(!baseUrl || !testDbUrl)(
               },
             ],
           },
-        }),
+        })
       );
       cleanup.push(() =>
         admin.DELETE("/api/recipes/{slug}", {
           params: { path: { slug: ids.slug } },
-        }),
+        })
       );
       cleanup.push(() =>
         admin.DELETE("/api/foods/{item_id}", {
           params: { path: { item_id: lentils.id } },
-        }),
+        })
       );
       cleanup.push(() =>
         admin.DELETE("/api/units/{item_id}", {
           params: { path: { item_id: gram.id } },
-        }),
+        })
       );
     });
 
     afterAll(async () => {
-      for (const fn of cleanup.reverse()) await fn().catch(() => undefined);
+      for (const fn of cleanup.reverse()) {
+        await fn().catch(() => undefined);
+      }
     });
 
     it("pushes the scaled, merged list, then replaces it on re-push", async () => {
@@ -125,7 +127,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
           slug: ids.slug,
           createdBy: a.id,
         },
-        { fetch: fromMealie },
+        { fetch: fromMealie }
       );
       await setPortion(db, lunch, b.id, 0.5); // 1 + 0.5 = 1.5 of 4 servings
 
@@ -141,7 +143,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       cleanup.push(() =>
         admin.DELETE("/api/households/shopping/lists/{item_id}", {
           params: { path: { item_id: first.listId } },
-        }),
+        })
       );
       expect(first).toMatchObject({
         listName: shoppingListName(WEEK),
@@ -155,14 +157,14 @@ describe.skipIf(!baseUrl || !testDbUrl)(
         unitId: ids.gram,
       });
       expect(items.find((i) => !i.foodId)?.note).toContain(
-        "a handful of parsley",
+        "a handful of parsley"
       );
 
       // Something added by hand in Mealie survives a re-push.
       const manual = await addShoppingItems(
         first.listId,
         [{ quantity: 1, note: `it-manual-${run}` }],
-        opts,
+        opts
       );
 
       await setPortion(db, lunch, b.id, 1); // now 2 of 4 servings
@@ -193,23 +195,23 @@ describe.skipIf(!baseUrl || !testDbUrl)(
           slug: ids.slug,
           createdBy: a.id,
         },
-        { fetch: fromMealie },
+        { fetch: fromMealie }
       );
       const first = await pushShoppingList(db, WEEK, { client: admin });
       unwrap(
         await admin.DELETE("/api/households/shopping/lists/{item_id}", {
           params: { path: { item_id: first.listId } },
-        }),
+        })
       );
 
       const second = await pushShoppingList(db, WEEK, { client: admin });
       cleanup.push(() =>
         admin.DELETE("/api/households/shopping/lists/{item_id}", {
           params: { path: { item_id: second.listId } },
-        }),
+        })
       );
       expect(second.listId).not.toBe(first.listId);
       expect(second.added).toBe(2);
     });
-  },
+  }
 );

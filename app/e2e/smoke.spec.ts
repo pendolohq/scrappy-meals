@@ -1,12 +1,16 @@
-import { readFileSync } from "node:fs";
-
 import { expect, type Page, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 import { formatDay } from "../src/lib/format";
 import { today } from "../src/server/domain/week";
+
 import { STATE_FILE, USERS } from "./global-setup";
 
-const state = () => JSON.parse(readFileSync(STATE_FILE, "utf8")) as { recipe: { name: string }; food: string };
+const state = () =>
+  JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
+    recipe: { name: string };
+    food: string;
+  };
 
 async function signIn(page: Page, user: { email: string; password: string }) {
   await page.goto("/login");
@@ -20,10 +24,20 @@ test.describe.configure({ mode: "serial" });
 
 test("is installable", async ({ request }) => {
   const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest).toMatchObject({ name: "Scrappy Meals", display: "standalone", start_url: "/week" });
-  expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(["192x192", "512x512", "512x512"]);
+  expect(manifest).toMatchObject({
+    name: "Scrappy Meals",
+    display: "standalone",
+    start_url: "/week",
+  });
+  expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual([
+    "192x192",
+    "512x512",
+    "512x512",
+  ]);
   expect((await request.get("/sw.js")).ok()).toBe(true);
-  expect((await request.get("/icons/icon-512.png")).headers()["content-type"]).toBe("image/png");
+  expect(
+    (await request.get("/icons/icon-512.png")).headers()["content-type"]
+  ).toBe("image/png");
 });
 
 test("rejects a wrong password", async ({ page }) => {
@@ -31,10 +45,15 @@ test("rejects a wrong password", async ({ page }) => {
   await page.getByLabel("Email").fill(USERS.alex.email);
   await page.getByLabel("Password").fill("not the password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.locator("main p[role=alert]")).toHaveText("Invalid email or password.");
+  await expect(page.locator("main p[role=alert]")).toHaveText(
+    "Invalid email or password."
+  );
 });
 
-test("plans, logs and shops a meal, and keeps the week readable offline", async ({ page, context }) => {
+test("plans, logs and shops a meal, and keeps the week readable offline", async ({
+  page,
+  context,
+}) => {
   const { recipe, food } = state();
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
@@ -42,19 +61,32 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   // Add today's lunch from Mealie.
   await day.getByRole("button", { name: "+ Add lunch" }).click();
   await page.getByRole("dialog").getByLabel("Search recipes").fill(recipe.name);
-  await page.getByRole("dialog").getByRole("button", { name: new RegExp(recipe.name) }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: new RegExp(recipe.name) })
+    .click();
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(meal).toBeVisible();
-  await expect(day.getByTestId("totals-Alex").getByTestId("kcal")).toHaveText("400");
+  await expect(day.getByTestId("totals-Alex").getByTestId("kcal")).toHaveText(
+    "400"
+  );
 
   // Sam has a half portion: 1 + 0.5 = 1.5 of 4 servings.
-  await meal.getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` }).click();
-  await meal.getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` }).click();
+  await meal
+    .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
+    .click();
+  await meal
+    .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
+    .click();
   await expect(meal.getByTestId("portion").nth(1)).toHaveText("½×");
-  await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText("200");
+  await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText(
+    "200"
+  );
 
   // One tap to log it.
-  const stuck = meal.getByRole("button", { name: new RegExp(`^Stuck to it: ${recipe.name}`) });
+  const stuck = meal.getByRole("button", {
+    name: new RegExp(`^Stuck to it: ${recipe.name}`),
+  });
   await stuck.click();
   await expect(stuck).toHaveAttribute("aria-pressed", "true");
 
@@ -71,11 +103,17 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     await navigator.serviceWorker.ready;
   });
   await page.reload(); // now controlled, so this copy is cached
-  await expect(page.getByTestId("meal").filter({ hasText: recipe.name })).toBeVisible();
+  await expect(
+    page.getByTestId("meal").filter({ hasText: recipe.name })
+  ).toBeVisible();
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByText("Offline: showing the last saved copy.")).toBeVisible();
-  await expect(page.getByTestId("meal").filter({ hasText: recipe.name })).toBeVisible();
+  await expect(
+    page.getByText("Offline: showing the last saved copy.")
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("meal").filter({ hasText: recipe.name })
+  ).toBeVisible();
   await context.setOffline(false);
 
   // Signing out drops the cached plan from this device.
@@ -83,15 +121,22 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await expect(page).toHaveURL(/\/login/);
   await context.setOffline(true);
   await page.goto("/week").catch(() => undefined);
-  await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "You're offline" })
+  ).toBeVisible();
   await expect(page.getByText(recipe.name)).toHaveCount(0);
   await context.setOffline(false);
 });
 
-test("the other person sees the plan and logs only their own meals", async ({ page }) => {
+test("the other person sees the plan and logs only their own meals", async ({
+  page,
+}) => {
   const { recipe } = state();
   await signIn(page, USERS.sam);
-  const meal = page.locator(`section[aria-label="${formatDay(today())}"]`).getByTestId("meal").filter({ hasText: recipe.name });
+  const meal = page
+    .locator(`section[aria-label="${formatDay(today())}"]`)
+    .getByTestId("meal")
+    .filter({ hasText: recipe.name });
   await expect(meal.getByTestId("adherence-badge")).toHaveText("✓ Stuck to it");
   await expect(meal.getByRole("group", { name: /How did/ })).toHaveCount(1); // Sam's own buttons only
 });

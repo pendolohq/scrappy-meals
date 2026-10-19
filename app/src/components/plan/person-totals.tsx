@@ -1,6 +1,6 @@
+import { formatAmount } from "@/lib/format";
 import type { PersonDayTotals } from "@/server/domain/macros";
 import type { Member } from "@/server/plan";
-import { formatAmount } from "@/lib/format";
 
 import { FastingToggle } from "./fasting-toggle";
 
@@ -13,8 +13,12 @@ const MACROS = [
 
 const tone = (total: number, target: number) => {
   const ratio = total / target;
-  if (ratio > 1.1) return "bg-danger";
-  if (ratio >= 0.9) return "bg-accent";
+  if (ratio > 1.1) {
+    return "bg-danger";
+  }
+  if (ratio >= 0.9) {
+    return "bg-accent";
+  }
   return "bg-muted";
 };
 

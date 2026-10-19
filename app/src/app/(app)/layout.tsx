@@ -1,11 +1,16 @@
 import Link from "next/link";
+
 import { signOut } from "@/auth";
 import { SignOut } from "@/components/sign-out";
 import { requireUser } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const user = await requireUser();
 
   return (

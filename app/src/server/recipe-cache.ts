@@ -1,6 +1,6 @@
-import "server-only";
-
 import { inArray } from "drizzle-orm";
+
+import "server-only";
 
 import type { Db } from "./db/client";
 import { recipeCache } from "./db/schema";
@@ -19,21 +19,33 @@ const MAX_AGE_MS = 60 * 60 * 1000;
 export async function loadRecipes(
   db: Db,
   slugs: string[],
-  opts: { fetch?: RecipeFetcher; maxAgeMs?: number; now?: Date; force?: boolean } = {},
+  opts: {
+    fetch?: RecipeFetcher;
+    maxAgeMs?: number;
+    now?: Date;
+    force?: boolean;
+  } = {}
 ): Promise<Map<string, CachedRecipe | null>> {
   const unique = [...new Set(slugs)];
   const result = new Map<string, CachedRecipe | null>();
-  if (unique.length === 0) return result;
+  if (unique.length === 0) {
+    return result;
+  }
 
   const fetchRecipe = opts.fetch ?? ((slug: string) => getRecipe(slug));
   const now = opts.now ?? new Date();
   const maxAge = opts.maxAgeMs ?? MAX_AGE_MS;
 
-  const rows = await db.select().from(recipeCache).where(inArray(recipeCache.slug, unique));
+  const rows = await db
+    .select()
+    .from(recipeCache)
+    .where(inArray(recipeCache.slug, unique));
   const cached = new Map(rows.map((r) => [r.slug, r]));
   const stale = unique.filter((slug) => {
     const row = cached.get(slug);
-    return opts.force || !row || now.getTime() - row.fetchedAt.getTime() > maxAge;
+    return (
+      opts.force || !row || now.getTime() - row.fetchedAt.getTime() > maxAge
+    );
   });
 
   await Promise.all(
@@ -64,11 +76,18 @@ export async function loadRecipes(
           .returning();
         cached.set(slug, row);
       } catch (err) {
-        console.warn(`recipe ${slug}: refresh from Mealie failed, using cached copy if any`, err);
+        console.warn(
+          `recipe ${slug}: refresh from Mealie failed, using cached copy if any`,
+          err
+        );
       }
-    }),
+    })
   );
 
-  for (const slug of unique) if (!result.has(slug)) result.set(slug, cached.get(slug) ?? null);
+  for (const slug of unique) {
+    if (!result.has(slug)) {
+      result.set(slug, cached.get(slug) ?? null);
+    }
+  }
   return result;
 }

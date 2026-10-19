@@ -30,13 +30,18 @@ export type NewShoppingItem = {
 
 export async function findShoppingListByName(
   name: string,
-  opts: { client?: MealieClient } = {},
+  opts: { client?: MealieClient } = {}
 ): Promise<ShoppingList | null> {
   const client = opts.client ?? mealie();
   const page = unwrap(
     await client.GET("/api/households/shopping/lists", {
-      params: { query: { queryFilter: `name = "${name.replace(/["\\]/g, "\\$&")}"`, perPage: 1 } },
-    }),
+      params: {
+        query: {
+          queryFilter: `name = "${name.replace(/["\\]/g, "\\$&")}"`,
+          perPage: 1,
+        },
+      },
+    })
   );
   const list = page.items[0];
   return list ? { id: list.id, name: list.name ?? name } : null;
@@ -44,20 +49,24 @@ export async function findShoppingListByName(
 
 export async function createShoppingList(
   name: string,
-  opts: { client?: MealieClient } = {},
+  opts: { client?: MealieClient } = {}
 ): Promise<ShoppingList> {
   const client = opts.client ?? mealie();
-  const list = unwrap(await client.POST("/api/households/shopping/lists", { body: { name } }));
+  const list = unwrap(
+    await client.POST("/api/households/shopping/lists", { body: { name } })
+  );
   return { id: list.id, name: list.name ?? name };
 }
 
 export async function getShoppingListItems(
   listId: string,
-  opts: { client?: MealieClient } = {},
+  opts: { client?: MealieClient } = {}
 ): Promise<ShoppingItem[]> {
   const client = opts.client ?? mealie();
   const list = unwrap(
-    await client.GET("/api/households/shopping/lists/{item_id}", { params: { path: { item_id: listId } } }),
+    await client.GET("/api/households/shopping/lists/{item_id}", {
+      params: { path: { item_id: listId } },
+    })
   );
   return (list.listItems ?? []).map(toItem);
 }
@@ -70,9 +79,11 @@ export async function getShoppingListItems(
 export async function addShoppingItems(
   listId: string,
   items: NewShoppingItem[],
-  opts: { client?: MealieClient } = {},
+  opts: { client?: MealieClient } = {}
 ): Promise<{ created: ShoppingItem[]; updated: ShoppingItem[] }> {
-  if (items.length === 0) return { created: [], updated: [] };
+  if (items.length === 0) {
+    return { created: [], updated: [] };
+  }
   const client = opts.client ?? mealie();
   const body: MealieItemCreate[] = items.map((item) => ({
     shoppingListId: listId,
@@ -80,16 +91,33 @@ export async function addShoppingItems(
     foodId: item.foodId ?? null,
     unitId: item.unitId ?? null,
     note: item.note ?? "",
-    recipeReferences: (item.recipeIds ?? []).map((recipeId) => ({ recipeId, recipeQuantity: 1 })),
+    recipeReferences: (item.recipeIds ?? []).map((recipeId) => ({
+      recipeId,
+      recipeQuantity: 1,
+    })),
   }));
-  const out = unwrap(await client.POST("/api/households/shopping/items/create-bulk", { body }));
-  return { created: (out.createdItems ?? []).map(toItem), updated: (out.updatedItems ?? []).map(toItem) };
+  const out = unwrap(
+    await client.POST("/api/households/shopping/items/create-bulk", { body })
+  );
+  return {
+    created: (out.createdItems ?? []).map(toItem),
+    updated: (out.updatedItems ?? []).map(toItem),
+  };
 }
 
-export async function deleteShoppingItems(ids: string[], opts: { client?: MealieClient } = {}): Promise<void> {
-  if (ids.length === 0) return;
+export async function deleteShoppingItems(
+  ids: string[],
+  opts: { client?: MealieClient } = {}
+): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
   const client = opts.client ?? mealie();
-  unwrap(await client.DELETE("/api/households/shopping/items", { params: { query: { ids } } }));
+  unwrap(
+    await client.DELETE("/api/households/shopping/items", {
+      params: { query: { ids } },
+    })
+  );
 }
 
 function toItem(i: MealieItemOut): ShoppingItem {

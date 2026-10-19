@@ -13,7 +13,11 @@ export async function GET() {
     .catch(() => false);
   const mealie = await checkMealieVersion()
     .then((v) => {
-      if (!v.matches) console.warn(`Mealie ${v.server} differs from schema ${v.schema}; run pnpm mealie:types`);
+      if (!v.matches) {
+        console.warn(
+          `Mealie ${v.server} differs from schema ${v.schema}; run pnpm mealie:types`
+        );
+      }
       return { reachable: true, versionMatches: v.matches };
     })
     .catch(() => ({ reachable: false, versionMatches: false }));

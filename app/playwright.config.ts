@@ -15,10 +15,16 @@ export default defineConfig({
     ...devices["Pixel 7"],
     baseURL,
     trace: "retain-on-failure",
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {},
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+      : {},
   },
   // Starts the standalone server unless E2E_BASE_URL points at one already running.
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : { command: "node .next/standalone/server.js", url: `${baseURL}/api/health`, timeout: 60_000 },
+    : {
+        command: "node .next/standalone/server.js",
+        url: `${baseURL}/api/health`,
+        timeout: 60_000,
+      },
 });

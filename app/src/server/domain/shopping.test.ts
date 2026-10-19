@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Ingredient } from "../mealie/recipes";
+
 import { buildShoppingList, type MealForShopping } from "./shopping";
 
 const g = { id: "u-g", name: "gram", abbreviation: "g" };
@@ -44,7 +45,7 @@ const dal = {
 const meal = (
   recipe: MealForShopping["recipe"],
   portions: Record<string, number>,
-  baseServings = 1,
+  baseServings = 1
 ): MealForShopping => ({
   recipe,
   slug: recipe?.id ?? "gone",
@@ -68,7 +69,7 @@ describe("buildShoppingList", () => {
     expect(
       list.lines
         .find((l) => l.key === "f-lentils|u-g")
-        ?.recipes.map((r) => r.name),
+        ?.recipes.map((r) => r.name)
     ).toEqual(["Soup", "Dal"]);
     expect(list.freeText).toEqual([
       {
@@ -86,7 +87,7 @@ describe("buildShoppingList", () => {
       meal(soup, { a: 1, b: 1 }),
     ]);
     expect(list.lines.find((l) => l.foodName === "lentils")?.quantity).toBe(
-      400,
+      400
     ); // (2 + 2) of 4
   });
 
