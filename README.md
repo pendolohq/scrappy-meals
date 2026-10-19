@@ -32,6 +32,8 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 | `docs/mealie-api.md` | What we rely on in the Mealie API, incl. nutrition semantics |
 | `docs/deploy.md` | Step-by-step deployment on a VPS |
 | `docs/security.md` | How sign-in is enforced for pages, server actions and API routes |
+| `docs/README.md` | How the pieces fit and how a commit reaches the server; index of the docs |
+| `AGENTS.md`, `.agents/`, `.claude/` | Instructions, skills and subagents for AI coding agents |
 
 Only Caddy publishes ports. Postgres and Mealie are reachable only on the
 Compose network; the app calls Mealie at `http://mealie:9000` with a
@@ -93,6 +95,7 @@ pnpm install
 pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
 pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
 pnpm format && pnpm lint:fix                       # fix formatting and auto-fixable lint
+pnpm update-packages --dry-run                      # outdated deps; without --dry-run applies minor/patch
 DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
 # End-to-end smoke test against a running build (empties DATABASE_URL!):
 E2E_ALLOW_RESET=1 E2E_BASE_URL=http://localhost:3000 DATABASE_URL=postgres://... \
