@@ -62,6 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!limits.allowed(email, ip)) {
           throw new RateLimitedError();
         }
+        limits.attempt(email, ip);
 
         const user = await verifyCredentials(
           getDb(),
@@ -69,7 +70,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           parsed.data.password
         );
         if (!user) {
-          limits.failed(email, ip);
           return null;
         }
         limits.succeeded(email, ip);

@@ -34,7 +34,7 @@ describe("createSignInLimits", () => {
     times: number
   ) => {
     for (let i = 0; i < times; i++) {
-      limits.failed(email, ip);
+      limits.attempt(email, ip);
     }
   };
 
@@ -53,17 +53,33 @@ describe("createSignInLimits", () => {
     expect(limits.allowed("alex@example.test", "1.2.3.4")).toBe(false);
 
     for (let n = 0; n < 30; n++) {
-      limits.failed(`guess${n}@example.test`, "7.7.7.7");
+      limits.attempt(`guess${n}@example.test`, "7.7.7.7");
     }
     expect(limits.allowed("sam@example.test", "7.7.7.7")).toBe(false);
   });
 
   it("doesn't count successful sign-ins", () => {
     const limits = createSignInLimits(() => 0);
-    fail(limits, "alex@example.test", "1.2.3.4", 9);
-    limits.succeeded("alex@example.test", "1.2.3.4");
+    // A household behind one IP signing in often: never blocked.
+    for (let n = 0; n < 40; n++) {
+      limits.attempt(`member${n % 2}@example.test`, "1.2.3.4");
+      limits.succeeded(`member${n % 2}@example.test`, "1.2.3.4");
+    }
     fail(limits, "alex@example.test", "1.2.3.4", 9);
     expect(limits.allowed("alex@example.test", "1.2.3.4")).toBe(true);
+  });
+
+  it("counts an attempt before its password is checked", () => {
+    const limits = createSignInLimits(() => 0);
+    // Ten requests sent at once: each is counted as it passes the check.
+    const passed = Array.from({ length: 12 }, () => {
+      const ok = limits.allowed("alex@example.test", "6.6.6.6");
+      if (ok) {
+        limits.attempt("alex@example.test", "6.6.6.6");
+      }
+      return ok;
+    });
+    expect(passed.filter(Boolean)).toHaveLength(10);
   });
 
   it("lets everyone in again after the window", () => {
