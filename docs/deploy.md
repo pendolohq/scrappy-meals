@@ -58,7 +58,7 @@ the database passwords end up inside a `postgres://` URL):
 - `DOMAIN`, `ACME_EMAIL`, `TZ` (your time zone decides what "today" is)
 - `POSTGRES_SUPERUSER_PASSWORD`, `PLANNER_DB_PASSWORD`, `MEALIE_DB_PASSWORD`
 - `AUTH_SECRET`
-- `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=latest` (or a version)
+- `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`
 
 Leave `MEALIE_API_TOKEN` empty for now.
 
@@ -112,16 +112,44 @@ sudo touch /var/log/scrappy-meals-backup.log && sudo chown deploy /var/log/scrap
 Do a test restore on a throwaway server once, so you know it works before
 you need it.
 
-## 7. Updating
+## 7. Releasing and updating
+
+Merging to `main` does **not** change what the server runs. CI publishes these
+image tags:
+
+| Event | Tags | Used by |
+| --- | --- | --- |
+| Pull request | none (built and smoke-tested only when the PR touches the image) | |
+| Push to `main` | `:main`, `:sha-<commit>` | trying a build before releasing it |
+| Tag `vX.Y.Z` | `:X.Y.Z`, `:X.Y`, `:latest` | the server |
+
+**To release**, tag a commit on `main` that has green CI, then push the tag (or
+publish a GitHub release, which creates the tag):
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Wait for the CI run on the tag to finish (it runs the full test suite again
+and then publishes). **Then update the server:**
 
 ```sh
 cd /opt/scrappy-meals
-git pull                          # compose file, Caddyfile, scripts
+git checkout v0.2.0               # compose file, Caddyfile, scripts of that release
 docker compose pull app && docker compose up -d app
 ```
 
-The app applies database migrations itself on start. To pin a version, set
-`APP_TAG` to a release tag or `sha-<commit>` instead of `latest`.
+`APP_TAG` in `.env` decides which image that pulls:
+
+- `APP_TAG=0.2.0`: pinned (recommended). Upgrading means changing it on
+  purpose; rolling back means setting the previous version.
+- `APP_TAG=latest`: always the newest release, never an unreleased `main`.
+- `APP_TAG=sha-<commit>` or `main`: only for trying a build.
+
+The app applies database migrations itself on start. Migrations only move
+forward, so rolling back past a release that added one needs the backup from
+before the upgrade (section 6, `scripts/restore.sh`). Take a backup before
+upgrading across a migration.
 
 **Upgrading Mealie** is a code change, not just a pull: the planner's Mealie
 client is generated from a specific Mealie version. Bump the tag in
