@@ -5,7 +5,7 @@ const auth = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 vi.mock("@/auth", () => ({ auth }));
 
 import { SIGNED_OUT, userAction, userFormAction } from "./action";
-import { UserFacingError } from "./errors";
+import { RetryableError, UserFacingError } from "./errors";
 
 const alex = {
   id: "7b0c1c9e-4c1a-4f55-9a0e-2f4d8d6f2a10",
@@ -29,7 +29,7 @@ describe("userAction", () => {
 
   it("rejects callers without a session before reading the input", async () => {
     auth.mockResolvedValue(null);
-    expect(await action({ n: 1 })).toEqual({ error: SIGNED_OUT });
+    expect(await action({ n: 1 })).toEqual({ error: SIGNED_OUT, retry: true });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -62,6 +62,14 @@ describe("userAction", () => {
     quiet.mockRestore();
   });
 
+  it("marks errors worth retrying", async () => {
+    handler.mockRejectedValueOnce(new RetryableError("Mealie didn't answer."));
+    expect(await action({ n: 4 })).toEqual({
+      error: "Mealie didn't answer.",
+      retry: true,
+    });
+  });
+
   it("uses a custom message for invalid input when given one", async () => {
     const custom = userAction(z.object({ n: z.number() }), handler, {
       invalid: () => "Pick a number",
@@ -88,6 +96,9 @@ describe("userFormAction", () => {
 
   it("rejects callers without a session", async () => {
     auth.mockResolvedValue(null);
-    expect(await action({}, new FormData())).toEqual({ error: SIGNED_OUT });
+    expect(await action({}, new FormData())).toEqual({
+      error: SIGNED_OUT,
+      retry: true,
+    });
   });
 });

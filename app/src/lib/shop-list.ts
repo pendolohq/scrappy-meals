@@ -12,35 +12,63 @@ export type ShopItemView = {
 };
 
 /**
- * A change made on this device. Ticks set a value instead of toggling, so a
- * change replayed twice (say, after a dropped response) ends up the same.
+ * A change made on this device, with its own `id`. Ticks set a value instead
+ * of toggling, and adds carry their `tempId` to Mealie, so a change sent
+ * twice (say, after a dropped response) ends up the same.
  */
-export type QueuedChange =
+export type QueuedChange = { id: string } & (
   | { kind: "check"; itemId: string; checked: boolean }
   | { kind: "add"; tempId: string; text: string }
-  | { kind: "remove"; itemId: string };
+  | { kind: "remove"; itemId: string }
+);
 
 export const TEMP_PREFIX = "local-";
 
 const isTemp = (id: string) => id.startsWith(TEMP_PREFIX);
 
-/** Adds a change to the queue, folding it into earlier changes to the same item. */
+/**
+ * Adds a change to the queue, folding it into earlier changes to the same
+ * item. The change being sent right now (`inFlightId`) is never touched: its
+ * request is already out, and it leaves the queue when the request settles.
+ */
 export function enqueue(
   queue: QueuedChange[],
-  change: QueuedChange
+  change: QueuedChange,
+  inFlightId: string | null = null
 ): QueuedChange[] {
   if (change.kind === "add") {
     return [...queue, change];
   }
-  const forItem = (c: QueuedChange) =>
-    c.kind === "add" ? c.tempId === change.itemId : c.itemId === change.itemId;
+  const target = change.itemId;
+  const foldable = (c: QueuedChange) =>
+    c.id !== inFlightId &&
+    (c.kind === "add" ? c.tempId === target : c.itemId === target);
   if (change.kind === "remove") {
-    const rest = queue.filter((c) => !forItem(c));
-    // An item that never reached Mealie just disappears.
-    return isTemp(change.itemId) ? rest : [...rest, change];
+    // An item whose add hasn't been sent yet just disappears. If the add is
+    // already on its way, the removal waits for Mealie's id (replaceTempId).
+    const unsentAdd =
+      isTemp(target) &&
+      queue.some((c) => c.kind === "add" && c.tempId === target && foldable(c));
+    const rest = queue.filter((c) => !foldable(c));
+    return unsentAdd ? rest : [...rest, change];
   }
-  // A later tick replaces an earlier one for the same item.
-  return [...queue.filter((c) => !(c.kind === "check" && forItem(c))), change];
+  // A later tick replaces an earlier, unsent one for the same item.
+  return [...queue.filter((c) => !(c.kind === "check" && foldable(c))), change];
+}
+
+/**
+ * Takes a change that will never succeed off the queue; for an add, also the
+ * later changes to the item it would have created.
+ */
+export function dropFailed(
+  queue: QueuedChange[],
+  failed: QueuedChange
+): QueuedChange[] {
+  return queue.filter(
+    (c) =>
+      c.id !== failed.id &&
+      !(failed.kind === "add" && c.kind !== "add" && c.itemId === failed.tempId)
+  );
 }
 
 /** What the list looks like once the queued changes land. */

@@ -282,8 +282,23 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       ).toBe(false);
 
       // A hand-added line is a plain note, and survives sending the week again.
-      const coffee = await addShopItem(db, WEEK, `it-coffee-${run}`, opts);
-      expect(coffee).toMatchObject({ listId: pushed.listId, checked: false });
+      const clientId = `local-${randomUUID()}`;
+      const coffee = await addShopItem(
+        db,
+        WEEK,
+        `it-coffee-${run}`,
+        clientId,
+        opts
+      );
+      expect(coffee).toMatchObject({
+        listId: pushed.listId,
+        checked: false,
+        clientId,
+      });
+      // Sending the same add again (a lost response) doesn't duplicate it.
+      expect(
+        (await addShopItem(db, WEEK, `it-coffee-${run}`, clientId, opts)).id
+      ).toBe(coffee.id);
       await pushShoppingList(db, WEEK, opts);
       const after = (await weekShopList(db, WEEK, opts))!.items;
       expect(after.find((i) => i.id === coffee.id)?.note).toBe(

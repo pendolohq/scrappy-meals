@@ -79,7 +79,7 @@ describe("server actions", () => {
           );
           expect({ name, result }).toEqual({
             name,
-            result: { error: SIGNED_OUT },
+            result: { error: SIGNED_OUT, retry: true },
           });
         }
       }

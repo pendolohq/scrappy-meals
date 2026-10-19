@@ -262,18 +262,27 @@ export async function checkShopItem(
 
 /**
  * Adds a free-text line to this week's list. It isn't recorded as the
- * planner's, so sending the week again keeps it.
+ * planner's, so sending the week again keeps it. `clientId` comes from the
+ * device that queued the add: if a response was lost and the add is sent
+ * again, the line already on the list is returned instead of a second one.
  */
 export async function addShopItem(
   db: Db,
   weekStart: string,
   note: string,
+  clientId: string,
   opts: Opts = {}
 ): Promise<ShoppingItem> {
   const listId = await pushedListId(db, weekStart);
+  const existing = (
+    await getShoppingListItems(listId, { client: opts.client })
+  ).find((i) => i.clientId === clientId);
+  if (existing) {
+    return existing;
+  }
   const { created, updated } = await addShoppingItems(
     listId,
-    [{ quantity: 0, note }],
+    [{ quantity: 0, note, clientId }],
     { client: opts.client }
   );
   const item = created[0] ?? updated[0];

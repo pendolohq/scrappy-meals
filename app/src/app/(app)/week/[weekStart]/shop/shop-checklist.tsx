@@ -6,10 +6,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   applyQueue,
+  dropFailed,
   enqueue,
   groupItems,
   type QueuedChange,
@@ -30,13 +30,9 @@ import {
   removeShopItemAction,
 } from "./actions";
 
-type Result = { error?: string; item?: { id: string } };
+type Result = { error?: string; retry?: true; item?: { id: string } };
 
-type FlushHooks = {
-  onError: (message: string) => void;
-  onSaved: (change: QueuedChange) => void;
-  onDone: () => void;
-};
+const RETRY_MS = 10_000;
 
 const send = (weekStart: string, c: QueuedChange): Promise<Result> => {
   if (c.kind === "check") {
@@ -47,69 +43,61 @@ const send = (weekStart: string, c: QueuedChange): Promise<Result> => {
     });
   }
   if (c.kind === "add") {
-    return addShopItemAction({ weekStart, text: c.text });
+    return addShopItemAction({ weekStart, text: c.text, clientId: c.tempId });
   }
   return removeShopItemAction({ weekStart, itemId: c.itemId });
 };
 
-type Settled = { base: ShopItemView[]; changes: QueuedChange[] };
-
-/** Callbacks for one flush; `items` is the list the saved changes apply to. */
-const flushHooks = (
-  items: ShopItemView[],
-  setSettled: (update: (s: Settled) => Settled) => void,
-  setError: (message: string) => void,
-  refresh: () => void
-): FlushHooks => ({
-  onError: setError,
-  onSaved: (change) =>
-    setSettled((s) => ({
-      base: items,
-      changes: s.base === items ? [...s.changes, change] : [change],
-    })),
-  onDone: refresh,
-});
-
-const flushing = new Set<string>();
+/** The change whose request is out, per list; enqueue leaves it alone. */
+const inFlight = new Map<string, string>();
 
 /**
- * Saves queued changes in order. A network failure stops the run and keeps
- * the rest queued for the next time the device is online.
+ * Saves queued changes one at a time, oldest first. Each change stays in the
+ * queue until its request settles; the queue is then re-read, since the user
+ * may have changed more in the meantime. A network failure or a retryable
+ * error (Mealie down, signed out) stops the run and keeps the queue.
  */
-const flush = async (listId: string, weekStart: string, hooks: FlushHooks) => {
-  if (flushing.has(listId) || !navigator.onLine) {
+const flush = async (
+  listId: string,
+  weekStart: string,
+  setError: (message: string | null) => void
+) => {
+  if (inFlight.has(listId) || !navigator.onLine) {
     return;
   }
-  flushing.add(listId);
-  let saved = false;
   try {
-    while (readQueue(listId).length > 0) {
-      const [change, ...rest] = readQueue(listId);
+    for (;;) {
+      const change = readQueue(listId)[0];
+      if (!change) {
+        break;
+      }
+      inFlight.set(listId, change.id);
       let result: Result;
       try {
+        // The action's response also carries the refreshed list.
         result = await send(weekStart, change);
       } catch {
         break;
       }
       if (result.error) {
-        hooks.onError(result.error);
-        writeQueue(listId, rest);
+        setError(result.error);
+        if (result.retry) {
+          break;
+        }
+        writeQueue(listId, dropFailed(readQueue(listId), change));
         continue;
       }
-      if (change.kind === "add" && result.item) {
-        writeQueue(listId, replaceTempId(rest, change.tempId, result.item.id));
-        hooks.onSaved({ ...change, tempId: result.item.id });
-      } else {
-        writeQueue(listId, rest);
-        hooks.onSaved(change);
-      }
-      saved = true;
+      setError(null);
+      const rest = readQueue(listId).filter((c) => c.id !== change.id);
+      writeQueue(
+        listId,
+        change.kind === "add" && result.item
+          ? replaceTempId(rest, change.tempId, result.item.id)
+          : rest
+      );
     }
   } finally {
-    flushing.delete(listId);
-  }
-  if (saved) {
-    hooks.onDone();
+    inFlight.delete(listId);
   }
 };
 
@@ -122,40 +110,41 @@ export const ShopChecklist = ({
   listId: string;
   items: ShopItemView[];
 }) => {
-  const router = useRouter();
   const queue = useSyncExternalStore(
     subscribeQueue,
     () => readQueue(listId),
     serverQueue
   );
-  // Saved changes, shown on top of `items` until a refreshed list (a new
-  // `items` from the server) arrives with them already in it.
-  const [settled, setSettled] = useState<Settled>({
-    base: items,
-    changes: [],
-  });
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
 
-  // Saves what an earlier visit left queued, and retries when back online.
+  // Saves what an earlier visit (or another tab) left queued, and retries
+  // when the device comes back online, regains focus, or every few seconds
+  // while something is waiting.
   useEffect(() => {
-    const hooks = flushHooks(items, setSettled, setError, () =>
-      router.refresh()
-    );
-    const run = () => void flush(listId, weekStart, hooks);
+    const run = () => void flush(listId, weekStart, setError);
+    const retry = () => {
+      if (readQueue(listId).length > 0) {
+        run();
+      }
+    };
     run();
+    const timer = setInterval(retry, RETRY_MS);
     window.addEventListener("online", run);
-    return () => window.removeEventListener("online", run);
-  }, [listId, weekStart, items, router]);
+    window.addEventListener("focus", retry);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", run);
+      window.removeEventListener("focus", retry);
+    };
+  }, [listId, weekStart]);
 
   const change = (c: QueuedChange) => {
-    setError(null);
-    writeQueue(listId, enqueue(readQueue(listId), c));
-    void flush(
+    writeQueue(
       listId,
-      weekStart,
-      flushHooks(items, setSettled, setError, () => router.refresh())
+      enqueue(readQueue(listId), c, inFlight.get(listId) ?? null)
     );
+    void flush(listId, weekStart, setError);
   };
 
   const add = (e: FormEvent) => {
@@ -165,6 +154,7 @@ export const ShopChecklist = ({
       return;
     }
     change({
+      id: crypto.randomUUID(),
       kind: "add",
       tempId: `${TEMP_PREFIX}${crypto.randomUUID()}`,
       text: value,
@@ -172,12 +162,7 @@ export const ShopChecklist = ({
     setText("");
   };
 
-  const saved = settled.base === items ? settled.changes : [];
-  const shown = applyQueue(
-    applyQueue(items, saved).map((i) => ({ ...i, pending: false })),
-    queue
-  );
-  const { groups, done } = groupItems(shown);
+  const { groups, done } = groupItems(applyQueue(items, queue));
 
   return (
     <div className="space-y-4">
@@ -251,37 +236,46 @@ const ShopRow = ({
 }: {
   item: ShopItemView;
   onChange: (c: QueuedChange) => void;
-}) => (
-  <li className="flex items-center gap-2" data-testid="shop-item">
-    <label className="flex min-h-11 flex-1 items-center gap-3 py-1">
-      <input
-        type="checkbox"
-        checked={item.checked}
-        onChange={(e) =>
-          onChange({
-            kind: "check",
-            itemId: item.id,
-            checked: e.target.checked,
-          })
-        }
-        className="size-5 accent-accent"
-      />
-      <span className={item.checked ? "text-muted line-through" : ""}>
-        {item.text}
-      </span>
-      {item.pending && (
-        <span className="text-xs text-muted" title="Not saved yet">
-          •
+}) => {
+  const remove = () => {
+    // Removing deletes the line in Mealie, so it asks first.
+    if (window.confirm(`Remove "${item.text}" from the list?`)) {
+      onChange({ id: crypto.randomUUID(), kind: "remove", itemId: item.id });
+    }
+  };
+  return (
+    <li className="flex items-center gap-2" data-testid="shop-item">
+      <label className="flex min-h-11 flex-1 items-center gap-3 py-1">
+        <input
+          type="checkbox"
+          checked={item.checked}
+          onChange={(e) =>
+            onChange({
+              id: crypto.randomUUID(),
+              kind: "check",
+              itemId: item.id,
+              checked: e.target.checked,
+            })
+          }
+          className="size-5 accent-accent"
+        />
+        <span className={item.checked ? "text-muted line-through" : ""}>
+          {item.text}
         </span>
-      )}
-    </label>
-    <button
-      type="button"
-      onClick={() => onChange({ kind: "remove", itemId: item.id })}
-      aria-label={`Remove ${item.text}`}
-      className="size-9 rounded-full text-muted"
-    >
-      ×
-    </button>
-  </li>
-);
+        {item.pending && (
+          <span className="text-xs text-muted" title="Not saved yet">
+            •
+          </span>
+        )}
+      </label>
+      <button
+        type="button"
+        onClick={remove}
+        aria-label={`Remove ${item.text}`}
+        className="size-11 shrink-0 rounded-full text-muted"
+      >
+        ×
+      </button>
+    </li>
+  );
+};

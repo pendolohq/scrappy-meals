@@ -7,6 +7,8 @@ type MealieItemCreate = components["schemas"]["ShoppingListItemCreate"];
 type MealieItemOut = components["schemas"]["ShoppingListItemOut-Output"];
 type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 
+const CLIENT_ID = "scrappyClientId";
+
 export type ShoppingList = { id: string; name: string };
 
 export type ShoppingItem = {
@@ -21,6 +23,8 @@ export type ShoppingItem = {
   /** Mealie's label for the item (or its food), used to group by aisle. */
   label: string | null;
   position: number;
+  /** Set on lines added from the shop page, so a replayed add finds them. */
+  clientId: string | null;
 };
 
 /** One line to add. Without foodId the line is free text (note) and Mealie won't merge it. */
@@ -31,6 +35,7 @@ export type NewShoppingItem = {
   note?: string;
   /** Recipes this line came from, so Mealie can show them on the item. */
   recipeIds?: string[];
+  clientId?: string;
 };
 
 export async function findShoppingListByName(
@@ -100,6 +105,7 @@ export async function addShoppingItems(
       recipeId,
       recipeQuantity: 1,
     })),
+    extras: item.clientId ? { [CLIENT_ID]: item.clientId } : {},
   }));
   const out = unwrap(
     await client.POST("/api/households/shopping/items/create-bulk", { body })
@@ -165,13 +171,17 @@ export async function setShoppingItemChecked(
       recipeNote: r.recipeNote,
     })),
   };
-  unwrap(
+  const out = unwrap(
     await client.PUT("/api/households/shopping/items/{item_id}", {
       params: { path: { item_id: itemId } },
       body,
     })
   );
-  return toItem({ ...current, checked });
+  // Unticking can merge the item into a matching unticked one, so prefer
+  // what Mealie sent back over our copy.
+  const saved = [...(out.updatedItems ?? []), ...(out.createdItems ?? [])];
+  const item = saved.find((i) => i.id === itemId) ?? saved[0];
+  return item ? toItem(item) : toItem({ ...current, checked });
 }
 
 async function getItemOut(
@@ -197,5 +207,7 @@ function toItem(i: MealieItemOut): ShoppingItem {
     checked: i.checked ?? false,
     label: i.label?.name ?? i.food?.label?.name ?? null,
     position: i.position ?? 0,
+    clientId:
+      typeof i.extras?.[CLIENT_ID] === "string" ? i.extras[CLIENT_ID] : null,
   };
 }

@@ -10,6 +10,7 @@ const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
     recipe: { name: string };
     food: string;
+    extra: string;
   };
 
 async function signIn(page: Page, user: { email: string; password: string }) {
@@ -54,7 +55,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   page,
   context,
 }) => {
-  const { recipe, food } = state();
+  const { recipe, food, extra } = state();
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
 
@@ -106,10 +107,10 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     .getByRole("checkbox")
     .click(); // a ticked item moves into "Done"
   await expect(page.getByText("Done (1)")).toBeVisible();
-  await page.getByLabel("Add an item").fill("coffee");
+  await page.getByLabel("Add an item").fill(extra);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
-    page.getByTestId("shop-item").filter({ hasText: "coffee" })
+    page.getByTestId("shop-item").filter({ hasText: extra })
   ).toBeVisible();
   await expect(page.getByTestId("pending")).toHaveCount(0); // all saved
 
@@ -161,10 +162,11 @@ test("the other person sees the ticks, and ticks saved offline sync later", asyn
   page,
   context,
 }) => {
+  const { extra } = state();
   await signIn(page, USERS.sam);
   await page.goto(`/week/${weekStartOf(today())}/shop`);
   await expect(page.getByText("Done (1)")).toBeVisible();
-  const coffee = page.getByTestId("shop-item").filter({ hasText: "coffee" });
+  const coffee = page.getByTestId("shop-item").filter({ hasText: extra });
   await expect(coffee).toBeVisible();
 
   // No signal in the shop: the tick shows at once and waits in a queue.
