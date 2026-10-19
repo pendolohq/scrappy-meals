@@ -21,7 +21,7 @@ Decisions already taken:
 
 ## M1 — Ops and deploy (no app code)
 
-- [ ] **Task 1: `.env.example` comments on their own lines**
+- [x] **Task 1: `.env.example` comments on their own lines**
   **Complexity:** XS
   **Why:** Compose reads `S3_ENDPOINT=   # leave empty for AWS` as the value
   `# leave empty for AWS` (reproduced with `docker compose config`). Every AWS backup fails and

@@ -60,7 +60,13 @@ the database passwords end up inside a `postgres://` URL):
 - `AUTH_SECRET`
 - `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`
 
-Leave `MEALIE_API_TOKEN` empty for now.
+Leave `MEALIE_API_TOKEN` empty for now. Keep comments on their own lines:
+Compose reads `KEY=   # note` as the value `# note`. Check what Compose
+actually sees with:
+
+```sh
+docker compose config | grep -E 'S3_ENDPOINT|BACKUP_PING_URL|MEALIE_API_TOKEN'
+```
 
 If the GHCR package is private, log the server in once with a GitHub token
 that has `read:packages`: `docker login ghcr.io -u <github-user>`.

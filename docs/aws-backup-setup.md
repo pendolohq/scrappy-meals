@@ -8,6 +8,9 @@ export BUCKET=scrappy-meals-backups-<something-unique>
 export AWS_REGION=eu-central-1
 ```
 
+These become `S3_BUCKET` and `S3_REGION` in the VPS `.env`. `S3_REGION` must
+equal `AWS_REGION` here.
+
 ## 1. Encryption key (age)
 
 ```sh
