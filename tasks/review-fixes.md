@@ -328,7 +328,7 @@ They become one page.
 
 ## M8 — Security hardening
 
-- [ ] **Task 25: `access.test.ts` has no blind spots**
+- [x] **Task 25: `access.test.ts` has no blind spots**
   **Complexity:** S
   **Do:**
   - Check every `page.tsx`/`layout.tsx` under `src/app` except an explicit public list

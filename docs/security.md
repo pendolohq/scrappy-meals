@@ -77,7 +77,11 @@ page under `src/app` and fails if:
 - an action answers anything but `{ error }` without a session, or touches the
   database or Mealie;
 - a route handler answers anything but `401` without a session;
-- a page that reads data doesn't call `requireUser()`.
+- a page or layout that reads data (itself, or through a component it renders)
+  doesn't call `requireUser()`, in any route group;
+- a `"use server"` appears anywhere but the first line of a file under `src`
+  (an inline server action would skip the checks above).
 
-Public exceptions (the login action, `/api/auth`, `/api/health`) are listed
+Public exceptions (the login action and page, `/offline`, `/api/auth`,
+`/api/health`) are listed
 in that file. Adding one is a deliberate, reviewed change.
