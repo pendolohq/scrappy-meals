@@ -51,6 +51,12 @@ export default async function WeekPage({
             Shopping
           </Link>
           <Link
+            href={`/week/${weekStart}/shop`}
+            className="mr-3 text-xs text-accent"
+          >
+            Shop
+          </Link>
+          <Link
             href={`/week/${weekStart}/adherence`}
             className="mr-3 text-xs text-accent"
           >

@@ -3,14 +3,18 @@ import type { z } from "zod";
 
 import "server-only";
 
-import { UserFacingError } from "./errors";
+import { RetryableError, UserFacingError } from "./errors";
 import { currentUser, type SessionUser } from "./session";
 
 export const SIGNED_OUT = "You are signed out. Reload the page.";
 
+/**
+ * `retry` marks errors worth trying again later (signed out, Mealie down), as
+ * opposed to ones that never succeed (invalid input, item gone).
+ */
 export type ActionResult<R extends object = object> =
   | (R & { error?: undefined })
-  | { error: string };
+  | { error: string; retry?: true };
 
 type Options = { invalid?: (err: z.ZodError) => string };
 
@@ -19,7 +23,8 @@ type Options = { invalid?: (err: z.ZodError) => string };
  * endpoints that anyone can call with any arguments, so the session check and
  * input validation happen here, before the handler runs, not in each action.
  * Errors become `{ error }`: a UserFacingError keeps its message, anything
- * else is logged and replaced by a generic one.
+ * else is logged and replaced by a generic one. Being signed out and a
+ * RetryableError add `retry: true`.
  */
 export function userAction<S extends z.ZodType, R extends object>(
   schema: S,
@@ -29,7 +34,7 @@ export function userAction<S extends z.ZodType, R extends object>(
   return async (input) => {
     const user = await currentUser();
     if (!user) {
-      return { error: SIGNED_OUT };
+      return { error: SIGNED_OUT, retry: true };
     }
     const parsed = schema.safeParse(input);
     if (!parsed.success) {
@@ -39,6 +44,9 @@ export function userAction<S extends z.ZodType, R extends object>(
       return await handler(parsed.data, user);
     } catch (err) {
       unstable_rethrow(err); // redirect() and notFound() must reach Next.js
+      if (err instanceof RetryableError) {
+        return { error: err.message, retry: true };
+      }
       if (err instanceof UserFacingError) {
         return { error: err.message };
       }

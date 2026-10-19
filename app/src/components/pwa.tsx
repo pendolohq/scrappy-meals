@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { clearAllQueues } from "@/lib/shop-queue-store";
+
 /** Registers the service worker (production only) and shows a banner while offline. */
 export const Pwa = () => {
   const [offline, setOffline] = useState(false);
@@ -33,7 +35,11 @@ export const Pwa = () => {
   );
 };
 
-/** Asks the service worker to drop cached pages (call on sign-out). */
+/**
+ * On sign-out: asks the service worker to drop cached pages and clears queued
+ * shop-list changes, so neither the plan nor the list stays on the device.
+ */
 export const clearCachedPages = () => {
   navigator.serviceWorker?.controller?.postMessage("clear-pages");
+  clearAllQueues();
 };
