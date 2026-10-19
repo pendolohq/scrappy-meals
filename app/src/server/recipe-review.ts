@@ -23,7 +23,10 @@ import {
   type MacroKey,
   normaliseNutrition,
 } from "./mealie/nutrition";
+import type { components } from "./mealie/schema";
 import { loadRecipes } from "./recipe-cache";
+
+type Ingredient = components["schemas"]["RecipeIngredient-Input"];
 
 type RawIngredient = {
   referenceId?: string | null;
@@ -74,6 +77,8 @@ export type ReviewLine = {
   confidence: number | null;
   /** True when the parser found no food: the line stays plain text. */
   asText: boolean;
+  /** A linked recipe: shown, not editable here. */
+  linked?: true;
 };
 
 export type ReviewDraft = {
@@ -188,6 +193,7 @@ export async function loadReview(
           note: i.note ?? "",
           confidence: null,
           asText: false,
+          ...(i.referencedRecipe ? { linked: true as const } : {}),
         };
       }
       const p = parsedBy.get(i);
@@ -302,38 +308,58 @@ export async function saveReview(
         .filter((i) => i.referenceId)
         .map((i) => [i.referenceId!, i])
     );
-    const storedFor = (l: ReviewInput["lines"][number]) =>
-      l.referenceId ? stored.get(l.referenceId) : undefined;
+    // Each stored ingredient matches at most one submitted line, so a
+    // repeated reference id can't duplicate its hidden fields.
+    const claimed = new Set<RawIngredient>();
+    const matches = input.lines.map((l) => {
+      const old = l.referenceId ? stored.get(l.referenceId) : undefined;
+      if (!old || claimed.has(old)) {
+        return undefined;
+      }
+      claimed.add(old);
+      return old;
+    });
     const isText = (l: ReviewInput["lines"][number]) =>
       l.asText || !l.food?.trim();
 
-    const foodLines = input.lines.filter((l) => !isText(l));
+    const foodLines = input.lines
+      .map((line, i) => ({ line, old: matches[i] }))
+      .filter((x) => !isText(x.line) && !x.old?.referencedRecipe);
     const [foods, units] = [
       await resolveAll(
-        foodLines.map((l) =>
-          keptRef(storedFor(l)?.food, l.food) ? null : l.food
+        foodLines.map((x) =>
+          keptRef(x.old?.food, x.line.food) ? null : x.line.food
         ),
         d.findOrCreateFood
       ),
       await resolveAll(
-        foodLines.map((l) =>
-          keptRef(storedFor(l)?.unit, l.unit) ? null : l.unit
+        foodLines.map((x) =>
+          keptRef(x.old?.unit, x.line.unit) ? null : x.line.unit
         ),
         d.findOrCreateUnit
       ),
     ];
 
-    const recipeIngredient = input.lines.map((l) => {
-      const old = storedFor(l);
+    const recipeIngredient = input.lines.map((l, index): Ingredient => {
+      const old = matches[index];
+      // A linked recipe is edited in Mealie: it goes back exactly as stored.
+      // (The stored object is Mealie's full ingredient, wider than RawIngredient.)
+      if (old?.referencedRecipe) {
+        return old as Ingredient;
+      }
       const carried = old
         ? {
             referenceId: old.referenceId!,
-            originalText: old.originalText || originalOf(old),
-            ...(old.referencedRecipe
-              ? { referencedRecipe: old.referencedRecipe }
-              : {}),
+            // Lines Mealie had unparsed keep the text the page showed, so
+            // they look the same on the next load.
+            originalText: isParsed(old)
+              ? (old.originalText ?? null)
+              : old.originalText || originalOf(old),
             ...(old.substitutions?.length
-              ? { substitutions: old.substitutions }
+              ? {
+                  substitutions:
+                    old.substitutions as Ingredient["substitutions"],
+                }
               : {}),
           }
         : {};
@@ -352,7 +378,7 @@ export async function saveReview(
         note: l.note,
         ...carried,
       };
-    }) as NonNullable<Parameters<Deps["patch"]>[1]["recipeIngredient"]>;
+    });
 
     // Text Mealie holds but we can't read as a number ("10-12") shows as an
     // empty field; saving that field unchanged must not wipe it.

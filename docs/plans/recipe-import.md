@@ -121,7 +121,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
     UI text the tests rely on: the recipe name as the page heading; a "Source" link (when
     there is one) and "Open in Mealie"; inputs labelled "Servings", "Calories (kcal)",
     "Protein (g)", "Carbs (g)", "Fat (g)", "Fibre (g)"; the nutrition label "From the page",
-    "Estimated", "Reviewed" or "Missing"; each ingredient a `fieldset` whose legend is the
+    "Estimated", "Reviewed", "Edited" (a macro changed since loading) or "Missing"; each ingredient a `fieldset` whose legend is the
     original line, with inputs "Amount", "Unit", "Food", "Note" and a checkbox "Keep as text";
     lines with confidence below 0.8 show "Check this line"; a "Save recipe" button; after a
     successful save a status "Saved" and a link "Back to the plan". Errors in

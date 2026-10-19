@@ -176,12 +176,17 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                 }`}
               >
                 <legend className="px-1 text-sm">{line.original}</legend>
+                {line.linked && (
+                  <p className="text-sm text-muted">
+                    Linked recipe — edit in Mealie
+                  </p>
+                )}
                 {low && (
                   <p id={hint} className="mb-2 text-sm text-danger">
                     Check this line
                   </p>
                 )}
-                {!state.asText && (
+                {!line.linked && !state.asText && (
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <label className="block">
                       <span className="text-sm text-muted">Amount</span>
@@ -216,25 +221,29 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                     </label>
                   </div>
                 )}
-                <label className="mt-2 block">
-                  <span className="text-sm text-muted">Note</span>
-                  <input
-                    aria-describedby={hint}
-                    value={state.note}
-                    onChange={(e) =>
-                      setLine(i, { note: e.target.value, noteEdited: true })
-                    }
-                    className={inputClass}
-                  />
-                </label>
-                <label className="mt-2 flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={state.asText}
-                    onChange={(e) => toggleText(i, e.target.checked)}
-                  />
-                  <span className="text-sm">Keep as text</span>
-                </label>
+                {!line.linked && (
+                  <>
+                    <label className="mt-2 block">
+                      <span className="text-sm text-muted">Note</span>
+                      <input
+                        aria-describedby={hint}
+                        value={state.note}
+                        onChange={(e) =>
+                          setLine(i, { note: e.target.value, noteEdited: true })
+                        }
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="mt-2 flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={state.asText}
+                        onChange={(e) => toggleText(i, e.target.checked)}
+                      />
+                      <span className="text-sm">Keep as text</span>
+                    </label>
+                  </>
+                )}
               </fieldset>
             </div>
           );

@@ -867,11 +867,10 @@ describe("hidden ingredient fields", () => {
     unit: { id: "u1", name: "cup" },
     food: { id: "f1", name: "flour" },
     note: "sifted",
-    referencedRecipe: { id: "r9", name: "Dough" },
     substitutions: [{ note: "or spelt" }],
   };
 
-  it("carries referenceId, originalText, linked recipe and substitutions over from Mealie's ingredient", async () => {
+  it("carries referenceId, originalText and substitutions over from Mealie's ingredient", async () => {
     const { deps, getRecipe, patch, findOrCreateFood, findOrCreateUnit } =
       makeDeps();
     getRecipe.mockResolvedValue(recipe({ recipeIngredient: [stored] }));
@@ -901,7 +900,6 @@ describe("hidden ingredient fields", () => {
             note: "x",
             referenceId: "ref-1",
             originalText: "2 cups flour, sifted",
-            referencedRecipe: { id: "r9", name: "Dough" },
             substitutions: [{ note: "or spelt" }],
           },
         ],
@@ -1101,5 +1099,102 @@ describe("loadReview after the recipe was reviewed", () => {
     await loadReview("soup", deps);
 
     expect(parse).toHaveBeenCalledWith(["1 onion, chopped"]);
+  });
+});
+
+describe("linked recipes and parsed lines on save", () => {
+  it("copies a linked-recipe line back as stored, whatever was submitted", async () => {
+    const { deps, getRecipe, patch, findOrCreateFood } = makeDeps();
+    const linked = {
+      referenceId: "ref-l",
+      quantity: 2,
+      note: "stored note",
+      originalText: "Dough",
+      referencedRecipe: { id: "r9", name: "Dough" },
+    };
+    getRecipe.mockResolvedValue(recipe({ recipeIngredient: [linked] }));
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [
+          {
+            ...line({ quantity: 9, food: "evil", unit: "kg", note: "changed" }),
+            referenceId: "ref-l",
+          },
+        ],
+      }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({ recipeIngredient: [linked] })
+    );
+    expect(findOrCreateFood).not.toHaveBeenCalled();
+  });
+
+  it("does not invent originalText for a line Mealie had parsed", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({
+        recipeIngredient: [
+          {
+            referenceId: "ref-p",
+            quantity: 1,
+            food: { id: "f1", name: "flour" },
+            note: "",
+          },
+        ],
+      })
+    );
+
+    await saveReview(
+      "soup",
+      input({
+        lines: [
+          { ...line({ quantity: 1, food: "flour" }), referenceId: "ref-p" },
+        ],
+      }),
+      deps
+    );
+
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        recipeIngredient: [
+          expect.objectContaining({ referenceId: "ref-p", originalText: null }),
+        ],
+      })
+    );
+  });
+
+  it("gives a repeated reference id to the first line only", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({ recipeIngredient: [{ referenceId: "dup", note: "salt" }] })
+    );
+    const l = { ...line({ asText: true, note: "salt" }), referenceId: "dup" };
+
+    await saveReview("soup", input({ lines: [l, l] }), deps);
+
+    const [, fields] = patch.mock.calls[0];
+    expect(fields.recipeIngredient?.map((i) => i.referenceId)).toEqual([
+      "dup",
+      undefined,
+    ]);
+  });
+
+  it("marks a linked-recipe line as linked when loading", async () => {
+    const { deps, getRecipe } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({
+        recipeIngredient: [
+          { referenceId: "a", note: "Dough", referencedRecipe: { id: "r9" } },
+        ],
+      })
+    );
+
+    expect((await loadReview("soup", deps))?.lines[0].linked).toBe(true);
   });
 });
