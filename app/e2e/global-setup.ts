@@ -118,7 +118,14 @@ export default async function globalSetup() {
         "@context": "https://schema.org",
         "@type": "Recipe",
         name: imported.name,
-        recipeIngredient: ["1 onion"],
+        recipeYield: "4 servings",
+        // Only calories, so the other macros are missing on the review page.
+        nutrition: { "@type": "NutritionInformation", calories: "350" },
+        recipeIngredient: [
+          "200 g red lentils",
+          "1 onion, chopped",
+          "a squeeze of lemon",
+        ],
         recipeInstructions: [{ "@type": "HowToStep", text: "Boil." }],
       })}</script></head><body></body></html>`,
     }
