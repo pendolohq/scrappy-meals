@@ -15,7 +15,8 @@ adherence, and talks to Mealie only through its REST API.
 | `backup/` | Image and script for encrypted nightly backups to S3 |
 | `scripts/` | Host-side `backup.sh` (cron) and `restore.sh` |
 | `docs/aws-backup-setup.md` | One-time S3 bucket, lifecycle and IAM setup |
-| `app/` | Next.js app (from milestone M2) |
+| `app/` | Next.js app; Mealie client in `app/src/server/mealie/` |
+| `docs/mealie-api.md` | What we rely on in the Mealie API, incl. nutrition semantics |
 
 Only Caddy publishes ports. Postgres and Mealie are reachable only on the
 Compose network; the app calls Mealie at `http://mealie:9000` with a
