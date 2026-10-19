@@ -1,3 +1,5 @@
+import "server-only";
+
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { createDb } from "./client";

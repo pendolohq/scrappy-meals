@@ -10,6 +10,8 @@ await build({
   platform: "node",
   target: "node22",
   format: "cjs",
+  // The CLI runs only on the server, so server-only modules resolve to their no-op build.
+  conditions: ["react-server"],
   // Native module, shipped in the standalone node_modules; pg-native is optional and unused.
   external: ["@node-rs/argon2", "pg-native"],
   logLevel: "info",

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { type MealieClient, mealie, unwrap } from "./client";
 import type { components } from "./schema";
 

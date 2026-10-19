@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { DayCard } from "@/components/plan/day-card";
 import { formatRange } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import { addDays, isIsoDate, today, weekStartOf } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
+import { requireUser } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +21,8 @@ export default async function WeekPage({
   if (weekStartOf(weekStart) !== weekStart)
     redirect(`/week/${weekStartOf(weekStart)}`);
 
-  const [session, plan] = await Promise.all([
-    auth(),
-    getWeekPlan(getDb(), weekStart),
-  ]);
+  const user = await requireUser();
+  const plan = await getWeekPlan(getDb(), weekStart);
   const now = today();
   const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";
 
@@ -80,7 +78,7 @@ export default async function WeekPage({
           meals={day.meals}
           members={plan.members}
           fasting={day.fasting}
-          currentUserId={session?.user.id ?? ""}
+          currentUserId={user.id}
           isToday={day.date === now}
           isPastOrToday={day.date <= now}
         />

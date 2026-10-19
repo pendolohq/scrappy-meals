@@ -1,10 +1,9 @@
-import { auth } from "@/auth";
+import { userRoute } from "@/server/session";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Proxies Mealie's recipe thumbnails so the browser only ever talks to this app.
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await auth())?.user) return new Response(null, { status: 401 });
+export const GET = userRoute(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   if (!UUID.test(id)) return new Response(null, { status: 400 });
 
@@ -23,4 +22,4 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       "X-Content-Type-Options": "nosniff",
     },
   });
-}
+});

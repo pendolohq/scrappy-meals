@@ -1,13 +1,15 @@
-import { auth } from "@/auth";
 import { getDb } from "@/server/db/client";
+import { requireUser } from "@/server/session";
 import { findUserById } from "@/server/users";
 
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
-  const session = await auth();
-  const user = session?.user && (await findUserById(getDb(), session.user.id));
-  if (!user) return null;
+  const { id } = await requireUser();
+  const user = await findUserById(getDb(), id);
+  if (!user) {
+    return null;
+  }
 
   return (
     <section>

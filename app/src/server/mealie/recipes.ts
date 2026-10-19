@@ -1,3 +1,5 @@
+import "server-only";
+
 import { type MealieClient, mealie, unwrap } from "./client";
 import { normaliseNutrition, type RecipeNutrition } from "./nutrition";
 import type { components } from "./schema";
