@@ -52,7 +52,7 @@ portions, servings) are household-wide on purpose.
 
 ## Defence in depth
 
-- `src/middleware.ts` redirects (or answers 401 under `/api/`) for everything
+- `src/proxy.ts` (Next.js middleware) redirects (or answers 401 under `/api/`) for everything
   except a short public list: `/login`, `/offline`, `/sw.js`, `/api/auth`,
   `/api/health`, `/manifest.webmanifest`. None of these read user data. It's a second layer: removing a path from that list
   must never be what keeps data private.
