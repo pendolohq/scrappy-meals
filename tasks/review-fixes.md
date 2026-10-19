@@ -182,7 +182,7 @@ Decisions already taken:
   client with a ~2 s timeout, and log the version-mismatch warning once per process.
   **Done when:** unit or route test; a hung Mealie doesn't fail the response.
 
-- [ ] **Task 13: Week page doesn't wait on Mealie for stale recipes**
+- [x] **Task 13: Week page doesn't wait on Mealie for stale recipes**
   **Complexity:** S
   **Do:** `loadRecipes` returns cached rows straight away and refreshes stale ones in `after()`
   (`next/server`; check the bundled docs). It only fetches inline for slugs with no cached row.

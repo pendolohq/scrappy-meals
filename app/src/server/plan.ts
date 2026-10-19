@@ -18,6 +18,7 @@ import { UserFacingError } from "./errors";
 import { isMealieUnavailable } from "./mealie/client";
 import {
   type CachedRecipe,
+  type Defer,
   loadRecipes,
   type RecipeFetcher,
 } from "./recipe-cache";
@@ -68,6 +69,8 @@ export type WeekPlan = {
     meals: PlannedMeal[];
     fasting: Record<string, boolean>;
   }[];
+  /** The week's recipes by slug, as loaded for this plan. */
+  recipes: Map<string, CachedRecipe | null>;
 };
 
 export async function listMembers(db: Db): Promise<Member[]> {
@@ -89,7 +92,7 @@ export async function listMembers(db: Db): Promise<Member[]> {
 export async function getWeekPlan(
   db: Db,
   weekStart: string,
-  opts: { fetch?: RecipeFetcher } = {}
+  opts: { fetch?: RecipeFetcher; defer?: Defer } = {}
 ): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
   const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
@@ -188,6 +191,7 @@ export async function getWeekPlan(
         ])
       ),
     })),
+    recipes,
   };
 }
 

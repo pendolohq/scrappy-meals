@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { formatDay, formatRange } from "@/lib/format";
 import { getDb } from "@/server/db/client";
@@ -35,7 +36,7 @@ export default async function AdherencePage({
     redirect(`/week/${weekStartOf(weekStart)}/adherence`);
   }
 
-  const plan = await getWeekPlan(getDb(), weekStart);
+  const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
   const now = today();
   const meals = plan.days.flatMap((d) => d.meals);
   const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";

@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import "server-only";
 
@@ -11,20 +11,27 @@ export type RecipeFetcher = (slug: string) => Promise<Recipe | null>;
 
 const MAX_AGE_MS = 60 * 60 * 1000;
 
+/** Runs work after the response is sent: `after` from next/server in a page. */
+export type Defer = (work: () => Promise<void>) => void;
+
 /**
  * Recipes by slug, served from our cache and refreshed from Mealie when older
  * than an hour. If Mealie is unreachable, a stale entry is better than
- * nothing, so it is kept. A recipe deleted in Mealie maps to null. With
- * `force`, every slug is fetched and a failed fetch throws instead.
+ * nothing, so it is kept. A recipe deleted in Mealie maps to null.
+ *
+ * - `defer`: stale entries are returned as they are and refreshed after the
+ *   response, so a slow Mealie never holds up a page. Only recipes not cached
+ *   at all are fetched before returning.
+ * - `force`: every slug is fetched now, and a failed fetch throws.
  */
 export async function loadRecipes(
   db: Db,
   slugs: string[],
   opts: {
     fetch?: RecipeFetcher;
-    maxAgeMs?: number;
     now?: Date;
     force?: boolean;
+    defer?: Defer;
   } = {}
 ): Promise<Map<string, CachedRecipe | null>> {
   const unique = [...new Set(slugs)];
@@ -35,58 +42,68 @@ export async function loadRecipes(
 
   const fetchRecipe = opts.fetch ?? ((slug: string) => getRecipe(slug));
   const now = opts.now ?? new Date();
-  const maxAge = opts.maxAgeMs ?? MAX_AGE_MS;
 
   const rows = await db
     .select()
     .from(recipeCache)
     .where(inArray(recipeCache.slug, unique));
   const cached = new Map(rows.map((r) => [r.slug, r]));
+
+  const refresh = async (slug: string) => {
+    try {
+      const recipe = await fetchRecipe(slug);
+      if (!recipe) {
+        await db.delete(recipeCache).where(eq(recipeCache.slug, slug));
+        cached.delete(slug);
+        result.set(slug, null);
+        return;
+      }
+      const values = {
+        slug,
+        mealieId: recipe.id,
+        name: recipe.name,
+        imagePath: recipe.imagePath,
+        servings: recipe.servings,
+        nutrition: recipe.nutrition,
+        ingredients: recipe.ingredients,
+        mealieUpdatedAt: recipe.updatedAt ? new Date(recipe.updatedAt) : null,
+        fetchedAt: now,
+      };
+      const [row] = await db
+        .insert(recipeCache)
+        .values(values)
+        .onConflictDoUpdate({ target: recipeCache.slug, set: values })
+        .returning();
+      cached.set(slug, row);
+    } catch (err) {
+      if (opts.force) {
+        throw err;
+      }
+      console.warn(
+        `recipe ${slug}: refresh from Mealie failed, using cached copy if any`,
+        err
+      );
+    }
+  };
+
+  const missing = unique.filter((slug) => opts.force || !cached.has(slug));
   const stale = unique.filter((slug) => {
     const row = cached.get(slug);
     return (
-      opts.force || !row || now.getTime() - row.fetchedAt.getTime() > maxAge
+      row &&
+      !missing.includes(slug) &&
+      now.getTime() - row.fetchedAt.getTime() > MAX_AGE_MS
     );
   });
-
-  await Promise.all(
-    stale.map(async (slug) => {
-      try {
-        const recipe = await fetchRecipe(slug);
-        if (!recipe) {
-          await db.delete(recipeCache).where(inArray(recipeCache.slug, [slug]));
-          cached.delete(slug);
-          result.set(slug, null);
-          return;
-        }
-        const values = {
-          slug,
-          mealieId: recipe.id,
-          name: recipe.name,
-          imagePath: recipe.imagePath,
-          servings: recipe.servings,
-          nutrition: recipe.nutrition,
-          ingredients: recipe.ingredients,
-          mealieUpdatedAt: recipe.updatedAt ? new Date(recipe.updatedAt) : null,
-          fetchedAt: now,
-        };
-        const [row] = await db
-          .insert(recipeCache)
-          .values(values)
-          .onConflictDoUpdate({ target: recipeCache.slug, set: values })
-          .returning();
-        cached.set(slug, row);
-      } catch (err) {
-        if (opts.force) {
-          throw err;
-        }
-        console.warn(
-          `recipe ${slug}: refresh from Mealie failed, using cached copy if any`,
-          err
-        );
-      }
-    })
-  );
+  const { defer } = opts;
+  if (defer && stale.length > 0) {
+    defer(async () => {
+      await Promise.all(stale.map(refresh));
+    });
+    await Promise.all(missing.map(refresh));
+  } else {
+    await Promise.all([...missing, ...stale].map(refresh));
+  }
 
   for (const slug of unique) {
     if (!result.has(slug)) {
