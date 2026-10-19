@@ -139,7 +139,8 @@ jobs:
             app/server.log
           retention-days: 7
 
-  # Decides whether a PR can affect the image; pushes to main and tags always build it.
+  # Decides whether a PR can affect the image or the backups; pushes to main and
+  # tags always run both.
   changes:
     runs-on: ubuntu-latest
     defaults:
@@ -147,6 +148,7 @@ jobs:
         working-directory: .
     outputs:
       image: ${{ steps.diff.outputs.image }}
+      backup: ${{ steps.diff.outputs.backup }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
@@ -157,16 +159,21 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           # Anything that goes into the image or the way CI builds it.
           PATTERN: '^(app/(Dockerfile|\.dockerignore|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|next\.config\.ts|docker/|scripts/|drizzle/|src/cli/|src/server/db/|src/server/users\.ts)|backup/|\.github/workflows/)'
+          # Anything the backup/restore round trip exercises.
+          BACKUP_PATTERN: '^(backup/|scripts/|postgres/|docker-compose\.yml|\.github/workflows/)'
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            echo "image=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" HEAD | grep -qE "$PATTERN"; then
-            git diff --name-only "$BASE" HEAD | grep -E "$PATTERN"
-            echo "image=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No image-related changes; the image job is skipped."
-            echo "image=false" >> "$GITHUB_OUTPUT"
-          fi
+          check() {
+            if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            elif git diff --name-only "$BASE" HEAD | grep -E "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No $1-related changes; the $1 job is skipped."
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          check image "$PATTERN"
+          check backup "$BACKUP_PATTERN"
 
   secrets:
     runs-on: ubuntu-latest
@@ -189,6 +196,18 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Scan full history
         run: gitleaks git --redact --verbose .
+
+  backup:
+    needs: [changes]
+    if: needs.changes.outputs.backup == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backup and restore round trip
+        run: scripts/test-backup-restore.sh
 
   # Pull requests: build and smoke-test only, never push.
   # main:          publish :main and :sha-<commit>. Never :latest.

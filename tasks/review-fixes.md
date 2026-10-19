@@ -93,7 +93,7 @@ Decisions already taken:
   **Done when:** every command in §4–§7 runs as written against a local `docker compose`
   stack (no server exists yet).
 
-- [ ] **Task 6: CI runs a backup and restore round trip**
+- [x] **Task 6: CI runs a backup and restore round trip**
   **Complexity:** M
   **Depends on:** Tasks 2, 3, 4
   **Do:** add a CI job, path-filtered on `backup/`, `scripts/`, `docker-compose.yml` and
