@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
-import { formatRange } from "@/lib/format";
+import { WeekHeader } from "@/components/week-header";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
 import type { WeekIngredients } from "@/server/domain/shopping";
-import { addDays, isIsoDate, weekStartOf } from "@/server/domain/week";
 import { isMealieUnavailable } from "@/server/mealie/client";
 import { requireUser } from "@/server/session";
 import { type ShopList, weekShopList } from "@/server/shop";
 import { lastPush, weekShoppingList } from "@/server/shopping";
+
+import { canonicalWeek } from "../../week-route";
 
 import { PushButton } from "./push-button";
 import { ShopChecklist } from "./shop-checklist";
@@ -86,13 +86,7 @@ export default async function ShoppingPage({
   params: Promise<{ weekStart: string }>;
 }) {
   await requireUser();
-  const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) {
-    redirect("/week");
-  }
-  if (weekStartOf(weekStart) !== weekStart) {
-    redirect(`/week/${weekStartOf(weekStart)}/shopping`);
-  }
+  const weekStart = canonicalWeek((await params).weekStart, "shopping");
 
   const db = getDb();
   const [plan, pushed] = await Promise.all([
@@ -125,35 +119,15 @@ export default async function ShoppingPage({
       position: i.position,
     })) ?? [];
   const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
-  const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";
 
   return (
     <div className="space-y-4 pb-8">
       {sent && <AutoRefresh seconds={15} />}
-      <div className="flex items-center justify-between gap-2">
-        <Link
-          href={`/week/${addDays(weekStart, -7)}/shopping`}
-          className={nav}
-          aria-label="Previous week"
-        >
-          ←
+      <WeekHeader weekStart={weekStart} page="shopping" title="Shopping">
+        <Link href={`/week/${weekStart}`} className="text-xs text-accent">
+          Back to the plan
         </Link>
-        <div className="text-center">
-          <h1 className="font-semibold">
-            Shopping · {formatRange(weekStart, addDays(weekStart, 6))}
-          </h1>
-          <Link href={`/week/${weekStart}`} className="text-xs text-accent">
-            Back to the plan
-          </Link>
-        </div>
-        <Link
-          href={`/week/${addDays(weekStart, 7)}/shopping`}
-          className={nav}
-          aria-label="Next week"
-        >
-          →
-        </Link>
-      </div>
+      </WeekHeader>
 
       {mealieDown && (
         <p role="alert" className="text-sm text-danger">

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { userFormAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
-import { isIsoDate, weekStartOf } from "@/server/domain/week";
+import { weekStartSchema } from "@/server/domain/week";
 import { UserFacingError } from "@/server/errors";
 import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
 import { pushShoppingList } from "@/server/shopping";
@@ -24,9 +24,7 @@ const fromForm = z.preprocess(
   (form) =>
     form instanceof FormData ? { weekStart: form.get("weekStart") } : form,
   z.object({
-    weekStart: z
-      .string()
-      .refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week"),
+    weekStart: weekStartSchema,
   })
 );
 

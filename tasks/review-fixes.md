@@ -277,7 +277,7 @@ They become one page.
   - Update the e2e and `docs/mealie-api.md`.
   **Done when:** e2e covers preview → send → tick; `next-dev-loop` on a phone viewport.
 
-- [ ] **Task 20: Shared week header and week param**
+- [x] **Task 20: Shared week header and week param**
   **Complexity:** S
   **Depends on:** Task 19
   **Do:** a `<WeekHeader weekStart title back>` server component for the prev/next arrows, title

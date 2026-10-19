@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { after } from "next/server";
 
-import { formatDay, formatRange } from "@/lib/format";
+import { WeekHeader } from "@/components/week-header";
+import { formatDay } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import {
   ADHERENCE_STATUSES,
   STATUS_LABEL,
   summariseAdherence,
 } from "@/server/domain/adherence";
-import { addDays, isIsoDate, today, weekStartOf } from "@/server/domain/week";
+import { today } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
+
+import { canonicalWeek } from "../../week-route";
 
 export const dynamic = "force-dynamic";
 
@@ -28,45 +30,19 @@ export default async function AdherencePage({
   params: Promise<{ weekStart: string }>;
 }) {
   await requireUser();
-  const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) {
-    redirect("/week");
-  }
-  if (weekStartOf(weekStart) !== weekStart) {
-    redirect(`/week/${weekStartOf(weekStart)}/adherence`);
-  }
+  const weekStart = canonicalWeek((await params).weekStart, "adherence");
 
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
   const now = today();
   const meals = plan.days.flatMap((d) => d.meals);
-  const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex items-center justify-between gap-2">
-        <Link
-          href={`/week/${addDays(weekStart, -7)}/adherence`}
-          className={nav}
-          aria-label="Previous week"
-        >
-          ←
+      <WeekHeader weekStart={weekStart} page="adherence" title="Adherence">
+        <Link href={`/week/${weekStart}`} className="text-xs text-accent">
+          Back to the plan
         </Link>
-        <div className="text-center">
-          <h1 className="font-semibold">
-            Adherence · {formatRange(weekStart, addDays(weekStart, 6))}
-          </h1>
-          <Link href={`/week/${weekStart}`} className="text-xs text-accent">
-            Back to the plan
-          </Link>
-        </div>
-        <Link
-          href={`/week/${addDays(weekStart, 7)}/adherence`}
-          className={nav}
-          aria-label="Next week"
-        >
-          →
-        </Link>
-      </div>
+      </WeekHeader>
 
       <p className="text-sm text-muted">
         Score: stuck to it counts 1, partly or swapped ½, skipped 0, averaged
