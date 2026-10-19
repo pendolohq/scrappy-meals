@@ -1,7 +1,6 @@
 // Surveys outdated dependencies (pnpm outdated), applies minor and patch
 // updates to package.json and the lockfile, and lists major updates for
 // manual review. `--dry-run` only prints what it would do.
-// Ported from valtiberina.travel's bun script.
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

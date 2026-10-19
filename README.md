@@ -108,8 +108,7 @@ MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... pnpm test
 
 Formatting is [oxfmt](https://oxc.rs/docs/guide/usage/formatter) (`app/.oxfmtrc.json`: 80 columns,
 sorted imports, sorted Tailwind classes) and linting is
-[oxlint](https://oxc.rs/docs/guide/usage/linter) (`app/.oxlintrc.json`). The setup matches
-valtiberina.travel, plus one house rule:
+[oxlint](https://oxc.rs/docs/guide/usage/linter) (`app/.oxlintrc.json`), plus one house rule:
 
 - braces on every `if`/`else`/loop body, even one-liners (`curly: all`).
 

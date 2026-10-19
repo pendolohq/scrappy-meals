@@ -27,16 +27,19 @@ export default defineConfig({
         test: {
           name: "db",
           include: ["src/**/*.db.test.ts"],
+          setupFiles: ["test/require-db.ts"],
           testTimeout: 30_000,
           fileParallelism: false,
         },
       },
-      // Needs a running Mealie: MEALIE_TEST_URL (+ optional MEALIE_TEST_USER / MEALIE_TEST_PASSWORD).
+      // Needs a running Mealie and a database: MEALIE_TEST_URL, DATABASE_TEST_URL
+      // (+ optional MEALIE_TEST_USER / MEALIE_TEST_PASSWORD).
       {
         resolve: { alias },
         test: {
           name: "integration",
           include: ["src/**/*.int.test.ts"],
+          setupFiles: ["test/require-mealie.ts"],
           testTimeout: 30_000,
           // One shared Mealie: files running at once intermittently got 401s.
           fileParallelism: false,

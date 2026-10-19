@@ -50,7 +50,7 @@ export const users = pgTable(
     /** Stored lowercased; see normaliseEmail(). */
     email: text("email").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
-    /** Bumped on password change or removal; sessions carrying an older value are rejected. */
+    /** Bumped on password change; sessions carrying an older value are rejected (and a removed user's row is gone). */
     sessionVersion: integer("session_version").notNull().default(0),
     targetKcal: integer("target_kcal"),
     targetProteinG: numeric("target_protein_g", {

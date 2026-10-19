@@ -72,18 +72,16 @@ lives in a doc; the trigger for reading each one is below.
 
 ## Workflow
 
-For a single task, Claude manually:
+- Small and medium tasks: do them directly (implement, write the tests, run the checks below),
+  then commit.
+- Large or risky tasks (auth, data migrations, anything hard to reverse): a full round. Write
+  the tests first (`unit-test-writer` / `e2e-test-writer`), build with `implementer`, validate
+  with `code-reviewer`, re-invoke `implementer` with any blockers, commit when LGTM.
+- After every edit to something user-visible, verify it at runtime with the `next-dev-loop`
+  skill.
 
-1. Invokes `implementer` to build it
-2. Invokes `unit-test-writer` and/or `e2e-test-writer` for coverage
-3. Invokes `code-reviewer` to validate
-4. Handles blockers by re-invoking `implementer` with the reviewer's feedback
-5. Commits when LGTM
-6. After every edit to something user-visible, verifies it at runtime with the `next-dev-loop`
-   skill
-
-For a full task file, use `/execute-tasks path/to/tasks.md`. It drives the implement → test →
-review → commit loop for every task in the file, in dependency order.
+For a full task file, use `/execute-tasks path/to/tasks.md`. It applies the same split to every
+task in the file, in dependency order.
 
 ## Code conventions
 

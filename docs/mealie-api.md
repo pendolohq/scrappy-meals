@@ -16,16 +16,18 @@ What the planner relies on, checked against a running instance
 - `checkMealieVersion()` compares `/api/app/about` with the schema version; the
   health route will report a mismatch after a Mealie upgrade.
 
-**Upgrading Mealie:** bump the tag in `docker-compose.yml`, run
-`pnpm mealie:types` against it, update `MEALIE_SCHEMA_VERSION` in `client.ts`,
-then run `pnpm typecheck` and `pnpm test:integration`.
+**Upgrading Mealie:** bump the tag in `docker-compose.yml` and the two in
+`.github/workflows/ci.yml`, run `pnpm mealie:types` against it, update
+`MEALIE_SCHEMA_VERSION` in `client.ts` and this page's title, then run
+`pnpm test`, `pnpm typecheck` and `pnpm test:integration`. `pnpm test` fails
+until every place names the same version (`mealie-version.test.ts`).
 
 ## Endpoints used
 
 | Purpose | Endpoint |
 |---|---|
 | Search / list recipes | `GET /api/recipes?search=&page=&perPage=` (paginated: `items`, `total`, `total_pages`) |
-| Recipe detail | `GET /api/recipes/{slug}` (404 if unknown) |
+| Recipe detail | `GET /api/recipes/{slug}` (404 if unknown; also takes the recipe's id, which survives a rename) |
 | Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` (proxied by the app at `/api/recipe-images/{id}`, signed-in users only) |
 | Find list by name | `GET /api/households/shopping/lists?queryFilter=name = "..."` |
 | Create list | `POST /api/households/shopping/lists` |

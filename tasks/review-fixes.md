@@ -414,7 +414,7 @@ They become one page.
   - Free-text "(×N)" counts recipes, not repeated lines within one recipe.
   **Done when:** unit tests for the nutrition and free-text changes.
 
-- [ ] **Task 31: Docs, agent files and dependencies**
+- [x] **Task 31: Docs, agent files and dependencies**
   **Complexity:** S
   **Do:**
   - AGENTS.md "Workflow" matches `execute-tasks.md` (direct by default, full round for
@@ -425,8 +425,9 @@ They become one page.
   - Merge the two "Ticking" bullets in `docs/mealie-api.md` if Task 16 hasn't already.
   - Remove the valtiberina references (`README.md:111`, `update-packages.ts:4`).
   - Fix the stale comments in `schema.ts:54` and `scripts/mealie-types.mjs:6`.
-  - `MEALIE_SCHEMA_VERSION` is read from `openapi.json`'s `info.version`, so the Mealie version
-    lives in compose, CI and openapi only.
+  - ~~`MEALIE_SCHEMA_VERSION` read from `openapi.json`.~~ Instead `mealie-version.test.ts`
+    fails unless compose, CI, openapi.json, the constant and the doc all agree; importing the
+    840 KB spec into the server bundle for one string wasn't worth it.
   - `@types/node` → `^22`.
   - Either pin the `^` deps exactly or relax the AGENTS.md rule, whichever is less churn.
   - DB and integration vitest projects fail loudly when their env var is missing instead of
