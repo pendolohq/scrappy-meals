@@ -155,12 +155,25 @@ Decisions already taken:
   reachable" instead of "Recipe not found".
   **Done when:** db test with a fetch that throws.
 
-- [ ] **Task 11: Error boundaries**
+- [x] **Task 11: Error boundaries**
   **Complexity:** XS
   **Do:** `src/app/(app)/error.tsx` (client: message, retry button, link to `/week`) and a
   minimal `src/app/global-error.tsx`. Check the bundled Next 16 docs for the current props
   (`reset` vs `unstable_retry`).
   **Done when:** a thrown error in a page shows the boundary (`next-dev-loop`).
+
+- [ ] **Task 11b: A database blip doesn't sign everyone out**
+  **Complexity:** S (auth: gets a review pass)
+  **Found while verifying Task 11:** the `jwt` callback in `auth.ts` checks the session
+  version against the database on every request. When that query throws (Postgres
+  restarting), Auth.js drops the session cookie, so everyone who opens the app during
+  the outage is signed out for good.
+  **Do:** if the lookup throws, keep the token and log the error. Data pages fail on their
+  own queries anyway, so nothing is served from a session that should have been revoked.
+  A removed user or a changed password still ends the session as soon as the database
+  answers again.
+  **Done when:** unit or db test; with Postgres stopped then started, the browser is still
+  signed in.
 
 - [ ] **Task 12: Health check that only the DB can fail**
   **Complexity:** XS
