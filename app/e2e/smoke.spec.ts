@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 import { formatDay } from "../src/lib/format";
-import { today } from "../src/server/domain/week";
+import { today, weekStartOf } from "../src/server/domain/week";
 
 import { STATE_FILE, USERS } from "./global-setup";
 
@@ -97,6 +97,22 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await page.getByRole("button", { name: "Send to Mealie" }).click();
   await expect(page.getByRole("status")).toContainText("Added 1 item");
 
+  // Shop from the planner: tick the item off and add a line of our own.
+  await page.getByRole("link", { name: "Start shopping" }).click();
+  await expect(page).toHaveURL(/\/shop$/);
+  await page
+    .getByTestId("shop-item")
+    .filter({ hasText: food })
+    .getByRole("checkbox")
+    .click(); // a ticked item moves into "Done"
+  await expect(page.getByText("Done (1)")).toBeVisible();
+  await page.getByLabel("Add an item").fill("coffee");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    page.getByTestId("shop-item").filter({ hasText: "coffee" })
+  ).toBeVisible();
+  await expect(page.getByTestId("pending")).toHaveCount(0); // all saved
+
   // Offline: once the service worker controls the page, the week stays readable.
   await page.goto("/week");
   await page.evaluate(async () => {
@@ -139,4 +155,26 @@ test("the other person sees the plan and logs only their own meals", async ({
     .filter({ hasText: recipe.name });
   await expect(meal.getByTestId("adherence-badge")).toHaveText("✓ Stuck to it");
   await expect(meal.getByRole("group", { name: /How did/ })).toHaveCount(1); // Sam's own buttons only
+});
+
+test("the other person sees the ticks, and ticks saved offline sync later", async ({
+  page,
+  context,
+}) => {
+  await signIn(page, USERS.sam);
+  await page.goto(`/week/${weekStartOf(today())}/shop`);
+  await expect(page.getByText("Done (1)")).toBeVisible();
+  const coffee = page.getByTestId("shop-item").filter({ hasText: "coffee" });
+  await expect(coffee).toBeVisible();
+
+  // No signal in the shop: the tick shows at once and waits in a queue.
+  await context.setOffline(true);
+  await coffee.getByRole("checkbox").click();
+  await expect(page.getByText("Done (2)")).toBeVisible();
+  await expect(page.getByTestId("pending")).toContainText("1 change");
+  await context.setOffline(false);
+  await expect(page.getByTestId("pending")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByText("Done (2)")).toBeVisible();
 });

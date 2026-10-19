@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 
 import { pushShoppingAction, type PushState } from "./actions";
 
@@ -47,16 +48,12 @@ export const PushButton = ({
           Added {state.ok.added} item{state.ok.added === 1 ? "" : "s"} to “
           {state.ok.listName}”
           {state.ok.replaced ? `, replacing ${state.ok.replaced}` : ""}.{" "}
-          {state.ok.url && (
-            <a
-              href={state.ok.url}
-              className="text-accent underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open in Mealie
-            </a>
-          )}
+          <Link
+            href={`/week/${weekStart}/shop`}
+            className="text-accent underline"
+          >
+            Start shopping
+          </Link>
         </output>
       )}
     </form>

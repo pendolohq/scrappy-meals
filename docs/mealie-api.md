@@ -32,6 +32,8 @@ then run `pnpm typecheck` and `pnpm test:integration`.
 | List items | `GET /api/households/shopping/lists/{id}` (`listItems`) |
 | Add items | `POST /api/households/shopping/items/create-bulk` → `createdItems` / `updatedItems` |
 | Remove items | `DELETE /api/households/shopping/items?ids=...&ids=...` |
+| Read one item | `GET /api/households/shopping/items/{id}` |
+| Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
 | Version | `GET /api/app/about` |
 
 ## Nutrition
@@ -82,3 +84,29 @@ then run `pnpm typecheck` and `pnpm test:integration`.
   lines go in as notes ("a squeeze of lemon (×2) · Red Lentil Soup").
 - Links to the list use `MEALIE_PUBLIC_URL` (`https://recipes.<domain>` in
   compose) + `/shopping-lists/<id>`.
+
+## Shopping from the planner
+
+`/week/<monday>/shop` is a checklist over the week's Mealie list, so nobody
+needs Mealie's own UI in the shop. Mealie stays the only copy of the list.
+
+- **Reading:** the page reads the list's items straight from Mealie on every
+  load (and every 15 s while open), ticks and hand-added lines included.
+  Items are grouped by their Mealie label (the item's, else its food's), as
+  aisles; unlabelled items go under "Other".
+- **Ticking:** `PUT /items/{id}` **replaces the whole item**: fields left out
+  fall back to defaults (quantity 1, empty note, no recipe references). So a
+  tick reads the item first and writes it back with only `checked` changed
+  (`setShoppingItemChecked`). Ticks set a value, never toggle, so a replayed
+  tick is harmless.
+- **Ownership:** item ids come from the browser, so every change first checks
+  that the item is on the list recorded for that week in `shopping_pushes`;
+  anything else is refused.
+- **Adding:** a quick-added line is a note item (quantity 0). It isn't
+  recorded as the planner's, so sending the week again keeps it.
+- **Re-sending** the week still replaces the planner's own items, ticks
+  included; hand-added lines stay.
+- **Offline:** ticks, adds and removals are queued in the browser
+  (`localStorage`, per list) and saved in order when the device is back
+  online. The service worker keeps the last loaded page. Two people ticking
+  the same item: the last save wins.

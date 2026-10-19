@@ -16,7 +16,6 @@ export type PushState = {
     added: number;
     replaced: number;
     listName: string;
-    url: string | null;
   };
 };
 
@@ -36,13 +35,8 @@ export const pushShoppingAction = userFormAction(
     try {
       const res = await pushShoppingList(getDb(), weekStart);
       revalidatePath(`/week/${weekStart}/shopping`);
-      const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
-      return {
-        ok: {
-          ...res,
-          url: base ? `${base}/shopping-lists/${res.listId}` : null,
-        },
-      };
+      revalidatePath(`/week/${weekStart}/shop`);
+      return { ok: res };
     } catch (err) {
       if (
         err instanceof MealieError ||

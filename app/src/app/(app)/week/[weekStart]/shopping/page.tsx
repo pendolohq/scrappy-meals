@@ -141,10 +141,18 @@ export default async function ShoppingPage({
         pushedBefore={pushed !== null}
       />
       {pushed && (
-        <p className="text-center text-xs text-muted">
-          Last sent{" "}
-          {pushed.pushedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
-        </p>
+        <>
+          <Link
+            href={`/week/${weekStart}/shop`}
+            className="block rounded-lg border border-accent px-4 py-2 text-center font-medium text-accent"
+          >
+            Shop from this list
+          </Link>
+          <p className="text-center text-xs text-muted">
+            Last sent{" "}
+            {pushed.pushedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+          </p>
+        </>
       )}
     </div>
   );

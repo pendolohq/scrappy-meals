@@ -5,17 +5,22 @@ import type { components } from "./schema";
 
 type MealieItemCreate = components["schemas"]["ShoppingListItemCreate"];
 type MealieItemOut = components["schemas"]["ShoppingListItemOut-Output"];
+type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 
 export type ShoppingList = { id: string; name: string };
 
 export type ShoppingItem = {
   id: string;
+  listId: string;
   quantity: number;
   foodId: string | null;
   unitId: string | null;
   note: string;
   display: string;
   checked: boolean;
+  /** Mealie's label for the item (or its food), used to group by aisle. */
+  label: string | null;
+  position: number;
 };
 
 /** One line to add. Without foodId the line is free text (note) and Mealie won't merge it. */
@@ -120,14 +125,77 @@ export async function deleteShoppingItems(
   );
 }
 
+export async function getShoppingItem(
+  itemId: string,
+  opts: { client?: MealieClient } = {}
+): Promise<ShoppingItem> {
+  const client = opts.client ?? mealie();
+  return toItem(await getItemOut(client, itemId));
+}
+
+/**
+ * Ticks or unticks one item. Mealie's update replaces the whole item, so the
+ * current item is read first and written back with only `checked` changed;
+ * otherwise quantity, note and recipe references would reset to defaults.
+ */
+export async function setShoppingItemChecked(
+  itemId: string,
+  checked: boolean,
+  opts: { client?: MealieClient } = {}
+): Promise<ShoppingItem> {
+  const client = opts.client ?? mealie();
+  const current = await getItemOut(client, itemId);
+  const body: MealieItemUpdate = {
+    shoppingListId: current.shoppingListId,
+    quantity: current.quantity,
+    note: current.note,
+    display: current.display,
+    checked,
+    position: current.position,
+    foodId: current.foodId,
+    unitId: current.unitId,
+    labelId: current.labelId,
+    extras: current.extras,
+    recipeReferences: (current.recipeReferences ?? []).map((r) => ({
+      id: r.id,
+      shoppingListItemId: r.shoppingListItemId,
+      recipeId: r.recipeId,
+      recipeQuantity: r.recipeQuantity,
+      recipeScale: r.recipeScale,
+      recipeNote: r.recipeNote,
+    })),
+  };
+  unwrap(
+    await client.PUT("/api/households/shopping/items/{item_id}", {
+      params: { path: { item_id: itemId } },
+      body,
+    })
+  );
+  return toItem({ ...current, checked });
+}
+
+async function getItemOut(
+  client: MealieClient,
+  itemId: string
+): Promise<MealieItemOut> {
+  return unwrap(
+    await client.GET("/api/households/shopping/items/{item_id}", {
+      params: { path: { item_id: itemId } },
+    })
+  );
+}
+
 function toItem(i: MealieItemOut): ShoppingItem {
   return {
     id: i.id,
+    listId: i.shoppingListId,
     quantity: i.quantity ?? 0,
     foodId: i.foodId ?? null,
     unitId: i.unitId ?? null,
     note: i.note ?? "",
     display: i.display ?? "",
     checked: i.checked ?? false,
+    label: i.label?.name ?? i.food?.label?.name ?? null,
+    position: i.position ?? 0,
   };
 }

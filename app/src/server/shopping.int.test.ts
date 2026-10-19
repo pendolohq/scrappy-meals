@@ -6,14 +6,19 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { testDbUrl, useTestDb } from "../../test/db";
 
 import { addDays, weekStartOf } from "./domain/week";
+import { UserFacingError } from "./errors";
 import { createMealieClient, type MealieClient, unwrap } from "./mealie/client";
 import { getRecipe } from "./mealie/recipes";
 import { addShoppingItems, getShoppingListItems } from "./mealie/shopping";
 import { addMeal, setPortion } from "./plan";
 import {
+  addShopItem,
+  checkShopItem,
   pushShoppingList,
+  removeShopItem,
   shoppingListName,
   weekShoppingList,
+  weekShopList,
 } from "./shopping";
 import { createUser } from "./users";
 
@@ -212,6 +217,103 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       );
       expect(second.listId).not.toBe(first.listId);
       expect(second.added).toBe(2);
+    });
+
+    it("ticks, adds and removes items on the week's list, and only there", async () => {
+      const WEEK = uniqueWeek();
+      const OTHER = addDays(WEEK, 7);
+      const opts = { client: admin };
+      const a = await createUser(db, {
+        name: "A",
+        email: "a@example.test",
+        password: "correct horse battery",
+      });
+      for (const week of [WEEK, OTHER]) {
+        await addMeal(
+          db,
+          {
+            date: addDays(week, 1),
+            slot: "lunch",
+            slug: ids.slug,
+            createdBy: a.id,
+          },
+          { fetch: fromMealie }
+        );
+      }
+      const pushed = await pushShoppingList(db, WEEK, opts);
+      const other = await pushShoppingList(db, OTHER, opts);
+      for (const listId of [pushed.listId, other.listId]) {
+        cleanup.push(() =>
+          admin.DELETE("/api/households/shopping/lists/{item_id}", {
+            params: { path: { item_id: listId } },
+          })
+        );
+      }
+
+      const list = (await weekShopList(db, WEEK, opts))!;
+      expect(list).toMatchObject({
+        listId: pushed.listId,
+        listName: shoppingListName(WEEK),
+      });
+      const lentils = list.items.find((i) => i.foodId === ids.lentils)!;
+
+      // Ticking keeps everything else about the item, recipe link included.
+      expect(
+        (await checkShopItem(db, WEEK, lentils.id, true, opts)).checked
+      ).toBe(true);
+      await checkShopItem(db, WEEK, lentils.id, true, opts); // replayed: no-op
+      const raw = unwrap(
+        await admin.GET("/api/households/shopping/items/{item_id}", {
+          params: { path: { item_id: lentils.id } },
+        })
+      );
+      expect(raw).toMatchObject({
+        checked: true,
+        quantity: lentils.quantity,
+        unitId: ids.gram,
+        foodId: ids.lentils,
+      });
+      expect(raw.recipeReferences).toHaveLength(1);
+      await checkShopItem(db, WEEK, lentils.id, false, opts);
+      expect(
+        (await weekShopList(db, WEEK, opts))!.items.find(
+          (i) => i.id === lentils.id
+        )?.checked
+      ).toBe(false);
+
+      // A hand-added line is a plain note, and survives sending the week again.
+      const coffee = await addShopItem(db, WEEK, `it-coffee-${run}`, opts);
+      expect(coffee).toMatchObject({ listId: pushed.listId, checked: false });
+      await pushShoppingList(db, WEEK, opts);
+      const after = (await weekShopList(db, WEEK, opts))!.items;
+      expect(after.find((i) => i.id === coffee.id)?.note).toBe(
+        `it-coffee-${run}`
+      );
+
+      // Items on another week's list are out of reach.
+      const foreign = (await weekShopList(db, OTHER, opts))!.items[0];
+      await expect(
+        checkShopItem(db, WEEK, foreign.id, true, opts)
+      ).rejects.toThrow(UserFacingError);
+      await expect(removeShopItem(db, WEEK, foreign.id, opts)).rejects.toThrow(
+        UserFacingError
+      );
+
+      await removeShopItem(db, WEEK, coffee.id, opts);
+      expect(
+        (await weekShopList(db, WEEK, opts))!.items.some(
+          (i) => i.id === coffee.id
+        )
+      ).toBe(false);
+      await expect(removeShopItem(db, WEEK, coffee.id, opts)).rejects.toThrow(
+        "no longer on the list"
+      );
+    });
+
+    it("has no shop list before the week is sent", async () => {
+      expect(
+        await weekShopList(db, uniqueWeek(), { client: admin })
+      ).toBeNull();
     });
   }
 );
