@@ -43,6 +43,12 @@ export default async function WeekPage({
           <h1 className="font-semibold">
             {formatRange(weekStart, addDays(weekStart, 6))}
           </h1>
+          <Link
+            href={`/week/${weekStart}/adherence`}
+            className="mr-3 text-xs text-accent"
+          >
+            Adherence
+          </Link>
           {weekStartOf(now) !== weekStart && (
             <Link href="/week" className="text-xs text-accent">
               Back to this week
@@ -70,6 +76,7 @@ export default async function WeekPage({
           fasting={day.fasting}
           currentUserId={session?.user.id ?? ""}
           isToday={day.date === now}
+          isPastOrToday={day.date <= now}
         />
       ))}
     </div>

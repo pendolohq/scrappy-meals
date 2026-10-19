@@ -20,6 +20,7 @@ export function DayCard({
   fasting,
   currentUserId,
   isToday,
+  isPastOrToday,
 }: {
   date: string;
   meals: PlannedMeal[];
@@ -27,6 +28,7 @@ export function DayCard({
   fasting: Record<string, boolean>;
   currentUserId: string;
   isToday: boolean;
+  isPastOrToday: boolean;
 }) {
   const forMacros = meals.map((m) => ({
     nutrition: m.recipe?.nutrition ?? null,
@@ -88,7 +90,13 @@ export function DayCard({
               {inSlot.length > 0 && (
                 <ul className="divide-y divide-border">
                   {inSlot.map((meal) => (
-                    <MealRow key={meal.id} meal={meal} members={members} />
+                    <MealRow
+                      key={meal.id}
+                      meal={meal}
+                      members={members}
+                      currentUserId={currentUserId}
+                      canLog={isPastOrToday}
+                    />
                   ))}
                 </ul>
               )}

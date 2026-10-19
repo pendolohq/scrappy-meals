@@ -8,6 +8,8 @@ import {
   setServingsAction,
 } from "@/app/(app)/week/actions";
 import { formatPortion } from "@/lib/format";
+
+import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
 import type { Member, PlannedMeal } from "@/server/plan";
 
 const STEP = 0.25;
@@ -82,9 +84,14 @@ function Stepper({
 export function MealRow({
   meal,
   members,
+  currentUserId,
+  canLog,
 }: {
   meal: PlannedMeal;
   members: Member[];
+  currentUserId: string;
+  /** True from the meal's day onwards: adherence can't be logged in advance. */
+  canLog: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -151,21 +158,33 @@ export function MealRow({
         }}
       >
         {members.map((m) => (
-          <Stepper
-            key={m.id}
-            label={`${m.name}'s portion of ${name}`}
-            value={portions[m.id] ?? 0}
-            onChange={(multiplier) =>
-              act(async () => {
-                setOptimisticPortion({ userId: m.id, multiplier });
-                return setPortionAction({
-                  mealId: meal.id,
-                  userId: m.id,
-                  multiplier,
-                });
-              })
-            }
-          />
+          <div key={m.id} className="space-y-1.5">
+            <Stepper
+              label={`${m.name}'s portion of ${name}`}
+              value={portions[m.id] ?? 0}
+              onChange={(multiplier) =>
+                act(async () => {
+                  setOptimisticPortion({ userId: m.id, multiplier });
+                  return setPortionAction({
+                    mealId: meal.id,
+                    userId: m.id,
+                    multiplier,
+                  });
+                })
+              }
+            />
+            {m.id === currentUserId ? (
+              canLog && (
+                <AdherenceButtons
+                  mealId={meal.id}
+                  mealName={name}
+                  log={meal.adherence[m.id]}
+                />
+              )
+            ) : (
+              <AdherenceBadge log={meal.adherence[m.id]} />
+            )}
+          </div>
         ))}
       </div>
 

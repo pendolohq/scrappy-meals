@@ -5,12 +5,14 @@ import { z } from "zod";
 
 import { auth } from "@/auth";
 import { getDb } from "@/server/db/client";
-import { isIsoDate, weekStartOf } from "@/server/domain/week";
+import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
+import { isIsoDate, today, weekStartOf } from "@/server/domain/week";
 import {
   addMeal,
   mealDate,
   PlanError,
   removeMeal,
+  setAdherence,
   setBaseServings,
   setFasting,
   setPortion,
@@ -105,5 +107,28 @@ export async function setFastingAction(input: {
     const data = z.object({ date, fasting: z.boolean() }).parse(input);
     await setFasting(getDb(), userId, data.date, data.fasting);
     return data.date;
+  });
+}
+
+/** Each person logs only their own meals, and only from the day itself onwards. */
+export async function setAdherenceAction(input: {
+  mealId: string;
+  status: string | null;
+  note?: string | null;
+}) {
+  return run(async (userId) => {
+    const data = z
+      .object({
+        mealId: id,
+        status: z.enum(ADHERENCE_STATUSES).nullable(),
+        note: z.string().max(2000).nullish(),
+      })
+      .parse(input);
+    const day = await mealDate(getDb(), data.mealId);
+    if (!day) throw new PlanError("That meal no longer exists");
+    if (day > today())
+      throw new PlanError("You can log this once the day comes");
+    await setAdherence(getDb(), data.mealId, userId, data.status, data.note);
+    return day;
   });
 }

@@ -1,7 +1,8 @@
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 
 import type { Db } from "./db/client";
-import { dayOverrides, mealSlots, mealSlotType, slotPortions, users } from "./db/schema";
+import { adherence, dayOverrides, mealSlots, mealSlotType, slotPortions, users } from "./db/schema";
+import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
 import { type CachedRecipe, loadRecipes, type RecipeFetcher } from "./recipe-cache";
@@ -28,6 +29,8 @@ export type PlannedMeal = {
   slug: string;
   baseServings: number;
   portions: Record<string, number>;
+  /** What each person logged for this meal, by user id. */
+  adherence: Record<string, { status: AdherenceStatus; note: string | null }>;
   /** Null if the recipe no longer exists in Mealie (and we have no cached copy). */
   recipe: Pick<CachedRecipe, "mealieId" | "name" | "imagePath" | "servings" | "nutrition"> | null;
 };
@@ -57,22 +60,28 @@ export async function listMembers(db: Db): Promise<Member[]> {
 
 export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: RecipeFetcher } = {}): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
-  const [members, slots, portions, overrides] = await Promise.all([
+  const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
+  const [members, slots, portions, overrides, logs] = await Promise.all([
     listMembers(db),
     db
       .select()
       .from(mealSlots)
-      .where(and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end)))
+      .where(inWeek)
       .orderBy(asc(mealSlots.date), asc(mealSlots.position)),
     db
       .select({ mealSlotId: slotPortions.mealSlotId, userId: slotPortions.userId, multiplier: slotPortions.multiplier })
       .from(slotPortions)
       .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
-      .where(and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end))),
+      .where(inWeek),
     db
       .select()
       .from(dayOverrides)
       .where(and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))),
+    db
+      .select({ mealSlotId: adherence.mealSlotId, userId: adherence.userId, status: adherence.status, note: adherence.note })
+      .from(adherence)
+      .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
+      .where(inWeek),
   ]);
 
   const recipes = await loadRecipes(
@@ -86,6 +95,12 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
     entry[p.userId] = p.multiplier;
     portionsBySlot.set(p.mealSlotId, entry);
   }
+  const logsBySlot = new Map<string, PlannedMeal["adherence"]>();
+  for (const l of logs) {
+    const entry = logsBySlot.get(l.mealSlotId) ?? {};
+    entry[l.userId] = { status: l.status, note: l.note };
+    logsBySlot.set(l.mealSlotId, entry);
+  }
 
   const meals: PlannedMeal[] = slots.map((s) => {
     const r = recipes.get(s.mealieRecipeSlug);
@@ -97,6 +112,7 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
       slug: s.mealieRecipeSlug,
       baseServings: s.baseServings,
       portions: portionsBySlot.get(s.id) ?? {},
+      adherence: logsBySlot.get(s.id) ?? {},
       recipe: r
         ? { mealieId: r.mealieId, name: r.name, imagePath: r.imagePath, servings: r.servings, nutrition: r.nutrition }
         : null,
@@ -235,4 +251,24 @@ export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
 export async function mealDate(db: Db, mealSlotId: string): Promise<string | null> {
   const [row] = await db.select({ date: mealSlots.date }).from(mealSlots).where(eq(mealSlots.id, mealSlotId));
   return row?.date ?? null;
+}
+
+/** Logs how a meal went for one person; `status: null` clears it. */
+export async function setAdherence(
+  db: Db,
+  mealSlotId: string,
+  userId: string,
+  status: AdherenceStatus | null,
+  note?: string | null,
+): Promise<void> {
+  if (status === null) {
+    await db.delete(adherence).where(and(eq(adherence.mealSlotId, mealSlotId), eq(adherence.userId, userId)));
+    return;
+  }
+  const clean = note?.trim().slice(0, 500) || null;
+  if (status === "swapped" && !clean) throw new PlanError("Say what you had instead");
+  await db
+    .insert(adherence)
+    .values({ mealSlotId, userId, status, note: clean })
+    .onConflictDoUpdate({ target: [adherence.mealSlotId, adherence.userId], set: { status, note: clean } });
 }
