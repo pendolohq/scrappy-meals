@@ -103,7 +103,7 @@ Decisions already taken:
   short shell script.
   **Done when:** the job passes and fails if you break `restore-db`.
 
-- [ ] **Task 7: Compose and Caddy hardening**
+- [x] **Task 7: Compose and Caddy hardening**
   **Complexity:** S
   **Do:**
   - An `x-logging` anchor (json-file, `max-size: 10m`, `max-file: "3"`) on every service.
@@ -111,8 +111,8 @@ Decisions already taken:
     init server runs.
   - Caddyfile, app site: `Content-Security-Policy "frame-ancestors 'none'; base-uri 'self';
     object-src 'none'"` and `X-Frame-Options DENY`. No script-src for now.
-  - Caddy only serves `/api/health` to local addresses, or drop it from the public site; the
-    container healthcheck uses `127.0.0.1` directly.
+  - ~~Caddy only serves `/api/health` to local addresses.~~ Skipped: deploy.md §8 points an
+    uptime monitor at it, which is worth more than hiding it. Task 12 makes it cheap.
   **Done when:** `docker compose config -q` passes; deployed headers checked with `curl -I`.
 
 - [ ] **Task 8: Image and CI hygiene**

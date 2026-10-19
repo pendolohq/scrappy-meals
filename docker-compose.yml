@@ -1,9 +1,17 @@
 name: scrappy-meals
 
+# Docker never rotates container logs by default; on a small disk they grow forever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-ops: &ops
   build: ./backup
   image: scrappy-meals-ops:local
   profiles: [ops]
+  logging: *logging
   depends_on:
     postgres:
       condition: service_healthy
@@ -38,12 +46,15 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      # Over TCP: during first boot the image runs a socket-only server while
+      # postgres/init creates the roles, and that one must not count as ready.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
     mem_limit: 768m
     restart: unless-stopped
+    logging: *logging
 
   mealie:
     image: ${MEALIE_IMAGE:-ghcr.io/mealie-recipes/mealie}:v3.29.0
@@ -65,6 +76,7 @@ services:
       - mealie-data:/app/data
     mem_limit: 1g
     restart: unless-stopped
+    logging: *logging
 
   app:
     image: ${APP_IMAGE:?set APP_IMAGE, e.g. ghcr.io/<owner>/scrappy-meals}:${APP_TAG:-latest}
@@ -85,6 +97,7 @@ services:
       TZ: ${TZ:-UTC}
     mem_limit: 512m
     restart: unless-stopped
+    logging: *logging
 
   caddy:
     image: caddy:2-alpine
@@ -101,6 +114,7 @@ services:
       - caddy-config:/config
     mem_limit: 128m
     restart: unless-stopped
+    logging: *logging
 
   # Nightly backup, run from host cron: docker compose run --rm backup
   # Write-only S3 credentials; cannot read or delete existing backups.
