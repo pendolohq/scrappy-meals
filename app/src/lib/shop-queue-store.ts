@@ -7,20 +7,9 @@ const PREFIX = "shop-queue:";
 const cache = new Map<string, QueuedChange[]>();
 const listeners = new Set<() => void>();
 
-const isChange = (c: unknown): c is QueuedChange =>
-  typeof c === "object" &&
-  c !== null &&
-  typeof (c as QueuedChange).id === "string" &&
-  ["check", "add", "remove"].includes((c as QueuedChange).kind);
-
-// Anything unreadable (old format, hand-edited) is dropped rather than
-// allowed to break the page.
 function load(listId: string): QueuedChange[] {
   try {
-    const parsed: unknown = JSON.parse(
-      localStorage.getItem(PREFIX + listId) ?? "[]"
-    );
-    return Array.isArray(parsed) && parsed.every(isChange) ? parsed : EMPTY;
+    return JSON.parse(localStorage.getItem(PREFIX + listId) ?? "[]");
   } catch {
     return EMPTY;
   }
@@ -58,25 +47,9 @@ export function writeQueue(listId: string, queue: QueuedChange[]): void {
   notify();
 }
 
-// Another tab (or the installed app next to a browser tab) changed a queue.
-const onStorage = (e: StorageEvent) => {
-  if (e.key === null || e.key.startsWith(PREFIX)) {
-    cache.clear();
-    notify();
-  }
-};
-
 export function subscribeQueue(listener: () => void): () => void {
-  if (listeners.size === 0) {
-    window.addEventListener("storage", onStorage);
-  }
   listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-    if (listeners.size === 0) {
-      window.removeEventListener("storage", onStorage);
-    }
-  };
+  return () => listeners.delete(listener);
 }
 
 /** Called on sign-out: queued item names stay off a shared device. */

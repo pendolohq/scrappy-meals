@@ -230,20 +230,21 @@ async function pushedListId(db: Db, weekStart: string): Promise<string> {
 /**
  * Item ids come from the browser, so every change first checks that the item
  * is on this week's list; otherwise any Mealie item could be edited by id.
+ * Null when the item no longer exists.
  */
 async function itemOnWeekList(
   db: Db,
   weekStart: string,
   itemId: string,
   opts: Opts
-): Promise<StoredShoppingItem> {
+): Promise<StoredShoppingItem | null> {
   const listId = await pushedListId(db, weekStart);
   let item: StoredShoppingItem;
   try {
     item = await getShoppingItem(itemId, { client: opts.client });
   } catch (err) {
     if (err instanceof MealieError && err.notFound) {
-      throw new UserFacingError("That item is no longer on the list.");
+      return null;
     }
     throw err;
   }
@@ -262,6 +263,9 @@ export async function checkShopItem(
   opts: Opts = {}
 ): Promise<void> {
   const item = await itemOnWeekList(db, weekStart, itemId, opts);
+  if (!item) {
+    throw new UserFacingError("That item is no longer on the list.");
+  }
   if (item.checked !== checked) {
     await setShoppingItemChecked(item, checked, { client: opts.client });
   }
@@ -269,27 +273,18 @@ export async function checkShopItem(
 
 /**
  * Adds a free-text line to this week's list. It isn't recorded as the
- * planner's, so sending the week again keeps it. `clientId` comes from the
- * device that queued the add: if a response was lost and the add is sent
- * again, the line already on the list is returned instead of a second one.
+ * planner's, so sending the week again keeps it.
  */
 export async function addShopItem(
   db: Db,
   weekStart: string,
   note: string,
-  clientId: string,
   opts: Opts = {}
 ): Promise<ShoppingItem> {
   const listId = await pushedListId(db, weekStart);
-  const existing = (
-    await getShoppingListItems(listId, { client: opts.client })
-  ).find((i) => i.clientId === clientId);
-  if (existing) {
-    return existing;
-  }
   const { created, updated } = await addShoppingItems(
     listId,
-    [{ quantity: 0, note, clientId }],
+    [{ quantity: 0, note }],
     { client: opts.client }
   );
   const item = created[0] ?? updated[0];
@@ -299,12 +294,14 @@ export async function addShopItem(
   return item;
 }
 
+/** An item that is already gone counts as removed: a replayed removal is harmless. */
 export async function removeShopItem(
   db: Db,
   weekStart: string,
   itemId: string,
   opts: Opts = {}
 ): Promise<void> {
-  await itemOnWeekList(db, weekStart, itemId, opts);
-  await deleteShoppingItems([itemId], { client: opts.client });
+  if (await itemOnWeekList(db, weekStart, itemId, opts)) {
+    await deleteShoppingItems([itemId], { client: opts.client });
+  }
 }

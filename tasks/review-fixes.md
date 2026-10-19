@@ -220,7 +220,7 @@ Decisions already taken:
 
 ## M4 — Shop queue: append and replay
 
-- [ ] **Task 17: Simplify the queue**
+- [x] **Task 17: Simplify the queue**
   **Complexity:** M
   **Do:**
   - `enqueue` always appends. Remove folding and `inFlightId`, the module-level `inFlight` map,
@@ -229,8 +229,8 @@ Decisions already taken:
     extras, and remove the regex in `shop/actions.ts`.
   - `shop-queue-store.ts`: `load()` is `try { JSON.parse } catch { [] }`. No `isChange` guard,
     no `storage` listener.
-  - `dropFailed` becomes a plain filter by id, since dependants of a failed add fail `z.uuid()`
-    and are dropped anyway.
+  - ~~`dropFailed` becomes a plain filter by id.~~ Kept as is: without the cascade, the
+    dependants of a failed add would each show a confusing "Invalid input".
   - Retry on a 10 s interval and on `online`; drop `focus`.
   - A remove that gets a 404 counts as success.
   - A Mealie 401/403 (revoked token) or a database error stops the run and keeps the queue,
@@ -240,7 +240,7 @@ Decisions already taken:
   - Rewrite the "Offline and retries" section of `docs/mealie-api.md` in about three lines.
   **Done when:** unit tests for the reducers; e2e offline tick-then-reconnect still passes.
 
-- [ ] **Task 18: `flush` is testable**
+- [x] **Task 18: `flush` is testable**
   **Complexity:** S
   **Depends on:** Task 17
   **Do:** move `flush` out of `shop-checklist.tsx` into `lib/shop-list.ts` (or

@@ -9,11 +9,10 @@ import {
 
 import {
   applyQueue,
-  dropFailed,
-  enqueue,
+  flushQueue,
   groupItems,
   type QueuedChange,
-  replaceTempId,
+  type SendResult,
   type ShopItemView,
   TEMP_PREFIX,
 } from "@/lib/shop-list";
@@ -30,11 +29,9 @@ import {
   removeShopItemAction,
 } from "./actions";
 
-type Result = { error?: string; retry?: true; item?: { id: string } };
-
 const RETRY_MS = 10_000;
 
-const send = (weekStart: string, c: QueuedChange): Promise<Result> => {
+const send = (weekStart: string, c: QueuedChange): Promise<SendResult> => {
   if (c.kind === "check") {
     return checkShopItemAction({
       weekStart,
@@ -43,61 +40,36 @@ const send = (weekStart: string, c: QueuedChange): Promise<Result> => {
     });
   }
   if (c.kind === "add") {
-    return addShopItemAction({ weekStart, text: c.text, clientId: c.tempId });
+    return addShopItemAction({ weekStart, text: c.text });
   }
   return removeShopItemAction({ weekStart, itemId: c.itemId });
 };
 
-/** The change whose request is out, per list; enqueue leaves it alone. */
-const inFlight = new Map<string, string>();
+/** Lists whose queue is being sent; one run per list at a time. */
+const running = new Set<string>();
 
-/**
- * Saves queued changes one at a time, oldest first. Each change stays in the
- * queue until its request settles; the queue is then re-read, since the user
- * may have changed more in the meantime. A network failure or a retryable
- * error (Mealie down, signed out) stops the run and keeps the queue.
- */
 const flush = async (
   listId: string,
   weekStart: string,
-  setError: (message: string | null) => void
+  setWaiting: (message: string | null) => void,
+  setFailed: (update: (failed: string[]) => string[]) => void
 ) => {
-  if (inFlight.has(listId) || !navigator.onLine) {
+  if (running.has(listId) || !navigator.onLine) {
     return;
   }
+  running.add(listId);
   try {
-    for (;;) {
-      const change = readQueue(listId)[0];
-      if (!change) {
-        break;
-      }
-      inFlight.set(listId, change.id);
-      let result: Result;
-      try {
-        // The action's response also carries the refreshed list.
-        result = await send(weekStart, change);
-      } catch {
-        break;
-      }
-      if (result.error) {
-        setError(result.error);
-        if (result.retry) {
-          break;
-        }
-        writeQueue(listId, dropFailed(readQueue(listId), change));
-        continue;
-      }
-      setError(null);
-      const rest = readQueue(listId).filter((c) => c.id !== change.id);
-      writeQueue(
-        listId,
-        change.kind === "add" && result.item
-          ? replaceTempId(rest, change.tempId, result.item.id)
-          : rest
-      );
-    }
+    await flushQueue({
+      read: () => readQueue(listId),
+      write: (queue) => writeQueue(listId, queue),
+      // The action's response also carries the refreshed list.
+      send: (c) => send(weekStart, c),
+      onSaved: () => setWaiting(null),
+      onRetry: setWaiting,
+      onDrop: (message) => setFailed((failed) => [...failed, message]),
+    });
   } finally {
-    inFlight.delete(listId);
+    running.delete(listId);
   }
 };
 
@@ -115,14 +87,16 @@ export const ShopChecklist = ({
     () => readQueue(listId),
     serverQueue
   );
-  const [error, setError] = useState<string | null>(null);
+  // Why the queue is waiting (cleared once a change saves), and changes that
+  // were dropped for good (kept until dismissed, so they can't flash past).
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
   const [text, setText] = useState("");
 
-  // Saves what an earlier visit (or another tab) left queued, and retries
-  // when the device comes back online, regains focus, or every few seconds
-  // while something is waiting.
+  // Saves what an earlier visit left queued, and retries when the device
+  // comes back online or every few seconds while something is waiting.
   useEffect(() => {
-    const run = () => void flush(listId, weekStart, setError);
+    const run = () => void flush(listId, weekStart, setWaiting, setFailed);
     const retry = () => {
       if (readQueue(listId).length > 0) {
         run();
@@ -131,20 +105,15 @@ export const ShopChecklist = ({
     run();
     const timer = setInterval(retry, RETRY_MS);
     window.addEventListener("online", run);
-    window.addEventListener("focus", retry);
     return () => {
       clearInterval(timer);
       window.removeEventListener("online", run);
-      window.removeEventListener("focus", retry);
     };
   }, [listId, weekStart]);
 
   const change = (c: QueuedChange) => {
-    writeQueue(
-      listId,
-      enqueue(readQueue(listId), c, inFlight.get(listId) ?? null)
-    );
-    void flush(listId, weekStart, setError);
+    writeQueue(listId, [...readQueue(listId), c]);
+    void flush(listId, weekStart, setWaiting, setFailed);
   };
 
   const add = (e: FormEvent) => {
@@ -183,10 +152,25 @@ export const ShopChecklist = ({
         </button>
       </form>
 
-      {error && (
+      {waiting && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {waiting}
         </p>
+      )}
+      {failed.length > 0 && (
+        <div role="alert" className="space-y-1 text-sm text-danger">
+          {failed.map((message, i) => (
+            // oxlint-disable-next-line react/no-array-index-key -- messages repeat and never reorder
+            <p key={i}>Not saved: {message}</p>
+          ))}
+          <button
+            type="button"
+            onClick={() => setFailed([])}
+            className="text-xs text-muted underline"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
       {queue.length > 0 && (
         <p className="text-xs text-muted" data-testid="pending">

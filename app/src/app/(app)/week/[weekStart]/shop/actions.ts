@@ -5,10 +5,10 @@ import { z } from "zod";
 
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
+import { isDbUnreachable } from "@/server/db/errors";
 import { isIsoDate, weekStartOf } from "@/server/domain/week";
 import { RetryableError, UserFacingError } from "@/server/errors";
 import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
-import type { ShoppingItem } from "@/server/mealie/shopping";
 import { addShopItem, checkShopItem, removeShopItem } from "@/server/shopping";
 
 const weekStart = z
@@ -26,10 +26,24 @@ async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
     revalidatePath(`/week/${week}/shop`);
     return result;
   } catch (err) {
+    // Errors that go away on their own keep the device's queue; dropping the
+    // changes would lose ticks made in the shop.
     if (isMealieUnavailable(err)) {
       console.error("shop list change failed", err);
       throw new RetryableError(
         "Mealie didn't answer. Your changes will save when it's back."
+      );
+    }
+    if (err instanceof MealieError && [401, 403].includes(err.status)) {
+      console.error("Mealie refused the planner's token", err);
+      throw new RetryableError(
+        "Mealie refused the planner's access. Your changes are kept until that's fixed."
+      );
+    }
+    if (isDbUnreachable(err)) {
+      console.error("shop list change failed", err);
+      throw new RetryableError(
+        "The planner can't reach its database. Your changes will save when it's back."
       );
     }
     if (err instanceof MealieError) {
@@ -39,8 +53,6 @@ async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
     throw err;
   }
 }
-
-const view = (item: ShoppingItem) => ({ id: item.id, checked: item.checked });
 
 export const checkShopItemAction = userAction(
   z.object({ weekStart, itemId, checked: z.boolean() }),
@@ -53,18 +65,13 @@ export const checkShopItemAction = userAction(
 );
 
 export const addShopItemAction = userAction(
-  z.object({
-    weekStart,
-    text: z.string().trim().min(1).max(200),
-    clientId: z.string().regex(/^local-[0-9a-f-]{36}$/),
-  }),
-  async (data) => ({
-    item: view(
-      await viaMealie(data.weekStart, () =>
-        addShopItem(getDb(), data.weekStart, data.text, data.clientId)
-      )
-    ),
-  })
+  z.object({ weekStart, text: z.string().trim().min(1).max(200) }),
+  async (data) => {
+    const item = await viaMealie(data.weekStart, () =>
+      addShopItem(getDb(), data.weekStart, data.text)
+    );
+    return { item: { id: item.id } };
+  }
 );
 
 export const removeShopItemAction = userAction(
