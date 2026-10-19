@@ -130,7 +130,26 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await expect(
     page.getByTestId("meal").filter({ hasText: recipe.name })
   ).toBeVisible();
+  // The installed app opens on "/week", which only redirects and so is never
+  // cached itself: offline, it gets this week's cached page.
+  await page.goto("/week");
+  await expect(
+    page.getByTestId("meal").filter({ hasText: recipe.name })
+  ).toBeVisible();
   await context.setOffline(false);
+
+  // A session that ended elsewhere (password changed) drops the cached plan
+  // as soon as a page bounces to the login screen.
+  await context.clearCookies();
+  await page.goto("/week");
+  await expect(page).toHaveURL(/\/login/);
+  await context.setOffline(true);
+  await page.goto(`/week/${weekStartOf(today())}`).catch(() => undefined);
+  await expect(
+    page.getByRole("heading", { name: "You're offline" })
+  ).toBeVisible();
+  await context.setOffline(false);
+  await signIn(page, USERS.alex);
 
   // Signing out drops the cached plan from this device.
   await page.getByRole("button", { name: /Sign out/ }).click();
