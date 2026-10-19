@@ -1,0 +1,101 @@
+# Recipe import
+
+Add recipes to Mealie from the planner: from a recipe web page, and from an Instagram or
+Facebook post or reel. Mealie does the scraping and the AI work; the planner adds the parts
+Mealie doesn't have: a review step, and labels showing where nutrition came from.
+
+## Decisions
+
+- **Mealie does the import.** `POST /api/recipes/create/url` for web pages,
+  `POST /api/recipes/create/ai` (text, images, URL; Mealie ≥ 3.23) for social posts. AI
+  providers and models are configured in Mealie (group settings, per feature: default, image,
+  audio), so the cost is set there. The app gets no AI key of its own.
+- **The source URL is kept** in Mealie's `orgURL` for every import, set explicitly after an AI
+  import, and shown in the planner as "Original post" / "Source".
+- **Ingredients are parsed on import** with Mealie's parser
+  (`POST /api/parser/ingredients`, `nlp`) and **reviewed before the recipe counts as done**.
+- **AI-estimated nutrition is allowed, labelled "estimated"** everywhere macros show, until
+  someone reviews it. Nutrition that came from the source page stays unlabelled. Missing stays
+  missing; the planner itself still never estimates.
+- **Import state lives on the recipe in Mealie**, in `extras` (string key/values), so it
+  survives with Mealie's backups and needs no planner table:
+  - `scrappyReview`: `pending` | `done` (absent = a recipe not imported through the planner,
+    treated as done)
+  - `scrappyNutrition`: `source` | `estimated` | `reviewed`
+  Writes use `PATCH /api/recipes/{slug}` so other fields are left alone.
+- **Two PRs:** milestone 1 (web page import + review), milestone 2 (social/AI import).
+
+## Milestone 1: import from a web page
+
+- [ ] **1. Mealie client: import, parse, patch.** **Complexity:** M
+  In `server/mealie/recipes.ts` (or a new `import.ts` there): `importRecipeFromUrl(url)`
+  → slug via `create/url` (no tags/categories); a scrape failure becomes a `UserFacingError`
+  ("Couldn't find a recipe on that page"), Mealie down stays a `RetryableError`.
+  `parseIngredients(lines)` via `/api/parser/ingredients` (`nlp`), returning food/unit/quantity
+  and the parser's confidence. `patchRecipe(slug, fields)` via PATCH. `findRecipeBySourceUrl`
+  (`queryFilter` on `orgURL`) for duplicate detection. `Recipe` gains `sourceUrl` and
+  `importState` (`{ review, nutrition }` read from `extras`, pure helper with unit tests).
+  Integration tests in `mealie.int.test.ts` (import a known page served from a local fixture,
+  parse, patch keeps untouched fields). Update the endpoint table in `docs/mealie-api.md`.
+
+- [ ] **2. Cache the import state.** **Complexity:** M (migration: full round)
+  Depends on 1. Add `source_url`, `review_state`, `nutrition_source` to `recipe_cache` (Drizzle
+  migration), filled by `loadRecipes`. `*.db.test.ts` coverage.
+
+- [ ] **3. "Add recipe" page.** **Complexity:** L (security: full round)
+  Depends on 1. `/recipes/new`, linked from the header nav. One URL field;
+  `userFormAction` with zod: `http(s)` only, no credentials in the URL, no IP literals in
+  private/loopback/link-local ranges, no single-label hosts (Mealie fetches the URL from inside
+  the Compose network, so `postgres`, `app`, `mealie` must not be reachable this way).
+  Rate-limited per user (20 an hour, `createRateLimiter`). If a recipe with the same
+  `orgURL` exists, link to it instead of importing again. On success: parse the ingredients,
+  `PATCH` the parsed lines plus `extras` (`scrappyReview: pending`, `scrappyNutrition:
+  source` when the page had nutrition), then redirect to the review page. Follow
+  `docs/security.md`; `access.test.ts` must pass unchanged.
+
+- [ ] **4. Review page.** **Complexity:** L
+  Depends on 2, 3. `/recipes/[slug]/review`: name, servings (required, shopping scaling needs
+  it), source link, nutrition per serving (editable, with its source label), and each
+  ingredient as original text beside the parsed amount/unit/food, low-confidence lines
+  highlighted. Per line: keep parsed, edit, or keep as a plain note. Foods and units the
+  parser found that don't exist in Mealie are created on save (`POST /api/foods`,
+  `/api/units`). Save = one `PATCH` (ingredients, servings, nutrition, `extras` →
+  `scrappyReview: done`, `scrappyNutrition: reviewed` if edited/confirmed), then refresh the
+  cache entry (`loadRecipes(..., { force: true })`). "Open in Mealie" for anything else.
+
+- [ ] **5. Show import state in the planner.** **Complexity:** M
+  Depends on 2. Wherever macros show (meal rows, day/person totals), an "estimated" label when
+  any recipe in the sum has `nutrition_source = estimated`. A "needs review" badge on recipes
+  with `review_state = pending`, linking to the review page. A "Source" link where a recipe is
+  shown in detail.
+
+- [ ] **6. Docs and e2e.** **Complexity:** S
+  Depends on 3–5. README features, `docs/mealie-api.md` (import, parser, extras keys), an e2e
+  path: add a recipe from a fixture page, review it, plan it.
+
+## Milestone 2: import from Instagram / Facebook
+
+- [ ] **7. Spike against a real Mealie with an AI provider.** **Complexity:** S
+  Needs the owner's AI key configured in Mealie (cheap text/image model, a transcription model
+  for audio). Find out, and record in `docs/mealie-api.md`: does `create/ai` with a reel URL
+  transcribe it from the server without signing in to Instagram/Facebook (else Mealie's
+  `YTDLP_COOKIEFILE`), does it set `orgURL`, does it fill nutrition when the source has none,
+  how long it takes (the app's Mealie timeout is 10 s), what it costs per import.
+
+- [ ] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
+  Depends on 7 and milestone 1. Instagram/Facebook links (`instagram.com`, `facebook.com`,
+  `fb.watch`) go through `create/ai` with the URL, plus optional pasted caption and
+  screenshots (size/count limits, server action body limit). If the video can't be fetched,
+  say so and ask for the caption or screenshots. Always set `orgURL` to the post URL. Nutrition
+  from an AI import is `estimated`. Same review step as milestone 1.
+
+- [ ] **9. Estimate missing nutrition.** **Complexity:** M
+  Depends on 7. If the spike shows `create/ai` estimates nutrition, offer "Estimate with AI" on
+  the review page for web-page imports that have none, marked `estimated`. If it doesn't,
+  decide with the owner before building anything (the alternative is the app calling a model
+  itself, which needs its own key and env var).
+
+- [ ] **10. Deploy docs.** **Complexity:** S
+  `docs/deploy.md`: set up AI providers in Mealie (which features need which provider, picking
+  cheap models), and `YTDLP_COOKIEFILE` if the spike shows it's needed (then `.env.example`
+  and `docker-compose.yml` too).
