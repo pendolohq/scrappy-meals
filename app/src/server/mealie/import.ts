@@ -99,3 +99,93 @@ export async function patchRecipe(
     })
   );
 }
+
+/**
+ * The recipe as Mealie stores it. The cached `Recipe` model drops raw
+ * nutrition fields and extras, which the import state and review need.
+ * Null for an unknown slug.
+ */
+export async function getRawRecipe(
+  slug: string,
+  opts: { client?: MealieClient } = {}
+) {
+  const client = opts.client ?? mealie();
+  const result = await client.GET("/api/recipes/{slug}", {
+    params: { path: { slug } },
+  });
+  if (result.response.status === 404) {
+    return null;
+  }
+  return unwrap(result);
+}
+
+const SEARCH_PAGE = 50;
+
+type Named = {
+  id: string;
+  name: string;
+  pluralName?: string | null;
+  abbreviation?: string | null;
+  pluralAbbreviation?: string | null;
+};
+
+const normalise = (text: string) => text.trim().toLowerCase();
+
+function pick(items: Named[], wanted: string, fields: (keyof Named)[]) {
+  const hit = items.find((item) =>
+    fields.some((f) => {
+      const value = item[f];
+      return typeof value === "string" && normalise(value) === wanted;
+    })
+  );
+  return hit ? { id: hit.id, name: hit.name } : null;
+}
+
+/** An existing food with this name (or plural), else a new one. */
+export async function findOrCreateFood(
+  name: string,
+  opts: { client?: MealieClient } = {}
+): Promise<{ id: string; name: string }> {
+  const client = opts.client ?? mealie();
+  const wanted = normalise(name);
+  const page = unwrap(
+    await client.GET("/api/foods", {
+      params: { query: { search: wanted, perPage: SEARCH_PAGE } },
+    })
+  );
+  const found = pick(page.items, wanted, ["name", "pluralName"]);
+  if (found) {
+    return found;
+  }
+  const created = unwrap(
+    await client.POST("/api/foods", { body: { name: name.trim() } })
+  );
+  return { id: created.id, name: created.name };
+}
+
+/** An existing unit with this name, plural or abbreviation, else a new one. */
+export async function findOrCreateUnit(
+  name: string,
+  opts: { client?: MealieClient } = {}
+): Promise<{ id: string; name: string }> {
+  const client = opts.client ?? mealie();
+  const wanted = normalise(name);
+  const page = unwrap(
+    await client.GET("/api/units", {
+      params: { query: { search: wanted, perPage: SEARCH_PAGE } },
+    })
+  );
+  const found = pick(page.items, wanted, [
+    "name",
+    "pluralName",
+    "abbreviation",
+    "pluralAbbreviation",
+  ]);
+  if (found) {
+    return found;
+  }
+  const created = unwrap(
+    await client.POST("/api/units", { body: { name: name.trim() } })
+  );
+  return { id: created.id, name: created.name };
+}

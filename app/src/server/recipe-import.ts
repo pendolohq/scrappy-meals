@@ -1,9 +1,10 @@
 import "server-only";
 
 import { RetryableError, UserFacingError } from "./errors";
-import { mealie, MealieError, unwrap } from "./mealie/client";
+import { isTransient } from "./mealie/client";
 import {
   findRecipeBySourceUrl,
+  getRawRecipe,
   importRecipeFromUrl,
   patchRecipe,
 } from "./mealie/import";
@@ -34,42 +35,13 @@ type Deps = {
 // credits), so a signed-in user can't hammer it.
 const limiter = createRateLimiter({ limit: 20, windowMs: 60 * 60 * 1000 });
 
-// The cached recipe model drops raw nutrition and extras, which the import
-// state needs.
-async function getRecipe(slug: string): Promise<FetchedRecipe | null> {
-  const result = await mealie().GET("/api/recipes/{slug}", {
-    params: { path: { slug } },
-  });
-  if (result.response.status === 404) {
-    return null;
-  }
-  const recipe = unwrap(result);
-  return { nutrition: recipe.nutrition, extras: recipe.extras };
-}
-
 const defaults: Deps = {
   find: (url) => findRecipeBySourceUrl(url),
   importFromUrl: (url) => importRecipeFromUrl(url),
-  getRecipe,
+  getRecipe: getRawRecipe,
   patch: (slug, fields) => patchRecipe(slug, fields),
   limiter,
 };
-
-/** Mealie down, overloaded or unreachable: worth trying again later. */
-function isTransient(err: unknown): boolean {
-  if (err instanceof MealieError) {
-    return err.status >= 500 || err.status === 429;
-  }
-  if (!(err instanceof Error)) {
-    return false;
-  }
-  return (
-    err.name === "TimeoutError" ||
-    err.name === "AbortError" ||
-    (err instanceof TypeError &&
-      (err.message === "fetch failed" || err.cause !== undefined))
-  );
-}
 
 /**
  * Imports the recipe on a web page through Mealie and marks it as awaiting
