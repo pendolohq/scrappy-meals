@@ -1,7 +1,8 @@
 # Deploying on a VPS
 
 A start-to-finish guide for one small server (tested target: Hetzner, 4 GB
-RAM, Ubuntu 24.04). Everything runs from `docker-compose.yml`: Postgres,
+RAM, Ubuntu 24.04). The app image is built for x86-64 (amd64) only, so pick an
+Intel/AMD server, not an ARM one (e.g. not Hetzner's CAX line). Everything runs from `docker-compose.yml`: Postgres,
 Mealie, the app and Caddy (HTTPS). Only ports 80 and 443 are exposed.
 
 Throughout, replace `example.com` with your domain and `<owner>` with the

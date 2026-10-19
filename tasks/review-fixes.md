@@ -115,7 +115,7 @@ Decisions already taken:
     uptime monitor at it, which is worth more than hiding it. Task 12 makes it cheap.
   **Done when:** `docker compose config -q` passes; deployed headers checked with `curl -I`.
 
-- [ ] **Task 8: Image and CI hygiene**
+- [x] **Task 8: Image and CI hygiene**
   **Complexity:** S
   **Do:**
   - `ci.yml`: `latest` only for tags without `-` (no prereleases).
