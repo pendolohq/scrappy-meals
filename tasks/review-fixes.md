@@ -175,7 +175,7 @@ Decisions already taken:
   **Done when:** unit or db test; with Postgres stopped then started, the browser is still
   signed in.
 
-- [ ] **Task 12: Health check that only the DB can fail**
+- [x] **Task 12: Health check that only the DB can fail**
   **Complexity:** XS
   **Depends on:** Task 9
   **Do:** `api/health/route.ts`: run the DB and Mealie checks in parallel, give Mealie its own
