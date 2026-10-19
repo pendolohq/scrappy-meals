@@ -38,6 +38,8 @@ export default defineConfig({
           name: "integration",
           include: ["src/**/*.int.test.ts"],
           testTimeout: 30_000,
+          // One shared Mealie: files running at once intermittently got 401s.
+          fileParallelism: false,
         },
       },
     ],
