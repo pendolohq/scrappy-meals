@@ -34,7 +34,11 @@ export const addMealAction = userAction(
   z.object({
     date,
     slot: z.enum(SLOT_TYPES),
-    slug: z.string().min(1).max(200),
+    // Mealie's slugs; also keeps "..", "/" and the like out of its API paths.
+    slug: z
+      .string()
+      .max(200)
+      .regex(/^[a-z0-9-]+$/),
   }),
   async (data, user) => {
     await addMeal(getDb(), { ...data, createdBy: user.id });
@@ -52,7 +56,8 @@ export const setPortionAction = userAction(
 );
 
 export const setServingsAction = userAction(
-  z.object({ mealId: id, baseServings: z.number().positive().max(100) }),
+  // At least 0.01: the column keeps two decimals, and 0 isn't allowed.
+  z.object({ mealId: id, baseServings: z.number().min(0.01).max(100) }),
   async (data) => {
     await setBaseServings(getDb(), data.mealId, data.baseServings);
     return refreshWeek(await mealDate(getDb(), data.mealId));

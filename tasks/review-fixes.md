@@ -338,7 +338,7 @@ They become one page.
   - Broaden the import regex to catch namespace and default imports.
   **Done when:** the test fails when you add an unguarded page in a new route group.
 
-- [ ] **Task 26: Small input tightening**
+- [x] **Task 26: Small input tightening**
   **Complexity:** XS
   **Do:**
   - `safeNext` rejects `\` and control characters (or compares `new URL(next, base).origin`).
