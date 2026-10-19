@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { getDb } from "@/server/db/client";
-import { createRateLimiter } from "@/server/rate-limit";
+import { createSignInLimits } from "@/server/rate-limit";
 import { refreshToken } from "@/server/session-token";
 import {
   findUserById,
@@ -30,9 +30,7 @@ export class RateLimitedError extends CredentialsSignin {
   code = "rate_limited";
 }
 
-const WINDOW_MS = 15 * 60 * 1000;
-const perEmail = createRateLimiter({ limit: 10, windowMs: WINDOW_MS });
-const perIp = createRateLimiter({ limit: 30, windowMs: WINDOW_MS });
+const limits = createSignInLimits();
 
 const credentialsSchema = z.object({
   email: z.string().min(1).max(320),
@@ -60,7 +58,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         const email = normaliseEmail(parsed.data.email);
 
-        if (!perIp.hit(clientIp(request)) || !perEmail.hit(email)) {
+        const ip = clientIp(request);
+        if (!limits.allowed(email, ip)) {
           throw new RateLimitedError();
         }
 
@@ -70,9 +69,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           parsed.data.password
         );
         if (!user) {
+          limits.failed(email, ip);
           return null;
         }
-        perEmail.reset(email);
+        limits.succeeded(email, ip);
         return {
           id: user.id,
           name: user.name,

@@ -67,7 +67,9 @@ portions, servings) are household-wide on purpose.
   database, and ends on the first request after Postgres is back.
 - Auth.js sets the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` when
   `AUTH_URL` is https. Caddy terminates TLS; the app port isn't published.
-- Sign-in is rate-limited per IP and per email (`src/auth.ts`).
+- Sign-in failures are rate-limited per IP, per email from one IP, and per
+  email overall (`createSignInLimits` in `src/server/rate-limit.ts`), so
+  guessing someone's password can't lock them out of their own device.
 
 ## Tests
 

@@ -348,7 +348,7 @@ They become one page.
     so tiny values don't hit the DB check or read as "no target".
   **Done when:** unit tests for `safeNext` and the schemas.
 
-- [ ] **Task 27: Sign-in limits can't lock the household out**
+- [x] **Task 27: Sign-in limits can't lock the household out**
   **Complexity:** S
   **Do:**
   - Count per-email failures per (email, IP) pair, with a higher global per-email ceiling (for

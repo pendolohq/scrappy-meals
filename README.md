@@ -68,7 +68,7 @@ someone with shell access to the server creates them:
 
 Run them with `docker compose exec app scrappy ...`. Passwords are read from
 a hidden prompt (or stdin when piped) and stored as argon2id hashes; they
-never go into env vars, files or logs. Logins are rate-limited per email and
+never go into env vars, files or logs. Failed logins are rate-limited per email and
 per IP.
 
 ## Backups
