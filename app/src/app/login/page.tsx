@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import { getDb } from "@/server/db/client";
+import { currentUser } from "@/server/session";
 import { countUsers } from "@/server/users";
 
 import { LoginForm } from "./login-form";
@@ -9,7 +9,9 @@ import { LoginForm } from "./login-form";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  if ((await auth())?.user) redirect("/");
+  if (await currentUser()) {
+    redirect("/");
+  }
   const { next } = await searchParams;
   const noUsers = (await countUsers(getDb())) === 0;
 

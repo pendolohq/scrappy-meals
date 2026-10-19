@@ -10,6 +10,7 @@ import {
 } from "@/server/domain/adherence";
 import { addDays, isIsoDate, today, weekStartOf } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
+import { requireUser } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function AdherencePage({
 }: {
   params: Promise<{ weekStart: string }>;
 }) {
+  await requireUser();
   const { weekStart } = await params;
   if (!isIsoDate(weekStart)) redirect("/week");
   if (weekStartOf(weekStart) !== weekStart)

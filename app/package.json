@@ -11,9 +11,9 @@
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:db": "vitest run --project db",
-    "cli": "tsx src/cli/index.ts",
+    "cli": "tsx --conditions=react-server src/cli/index.ts",
     "mealie:types": "node scripts/mealie-types.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "NODE_OPTIONS=--conditions=react-server playwright test"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

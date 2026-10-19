@@ -1,13 +1,16 @@
+import "server-only";
+
 import { hash, verify } from "@node-rs/argon2";
 import { asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Db } from "./db/client";
 import { type User, users } from "./db/schema";
+import { UserFacingError } from "./errors";
 
 export const MIN_PASSWORD_LENGTH = 12;
 
-export class UserError extends Error {
+export class UserError extends UserFacingError {
   name = "UserError";
 }
 

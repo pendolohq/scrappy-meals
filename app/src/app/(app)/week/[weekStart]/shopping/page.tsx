@@ -5,6 +5,7 @@ import { formatRange } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import { addDays, isIsoDate, weekStartOf } from "@/server/domain/week";
 import { lastPush, weekShoppingList } from "@/server/shopping";
+import { requireUser } from "@/server/session";
 
 import { PushButton } from "./push-button";
 
@@ -17,6 +18,7 @@ export default async function ShoppingPage({
 }: {
   params: Promise<{ weekStart: string }>;
 }) {
+  await requireUser();
   const { weekStart } = await params;
   if (!isIsoDate(weekStart)) redirect("/week");
   if (weekStartOf(weekStart) !== weekStart)

@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
 import { SignOut } from "@/components/sign-out";
+import { requireUser } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const user = await requireUser();
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-[env(safe-area-inset-bottom)]">
@@ -18,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/settings">Settings</Link>
         </nav>
         <SignOut
-          name={session.user.name}
+          name={user.name}
           action={async () => {
             "use server";
             await signOut({ redirectTo: "/login" });

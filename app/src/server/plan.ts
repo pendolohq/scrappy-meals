@@ -1,3 +1,5 @@
+import "server-only";
+
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 
 import type { Db } from "./db/client";
@@ -5,12 +7,13 @@ import { adherence, dayOverrides, mealSlots, mealSlotType, slotPortions, users }
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
+import { UserFacingError } from "./errors";
 import { type CachedRecipe, loadRecipes, type RecipeFetcher } from "./recipe-cache";
 
 export type SlotType = (typeof mealSlotType.enumValues)[number];
 export const SLOT_TYPES = mealSlotType.enumValues;
 
-export class PlanError extends Error {
+export class PlanError extends UserFacingError {
   name = "PlanError";
 }
 

@@ -31,6 +31,7 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 | `app/` | Next.js app; Mealie client in `app/src/server/mealie/` |
 | `docs/mealie-api.md` | What we rely on in the Mealie API, incl. nutrition semantics |
 | `docs/deploy.md` | Step-by-step deployment on a VPS |
+| `docs/security.md` | How sign-in is enforced for pages, server actions and API routes |
 
 Only Caddy publishes ports. Postgres and Mealie are reachable only on the
 Compose network; the app calls Mealie at `http://mealie:9000` with a

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-import { auth } from "@/auth";
+import { userFormAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { isIsoDate, weekStartOf } from "@/server/domain/week";
+import { UserFacingError } from "@/server/errors";
 import { MealieError } from "@/server/mealie/client";
 import { pushShoppingList } from "@/server/shopping";
 
@@ -18,30 +20,30 @@ export type PushState = {
   };
 };
 
-export async function pushShoppingAction(
-  _prev: PushState,
-  form: FormData,
-): Promise<PushState> {
-  if (!(await auth())?.user)
-    return { error: "You are signed out. Reload the page." };
-  const weekStart = String(form.get("weekStart") ?? "");
-  if (!isIsoDate(weekStart) || weekStartOf(weekStart) !== weekStart)
-    return { error: "Invalid week" };
+const fromForm = z.preprocess(
+  (form) => (form instanceof FormData ? { weekStart: form.get("weekStart") } : form),
+  z.object({
+    weekStart: z.string().refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week"),
+  }),
+);
 
-  try {
-    const res = await pushShoppingList(getDb(), weekStart);
-    revalidatePath(`/week/${weekStart}/shopping`);
-    const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
-    return {
-      ok: { ...res, url: base ? `${base}/shopping-lists/${res.listId}` : null },
-    };
-  } catch (err) {
-    console.error("shopping push failed", err);
-    return {
-      error:
-        err instanceof MealieError || (err as Error).name === "TimeoutError"
-          ? "Mealie didn't accept the list. Is it running? Nothing was changed on our side."
-          : "Something went wrong. Try again.",
-    };
-  }
-}
+export const pushShoppingAction = userFormAction(
+  fromForm,
+  async ({ weekStart }) => {
+    try {
+      const res = await pushShoppingList(getDb(), weekStart);
+      revalidatePath(`/week/${weekStart}/shopping`);
+      const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
+      return {
+        ok: { ...res, url: base ? `${base}/shopping-lists/${res.listId}` : null },
+      };
+    } catch (err) {
+      if (err instanceof MealieError || (err as Error).name === "TimeoutError") {
+        console.error("shopping push failed", err);
+        throw new UserFacingError("Mealie didn't accept the list. Is it running? Nothing was changed on our side.");
+      }
+      throw err;
+    }
+  },
+  { invalid: () => "Invalid week" },
+);
