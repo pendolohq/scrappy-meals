@@ -18,7 +18,6 @@ export type RecipeListItem = {
 };
 
 export type Ingredient = {
-  referenceId: string;
   /** Null when Mealie has no amount (unparsed line, or "to taste"). */
   quantity: number | null;
   food: { id: string; name: string } | null;
@@ -26,8 +25,6 @@ export type Ingredient = {
   note: string;
   /** Mealie's rendered line, e.g. "2 cups flour, sifted". */
   display: string;
-  /** Section heading shown above this line, if any. */
-  title: string | null;
 };
 
 export type Recipe = RecipeListItem & {
@@ -37,16 +34,11 @@ export type Recipe = RecipeListItem & {
   updatedAt: string | null;
 };
 
-export type RecipePage = {
-  items: RecipeListItem[];
-  page: number;
-  totalPages: number;
-  total: number;
-};
+export type RecipePage = { items: RecipeListItem[] };
 
 export async function searchRecipes(
   query: string,
-  opts: { page?: number; perPage?: number; client?: MealieClient } = {}
+  opts: { perPage?: number; client?: MealieClient } = {}
 ): Promise<RecipePage> {
   const client = opts.client ?? mealie();
   const search = query.trim();
@@ -59,7 +51,7 @@ export async function searchRecipes(
           ...(search
             ? {}
             : { orderBy: "name", orderDirection: "asc" as const }),
-          page: opts.page ?? 1,
+          page: 1,
           perPage: opts.perPage ?? 20,
         },
       },
@@ -67,9 +59,6 @@ export async function searchRecipes(
   );
   return {
     items: page.items.map(toListItem),
-    page: page.page ?? 1,
-    totalPages: page.total_pages ?? 1,
-    total: page.total ?? page.items.length,
   };
 }
 
@@ -130,12 +119,10 @@ function toIngredient(i: MealieIngredient): Ingredient {
         }
       : null;
   return {
-    referenceId: i.referenceId ?? "",
     quantity: i.quantity ? i.quantity : null,
     food,
     unit,
     note: i.note ?? "",
     display: i.display || i.originalText || i.note || "",
-    title: i.title || null,
   };
 }

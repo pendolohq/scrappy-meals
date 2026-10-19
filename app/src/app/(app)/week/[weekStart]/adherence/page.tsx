@@ -10,19 +10,10 @@ import {
   summariseAdherence,
 } from "@/server/domain/adherence";
 import { today } from "@/server/domain/week";
-import { getWeekPlan } from "@/server/plan";
+import { getWeekPlan, SLOT_LABEL } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../../week-route";
-
-export const dynamic = "force-dynamic";
-
-const SLOT_LABEL = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-} as const;
 
 export default async function AdherencePage({
   params,

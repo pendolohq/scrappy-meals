@@ -33,9 +33,7 @@ export type MealAdherence = {
 
 export type AdherenceSummary = {
   counts: Record<AdherenceStatus, number>;
-  /** Meals planned for this person up to today. */
-  due: number;
-  /** Due meals with no status yet. */
+  /** Meals planned for this person up to today with no status yet. */
   unlogged: number;
   /** Weighted share of logged meals, 0–1; null when nothing is logged. */
   score: number | null;
@@ -55,7 +53,6 @@ export function summariseAdherence(
     skipped: 0,
     swapped: 0,
   };
-  let due = 0;
   let unlogged = 0;
   let logged = 0;
   let weighted = 0;
@@ -66,12 +63,9 @@ export function summariseAdherence(
       logged += 1;
       weighted += STATUS_WEIGHT[m.status];
     }
-    if (m.portion > 0 && m.date <= today) {
-      due += 1;
-      if (!m.status) {
-        unlogged += 1;
-      }
+    if (m.portion > 0 && m.date <= today && !m.status) {
+      unlogged += 1;
     }
   }
-  return { counts, due, unlogged, score: logged ? weighted / logged : null };
+  return { counts, unlogged, score: logged ? weighted / logged : null };
 }

@@ -26,6 +26,13 @@ import {
 export type SlotType = (typeof mealSlotType.enumValues)[number];
 export const SLOT_TYPES = mealSlotType.enumValues;
 
+export const SLOT_LABEL: Record<SlotType, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+};
+
 export class PlanError extends UserFacingError {
   name = "PlanError";
 }
@@ -193,26 +200,6 @@ export async function getWeekPlan(
     })),
     recipes,
   };
-}
-
-/** Whether `userId` fasts on `date`. */
-export async function isUserFasting(
-  db: Db,
-  userId: string,
-  date: string
-): Promise<boolean> {
-  const [user] = await db
-    .select({ days: users.defaultFastingDays })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (!user) {
-    throw new PlanError("Unknown user");
-  }
-  const [o] = await db
-    .select({ isFasting: dayOverrides.isFasting })
-    .from(dayOverrides)
-    .where(and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date)));
-  return isFasting(user.days, date, o?.isFasting);
 }
 
 /**

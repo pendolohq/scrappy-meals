@@ -360,7 +360,7 @@ They become one page.
 
 ## M9 — Cleanup
 
-- [ ] **Task 28: Remove dead code and duplicates**
+- [x] **Task 28: Remove dead code and duplicates**
   **Complexity:** S
   **Do:**
   - Delete code only tests use: `isUserFasting` (test through `getWeekPlan`) and
@@ -379,6 +379,11 @@ They become one page.
     - test DB setup in `users.db.test.ts` and the TRUNCATE list in e2e global setup.
   - Drop redundant `export const dynamic = "force-dynamic"`, the `inArray` with one element and
     the `auth.ts:88` cast (add `sv` to the `User` augmentation).
+  **Kept on purpose:** `createMealieClient`'s `timeoutMs`/`fetch` (now used by `mealie()` and
+  the client test); the client's `SendResult` (the queue lives in `lib/`, which can't import
+  `server/action.ts`); the TRUNCATE list in `e2e/global-setup.ts` (Playwright can't import the
+  vitest helper); `force-dynamic` on `/week` and `/login` (they'd otherwise risk being
+  prerendered with a build-time date or a build-time database).
   **Done when:** all checks green; Grep shows no remaining references.
 
 - [ ] **Task 29: Drop the `addMeal` retry loop and the redundant index**

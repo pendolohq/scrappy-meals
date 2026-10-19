@@ -17,6 +17,10 @@ declare module "next-auth" {
   interface Session {
     user: { id: string; name: string; email: string };
   }
+  interface User {
+    /** Session version at sign-in; see refreshToken. */
+    sv?: number;
+  }
 }
 
 declare module "next-auth/jwt" {
@@ -86,7 +90,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         // Sign-in: `user` is what authorize() returned.
-        return { ...token, uid: user.id, sv: (user as { sv: number }).sv };
+        return { ...token, uid: user.id, sv: user.sv };
       }
       return refreshToken(token, (id) => findUserById(getDb(), id));
     },

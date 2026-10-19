@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
 // Runs against a real Postgres: DATABASE_TEST_URL=postgres://... pnpm test:db
 // The database is migrated and its users table emptied, so point it at a throwaway DB.
-import path from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { createDb } from "./db/client";
-import { runMigrations } from "./db/migrate";
+import { testDbUrl, useTestDb } from "../../test/db";
+
 import { users } from "./db/schema";
 import {
   countUsers,
@@ -19,21 +18,9 @@ import {
   verifyCredentials,
 } from "./users";
 
-const url = process.env.DATABASE_TEST_URL;
-
-describe.skipIf(!url)("users (Postgres)", () => {
-  const { db, pool } = createDb(url ?? "postgres://unused");
+describe.skipIf(!testDbUrl)("users (Postgres)", () => {
+  const db = useTestDb();
   const pw = "correct horse battery";
-
-  beforeAll(async () => {
-    await runMigrations(url!, path.join(__dirname, "../../drizzle"));
-  });
-  beforeEach(async () => {
-    await db.delete(users);
-  });
-  afterAll(async () => {
-    await pool.end();
-  });
 
   it("creates a user with a normalised email and an argon2id hash", async () => {
     const u = await createUser(db, {

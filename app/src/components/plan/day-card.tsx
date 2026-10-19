@@ -1,17 +1,15 @@
 import { formatDay } from "@/lib/format";
 import { personDayTotals } from "@/server/domain/macros";
-import type { Member, PlannedMeal, SlotType } from "@/server/plan";
+import {
+  type Member,
+  type PlannedMeal,
+  SLOT_LABEL,
+  SLOT_TYPES,
+} from "@/server/plan";
 
 import { AddMeal } from "./add-meal";
 import { MealRow } from "./meal-row";
 import { PersonTotals } from "./person-totals";
-
-const SLOTS: { slot: SlotType; label: string }[] = [
-  { slot: "breakfast", label: "Breakfast" },
-  { slot: "lunch", label: "Lunch" },
-  { slot: "dinner", label: "Dinner" },
-  { slot: "snack", label: "Snack" },
-];
 
 export const DayCard = ({
   date,
@@ -77,7 +75,8 @@ export const DayCard = ({
       )}
 
       <div className="space-y-3">
-        {SLOTS.map(({ slot, label }) => {
+        {SLOT_TYPES.map((slot) => {
+          const label = SLOT_LABEL[slot];
           const inSlot = meals.filter((m) => m.slot === slot);
           return (
             <div key={slot}>

@@ -11,13 +11,11 @@ const onion = { id: "f-onion", name: "onion" };
 const salt = { id: "f-salt", name: "salt" };
 
 const ing = (over: Partial<Ingredient>): Ingredient => ({
-  referenceId: "r",
   quantity: null,
   food: null,
   unit: null,
   note: "",
   display: "",
-  title: null,
   ...over,
 });
 
