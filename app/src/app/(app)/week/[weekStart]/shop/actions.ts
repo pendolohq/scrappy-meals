@@ -44,13 +44,12 @@ const view = (item: ShoppingItem) => ({ id: item.id, checked: item.checked });
 
 export const checkShopItemAction = userAction(
   z.object({ weekStart, itemId, checked: z.boolean() }),
-  async (data) => ({
-    item: view(
-      await viaMealie(data.weekStart, () =>
-        checkShopItem(getDb(), data.weekStart, data.itemId, data.checked)
-      )
-    ),
-  })
+  async (data) => {
+    await viaMealie(data.weekStart, () =>
+      checkShopItem(getDb(), data.weekStart, data.itemId, data.checked)
+    );
+    return {};
+  }
 );
 
 export const addShopItemAction = userAction(

@@ -98,14 +98,13 @@ needs Mealie's own UI in the shop. Mealie stays the only copy of the list.
   aisles; unlabelled items go under "Other".
 - **Ticking:** `PUT /items/{id}` **replaces the whole item**: fields left out
   fall back to defaults (quantity 1, empty note, no recipe references). So a
-  tick reads the item first and writes it back with only `checked` changed
-  (`setShoppingItemChecked`). Ticks set a value, never toggle, so a replayed
-  tick is harmless.
+  tick writes back the item it just read (to check ownership, below) with
+  only `checked` changed (`setShoppingItemChecked`). Ticks set a value, never
+  toggle, so a replayed tick is harmless. Unticking may merge the item into a
+  matching unticked one; the page reloads the list after every change anyway.
 - **Ownership:** item ids come from the browser, so every change first checks
   that the item is on the list recorded for that week in `shopping_pushes`;
   anything else is refused.
-- **Ticking (cont.):** the update's response is used as the result: Mealie
-  may merge an unticked item into a matching one, changing its id.
 - **Adding:** a quick-added line is a note item (quantity 0) with
   `extras.scrappyClientId` set to the id the device gave it. Sending the
   same add again (a lost response) returns the existing line instead of

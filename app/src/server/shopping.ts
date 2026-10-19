@@ -17,6 +17,7 @@ import {
   getShoppingListItems,
   type NewShoppingItem,
   setShoppingItemChecked,
+  type StoredShoppingItem,
   type ShoppingItem,
 } from "./mealie/shopping";
 import { getWeekPlan } from "./plan";
@@ -235,9 +236,9 @@ async function itemOnWeekList(
   weekStart: string,
   itemId: string,
   opts: Opts
-): Promise<ShoppingItem> {
+): Promise<StoredShoppingItem> {
   const listId = await pushedListId(db, weekStart);
-  let item: ShoppingItem;
+  let item: StoredShoppingItem;
   try {
     item = await getShoppingItem(itemId, { client: opts.client });
   } catch (err) {
@@ -246,7 +247,7 @@ async function itemOnWeekList(
     }
     throw err;
   }
-  if (item.listId !== listId) {
+  if (item.shoppingListId !== listId) {
     throw new UserFacingError("That item isn't on this week's list.");
   }
   return item;
@@ -259,12 +260,11 @@ export async function checkShopItem(
   itemId: string,
   checked: boolean,
   opts: Opts = {}
-): Promise<ShoppingItem> {
+): Promise<void> {
   const item = await itemOnWeekList(db, weekStart, itemId, opts);
-  if (item.checked === checked) {
-    return item;
+  if (item.checked !== checked) {
+    await setShoppingItemChecked(item, checked, { client: opts.client });
   }
-  return setShoppingItemChecked(itemId, checked, { client: opts.client });
 }
 
 /**

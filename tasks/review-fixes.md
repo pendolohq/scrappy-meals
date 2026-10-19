@@ -210,7 +210,7 @@ Decisions already taken:
   **Done when:** integration test pushing into a list with a hand-added item of the same food
   and unit.
 
-- [ ] **Task 16: One Mealie read per tick**
+- [x] **Task 16: One Mealie read per tick**
   **Complexity:** XS
   **Do:** `itemOnWeekList` returns Mealie's raw item. `setShoppingItemChecked(current, checked)`
   writes it back and returns `void`. `checkShopItemAction` returns `{}`. Delete the

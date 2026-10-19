@@ -294,9 +294,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       const lentils = list.items.find((i) => i.foodId === ids.lentils)!;
 
       // Ticking keeps everything else about the item, recipe link included.
-      expect(
-        (await checkShopItem(db, WEEK, lentils.id, true, opts)).checked
-      ).toBe(true);
+      await checkShopItem(db, WEEK, lentils.id, true, opts);
       await checkShopItem(db, WEEK, lentils.id, true, opts); // replayed: no-op
       const raw = unwrap(
         await admin.GET("/api/households/shopping/items/{item_id}", {
