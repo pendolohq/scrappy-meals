@@ -12,7 +12,8 @@
     "test:integration": "vitest run --project integration",
     "test:db": "vitest run --project db",
     "cli": "tsx src/cli/index.ts",
-    "mealie:types": "node scripts/mealie-types.mjs"
+    "mealie:types": "node scripts/mealie-types.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.28",
     "openapi-typescript": "^7.13.0",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
