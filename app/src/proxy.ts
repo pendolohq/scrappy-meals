@@ -11,7 +11,7 @@ const PUBLIC_PATHS = [
   "/manifest.webmanifest",
 ];
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   if (
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -31,8 +31,7 @@ export default auth((req) => {
   return NextResponse.redirect(login);
 });
 
+// Proxy always runs on Node.js, which the session check needs (it reads the database).
 export const config = {
-  // Node runtime: the session check reads the database.
-  runtime: "nodejs",
   matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/).*)"],
 };
