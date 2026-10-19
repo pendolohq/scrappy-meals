@@ -17,6 +17,8 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      "dist/**",
+      "src/server/mealie/schema.d.ts",
       "next-env.d.ts",
     ],
   },

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Admin CLI: docker compose exec app scrappy user add
+exec node /app/cli.cjs "$@"

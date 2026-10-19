@@ -27,7 +27,7 @@ server-side API token.
 1. Point DNS `A`/`AAAA` records for `app.<domain>` and `recipes.<domain>` at the VPS.
 2. Install Docker, then clone this repo to `/opt/scrappy-meals`.
 3. `cp .env.example .env && chmod 600 .env`, fill in the domain and the
-   Postgres passwords (`openssl rand -base64 32`).
+   secrets (`openssl rand -hex 32` for each).
 4. `docker compose up -d postgres mealie caddy`.
 5. Open `https://recipes.<domain>`, log in as `changeme@example.com` /
    `MyPassword`, **change that account's email and password immediately**,
@@ -35,7 +35,30 @@ server-side API token.
    `MEALIE_API_TOKEN`.
 6. Set up backups: follow `docs/aws-backup-setup.md`, run
    `scripts/backup.sh` once by hand, then install the cron entry.
-7. Once the app image exists (M2): `docker compose up -d`.
+7. Start everything: `docker compose up -d`. Migrations run automatically
+   on each app start.
+8. Create the accounts (repeat per person):
+   ```sh
+   docker compose exec app scrappy user add
+   ```
+   You'll be asked for a name, email and password (hidden, min. 12 chars).
+
+## Users
+
+There is no sign-up page and no default account. Accounts exist only once
+someone with shell access to the server creates them:
+
+| Command | |
+|---|---|
+| `scrappy user add [--name N] [--email E]` | create a user |
+| `scrappy user passwd EMAIL` | set a new password; signs out that user's sessions |
+| `scrappy user list` | list users |
+| `scrappy user remove EMAIL` | delete a user and their portions/adherence |
+
+Run them with `docker compose exec app scrappy ...`. Passwords are read from
+a hidden prompt (or stdin when piped) and stored as argon2id hashes; they
+never go into env vars, files or logs. Logins are rate-limited per email and
+per IP.
 
 ## Backups
 
@@ -55,3 +78,25 @@ monthlies) is handled by an S3 lifecycle rule.
 
 Restore with `scripts/restore.sh` using read credentials and the age key;
 see `docs/aws-backup-setup.md` §6.
+
+## Development
+
+```sh
+cd app
+pnpm install
+pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN
+pnpm lint && pnpm typecheck && pnpm test
+DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
+MEALIE_TEST_URL=http://localhost:9000 pnpm test:integration
+```
+
+CI runs all of the above, scans for committed secrets with gitleaks, builds
+and smoke-tests the image, and pushes it to GHCR from `main` and `v*` tags.
+
+## License
+
+[AGPL-3.0-or-later](LICENSE). You can use, modify and self-host it freely;
+if you run a modified version as a service for others, you must offer them
+its source.
+
+Security issues: see [SECURITY.md](SECURITY.md).

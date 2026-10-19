@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: planner_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      mealie:
+        # Must match docker-compose.yml; uses Mealie's built-in SQLite and default admin.
+        image: ghcr.io/mealie-recipes/mealie:v3.29.0
+        env:
+          ALLOW_SIGNUP: "false"
+        ports: ["9000:9000"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:db
+        env:
+          DATABASE_TEST_URL: postgres://postgres:postgres@localhost:5432/planner_test
+      - name: Wait for Mealie
+        run: |
+          for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about && exit 0; sleep 3; done
+          exit 1
+      - run: pnpm test:integration
+        env:
+          MEALIE_TEST_URL: http://localhost:9000
+      - name: Migrations match the schema
+        run: |
+          DATABASE_URL=unused pnpm drizzle-kit generate --name ci-check
+          git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run pnpm drizzle-kit generate" && exit 1)
+          test -z "$(git status --porcelain -- drizzle)" || (echo "::error::uncommitted migration generated" && exit 1)
+
+  secrets:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  image:
+    needs: [check, secrets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=pr
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+      - name: Build app image
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          load: true
+          tags: scrappy-meals:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build backup image
+        uses: docker/build-push-action@v6
+        with:
+          context: backup
+          tags: scrappy-meals-ops:ci
+      - name: Smoke test the app image
+        run: |
+          docker network create smoke
+          docker run -d --name db --network smoke -e POSTGRES_PASSWORD=pw postgres:16-alpine
+          for i in $(seq 1 30); do docker exec db pg_isready -U postgres && break; sleep 1; done
+          docker run -d --name app --network smoke -p 3000:3000 \
+            -e DATABASE_URL=postgres://postgres:pw@db:5432/postgres \
+            -e AUTH_SECRET=ci-only-not-a-secret -e AUTH_URL=http://localhost:3000 \
+            -e MEALIE_URL=http://mealie.invalid -e MEALIE_API_TOKEN=unused \
+            scrappy-meals:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && break; sleep 2; done
+          curl -fsS http://localhost:3000/api/health | grep -q '"db":true'
+          printf '%s\n' 'ci password 12345' 'ci password 12345' \
+            | docker exec -i app scrappy user add --name CI --email ci@example.test
+          docker exec app scrappy user list | grep -q ci@example.test
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:3000/login | grep -q 200
+      - name: Show app logs
+        if: failure()
+        run: docker logs app || true
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push app image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

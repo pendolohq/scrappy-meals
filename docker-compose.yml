@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/krustyc/scrappy-meals:${APP_TAG:-latest}
+    image: ${APP_IMAGE:-ghcr.io/krustyc/scrappy-meals}:${APP_TAG:-latest}
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,10 +76,9 @@ services:
       DATABASE_URL: postgres://planner:${PLANNER_DB_PASSWORD:?}@postgres:5432/planner
       MEALIE_URL: http://mealie:9000
       MEALIE_API_TOKEN: ${MEALIE_API_TOKEN:-}
-      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET: ${AUTH_SECRET:?}
       AUTH_URL: https://app.${DOMAIN:?}
       AUTH_TRUST_HOST: "true"
-      SEED_USERS: ${SEED_USERS:-}
       TZ: ${TZ:-UTC}
     mem_limit: 512m
     restart: unless-stopped
