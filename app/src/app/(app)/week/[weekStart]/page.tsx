@@ -17,9 +17,12 @@ export default async function WeekPage({
   params: Promise<{ weekStart: string }>;
 }) {
   const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) redirect("/week");
-  if (weekStartOf(weekStart) !== weekStart)
+  if (!isIsoDate(weekStart)) {
+    redirect("/week");
+  }
+  if (weekStartOf(weekStart) !== weekStart) {
     redirect(`/week/${weekStartOf(weekStart)}`);
+  }
 
   const user = await requireUser();
   const plan = await getWeekPlan(getDb(), weekStart);

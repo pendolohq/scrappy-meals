@@ -30,7 +30,8 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 body {

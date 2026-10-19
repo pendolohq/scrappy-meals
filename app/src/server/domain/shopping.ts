@@ -61,31 +61,39 @@ export function buildShoppingList(meals: MealForShopping[]): ShoppingList {
     const eaten =
       meal.baseServings *
       Object.values(meal.portions).reduce((a, b) => a + b, 0);
-    if (eaten <= 0) continue;
+    if (eaten <= 0) {
+      continue;
+    }
     if (!meal.recipe) {
       missing.add(meal.slug);
       continue;
     }
     const { recipe } = meal;
     const scale = recipe.servings ? eaten / recipe.servings : null;
-    if (scale === null) unscaled.add(recipe.name);
+    if (scale === null) {
+      unscaled.add(recipe.name);
+    }
     const source = { id: recipe.id, name: recipe.name };
 
     for (const ing of recipe.ingredients) {
       if (!ing.food || scale === null) {
         const text = ing.display.trim() || ing.note.trim();
-        if (!text) continue;
+        if (!text) {
+          continue;
+        }
         const line =
           scale === null && ing.food ? `${text} (whole recipe)` : text;
         const existing = freeText.get(`${recipe.id}|${line}`);
-        if (existing) existing.times += 1;
-        else
+        if (existing) {
+          existing.times += 1;
+        } else {
           freeText.set(`${recipe.id}|${line}`, {
             text: line,
             recipeId: recipe.id,
             recipeName: recipe.name,
             times: 1,
           });
+        }
         continue;
       }
       const key = `${ing.food.id}|${ing.unit?.id ?? ""}`;
@@ -98,10 +106,12 @@ export function buildShoppingList(meals: MealForShopping[]): ShoppingList {
         quantity: null,
         recipes: [],
       };
-      if (ing.quantity !== null)
+      if (ing.quantity !== null) {
         line.quantity = round((line.quantity ?? 0) + ing.quantity * scale);
-      if (!line.recipes.some((r) => r.id === recipe.id))
+      }
+      if (!line.recipes.some((r) => r.id === recipe.id)) {
         line.recipes.push(source);
+      }
       lines.set(key, line);
     }
   }
@@ -110,7 +120,7 @@ export function buildShoppingList(meals: MealForShopping[]): ShoppingList {
     lines: [...lines.values()].sort(
       (a, b) =>
         a.foodName.localeCompare(b.foodName) ||
-        (a.unit ?? "").localeCompare(b.unit ?? ""),
+        (a.unit ?? "").localeCompare(b.unit ?? "")
     ),
     freeText: [...freeText.values()],
     unscaled: [...unscaled],

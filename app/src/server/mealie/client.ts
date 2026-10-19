@@ -1,6 +1,6 @@
-import "server-only";
-
 import createClient, { type Middleware } from "openapi-fetch";
+
+import "server-only";
 
 import type { paths } from "./schema";
 
@@ -15,7 +15,7 @@ export class MealieError extends Error {
   constructor(
     readonly status: number,
     readonly path: string,
-    readonly detail: unknown,
+    readonly detail: unknown
   ) {
     super(`Mealie ${path} failed: ${status} ${describe(detail)}`);
     this.name = "MealieError";
@@ -27,7 +27,9 @@ export class MealieError extends Error {
 }
 
 function describe(detail: unknown): string {
-  if (typeof detail === "string") return detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
   if (detail && typeof detail === "object" && "detail" in detail) {
     const d = (detail as { detail: unknown }).detail;
     return typeof d === "string" ? d : JSON.stringify(d);
@@ -52,7 +54,10 @@ export function createMealieClient(opts: {
 
   const client = createClient<paths>({
     baseUrl: opts.baseUrl.replace(/\/$/, ""),
-    fetch: (req) => (opts.fetch ?? fetch)(new Request(req, { signal: AbortSignal.timeout(timeoutMs) })),
+    fetch: (req) =>
+      (opts.fetch ?? fetch)(
+        new Request(req, { signal: AbortSignal.timeout(timeoutMs) })
+      ),
   });
   client.use(auth);
   return client;
@@ -62,9 +67,15 @@ export function createMealieClient(opts: {
  * Unwraps an openapi-fetch result: returns `data`, or throws MealieError.
  * Usage: `const recipe = unwrap(await client.GET("/api/recipes/{slug}", ...))`.
  */
-export function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
+export function unwrap<T>(result: {
+  data?: T;
+  error?: unknown;
+  response: Response;
+}): T {
   const { data, error, response } = result;
-  if (response.ok && data !== undefined) return data;
+  if (response.ok && data !== undefined) {
+    return data;
+  }
   const url = new URL(response.url || "http://mealie/unknown");
   throw new MealieError(response.status, url.pathname, error);
 }
@@ -76,7 +87,9 @@ export function mealie(): MealieClient {
   if (!shared) {
     const baseUrl = process.env.MEALIE_URL;
     const token = process.env.MEALIE_API_TOKEN;
-    if (!baseUrl || !token) throw new Error("MEALIE_URL and MEALIE_API_TOKEN must be set");
+    if (!baseUrl || !token) {
+      throw new Error("MEALIE_URL and MEALIE_API_TOKEN must be set");
+    }
     shared = createMealieClient({ baseUrl, token });
   }
   return shared;

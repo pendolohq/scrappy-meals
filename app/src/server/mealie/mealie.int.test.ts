@@ -3,10 +3,15 @@
 //
 //   MEALIE_TEST_URL=http://localhost:9000 pnpm test:integration
 import { randomUUID } from "node:crypto";
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { checkMealieVersion, createMealieClient, type MealieClient, MealieError, unwrap } from "./client";
+import {
+  checkMealieVersion,
+  createMealieClient,
+  type MealieClient,
+  MealieError,
+  unwrap,
+} from "./client";
 import { getRecipe, searchRecipes } from "./recipes";
 import {
   addShoppingItems,
@@ -32,27 +37,58 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       username: process.env.MEALIE_TEST_USER ?? "changeme@example.com",
       password: process.env.MEALIE_TEST_PASSWORD ?? "MyPassword",
     });
-    const login = await fetch(`${baseUrl}/api/auth/token`, { method: "POST", body: form });
-    if (!login.ok) throw new Error(`admin login failed: ${login.status}`);
+    const login = await fetch(`${baseUrl}/api/auth/token`, {
+      method: "POST",
+      body: form,
+    });
+    if (!login.ok) {
+      throw new Error(`admin login failed: ${login.status}`);
+    }
     const { access_token } = (await login.json()) as { access_token: string };
     admin = createMealieClient({ baseUrl: baseUrl!, token: access_token });
 
     // The app authenticates with a long-lived API token, so test with one too.
-    const token = unwrap(await admin.POST("/api/users/api-tokens", { body: { name: `it-${run}` } }));
+    const token = unwrap(
+      await admin.POST("/api/users/api-tokens", { body: { name: `it-${run}` } })
+    );
     tokenId = token.id;
     client = createMealieClient({ baseUrl: baseUrl!, token: token.token });
 
-    const food = unwrap(await admin.POST("/api/foods", { body: { name: `it-lentils-${run}` } }));
-    const unit = unwrap(await admin.POST("/api/units", { body: { name: `it-gram-${run}`, abbreviation: "g" } }));
+    const food = unwrap(
+      await admin.POST("/api/foods", { body: { name: `it-lentils-${run}` } })
+    );
+    const unit = unwrap(
+      await admin.POST("/api/units", {
+        body: { name: `it-gram-${run}`, abbreviation: "g" },
+      })
+    );
     ids.food = food.id;
     ids.unit = unit.id;
-    cleanup.push(() => admin.DELETE("/api/foods/{item_id}", { params: { path: { item_id: food.id } } }));
-    cleanup.push(() => admin.DELETE("/api/units/{item_id}", { params: { path: { item_id: unit.id } } }));
+    cleanup.push(() =>
+      admin.DELETE("/api/foods/{item_id}", {
+        params: { path: { item_id: food.id } },
+      })
+    );
+    cleanup.push(() =>
+      admin.DELETE("/api/units/{item_id}", {
+        params: { path: { item_id: unit.id } },
+      })
+    );
 
-    ids.fullSlug = unwrap(await admin.POST("/api/recipes", { body: { name: `IT Lentil Soup ${run}` } }));
-    ids.bareSlug = unwrap(await admin.POST("/api/recipes", { body: { name: `IT Plain Toast ${run}` } }));
+    ids.fullSlug = unwrap(
+      await admin.POST("/api/recipes", {
+        body: { name: `IT Lentil Soup ${run}` },
+      })
+    );
+    ids.bareSlug = unwrap(
+      await admin.POST("/api/recipes", {
+        body: { name: `IT Plain Toast ${run}` },
+      })
+    );
     for (const slug of [ids.fullSlug, ids.bareSlug]) {
-      cleanup.push(() => admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } }));
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      );
     }
 
     unwrap(
@@ -68,24 +104,40 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
             fiberContent: "14",
           },
           recipeIngredient: [
-            { quantity: 300, food: { id: food.id, name: food.name }, unit: { id: unit.id, name: unit.name }, note: "" },
-            { quantity: 0, note: "salt to taste", originalText: "salt to taste" },
+            {
+              quantity: 300,
+              food: { id: food.id, name: food.name },
+              unit: { id: unit.id, name: unit.name },
+              note: "",
+            },
+            {
+              quantity: 0,
+              note: "salt to taste",
+              originalText: "salt to taste",
+            },
           ],
         },
-      }),
+      })
     );
   });
 
   afterAll(async () => {
-    for (const fn of cleanup.reverse()) await fn().catch(() => undefined);
+    for (const fn of cleanup.reverse()) {
+      await fn().catch(() => undefined);
+    }
     if (tokenId !== undefined) {
-      await admin.DELETE("/api/users/api-tokens/{token_id}", { params: { path: { token_id: tokenId } } });
+      await admin.DELETE("/api/users/api-tokens/{token_id}", {
+        params: { path: { token_id: tokenId } },
+      });
     }
   });
 
   it("talks to the Mealie version our types were generated from", async () => {
     const v = await checkMealieVersion(client);
-    expect(v.matches, `server ${v.server}, schema ${v.schema}: run pnpm mealie:types`).toBe(true);
+    expect(
+      v.matches,
+      `server ${v.server}, schema ${v.schema}: run pnpm mealie:types`
+    ).toBe(true);
   });
 
   it("rejects a bad token with a MealieError", async () => {
@@ -112,7 +164,11 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     });
     expect(r.ingredients).toHaveLength(2);
     const [lentils, salt] = r.ingredients;
-    expect(lentils).toMatchObject({ quantity: 300, food: { id: ids.food }, unit: { id: ids.unit, abbreviation: "g" } });
+    expect(lentils).toMatchObject({
+      quantity: 300,
+      food: { id: ids.food },
+      unit: { id: ids.unit, abbreviation: "g" },
+    });
     expect(salt).toMatchObject({ quantity: null, food: null, unit: null });
     expect(salt.display).toContain("salt to taste");
   });
@@ -130,32 +186,55 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
   it("creates, fills, finds and empties a shopping list", async () => {
     const name = `IT Week ${run}`;
     const list = await createShoppingList(name, { client });
-    cleanup.push(() => admin.DELETE("/api/households/shopping/lists/{item_id}", { params: { path: { item_id: list.id } } }));
+    cleanup.push(() =>
+      admin.DELETE("/api/households/shopping/lists/{item_id}", {
+        params: { path: { item_id: list.id } },
+      })
+    );
 
     expect(await findShoppingListByName(name, { client })).toEqual(list);
-    expect(await findShoppingListByName(`IT Missing ${run}`, { client })).toBeNull();
+    expect(
+      await findShoppingListByName(`IT Missing ${run}`, { client })
+    ).toBeNull();
 
     const recipe = (await getRecipe(ids.fullSlug, { client }))!;
     const first = await addShoppingItems(
       list.id,
       [
-        { quantity: 450, foodId: ids.food, unitId: ids.unit, recipeIds: [recipe.id] },
+        {
+          quantity: 450,
+          foodId: ids.food,
+          unitId: ids.unit,
+          recipeIds: [recipe.id],
+        },
         { quantity: 1, note: "salt" },
       ],
-      { client },
+      { client }
     );
     expect(first.created).toHaveLength(2);
-    expect(first.created.find((i) => i.foodId === ids.food)).toMatchObject({ quantity: 450, unitId: ids.unit });
+    expect(first.created.find((i) => i.foodId === ids.food)).toMatchObject({
+      quantity: 450,
+      unitId: ids.unit,
+    });
 
     // Same food + unit again: Mealie merges into the existing line.
-    const second = await addShoppingItems(list.id, [{ quantity: 50, foodId: ids.food, unitId: ids.unit }], { client });
-    const merged = [...second.created, ...second.updated].find((i) => i.foodId === ids.food)!;
+    const second = await addShoppingItems(
+      list.id,
+      [{ quantity: 50, foodId: ids.food, unitId: ids.unit }],
+      { client }
+    );
+    const merged = [...second.created, ...second.updated].find(
+      (i) => i.foodId === ids.food
+    )!;
     expect(merged.quantity).toBe(500);
 
     const items = await getShoppingListItems(list.id, { client });
     expect(items).toHaveLength(2);
 
-    await deleteShoppingItems(items.map((i) => i.id), { client });
+    await deleteShoppingItems(
+      items.map((i) => i.id),
+      { client }
+    );
     expect(await getShoppingListItems(list.id, { client })).toEqual([]);
   });
 });

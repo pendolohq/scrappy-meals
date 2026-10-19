@@ -9,13 +9,19 @@ import { fileURLToPath } from "node:url";
 import openapiTS, { astToString } from "openapi-typescript";
 
 const outDir = new URL("../src/server/mealie/", import.meta.url);
-const base = (process.env.MEALIE_URL ?? "http://localhost:9000").replace(/\/$/, "");
+const base = (process.env.MEALIE_URL ?? "http://localhost:9000").replace(
+  /\/$/,
+  ""
+);
 
 const res = await fetch(`${base}/openapi.json`);
 if (!res.ok) throw new Error(`GET ${base}/openapi.json -> ${res.status}`);
 const spec = await res.json();
 
-await writeFile(new URL("openapi.json", outDir), JSON.stringify(spec, null, 2) + "\n");
+await writeFile(
+  new URL("openapi.json", outDir),
+  JSON.stringify(spec, null, 2) + "\n"
+);
 // Fields with a server-side default stay optional, so request bodies only
 // need what we actually send.
 const ast = await openapiTS(spec, { defaultNonNullable: false });

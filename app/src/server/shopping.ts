@@ -1,6 +1,6 @@
-import "server-only";
-
 import { eq } from "drizzle-orm";
+
+import "server-only";
 
 import type { Db } from "./db/client";
 import { shoppingPushes } from "./db/schema";
@@ -53,7 +53,7 @@ function fetcher(opts: Opts): RecipeFetcher | undefined {
 export async function weekShoppingList(
   db: Db,
   weekStart: string,
-  opts: Opts = {},
+  opts: Opts = {}
 ): Promise<ShoppingList> {
   const fetch = fetcher(opts);
   const plan = await getWeekPlan(db, weekStart, { fetch });
@@ -61,7 +61,7 @@ export async function weekShoppingList(
   const recipes = await loadRecipes(
     db,
     meals.map((m) => m.slug),
-    { fetch },
+    { fetch }
   );
   return buildShoppingList(
     meals.map((m) => {
@@ -79,7 +79,7 @@ export async function weekShoppingList(
             }
           : null,
       };
-    }),
+    })
   );
 }
 
@@ -98,7 +98,7 @@ export type PushResult = {
 export async function pushShoppingList(
   db: Db,
   weekStart: string,
-  opts: Opts = {},
+  opts: Opts = {}
 ): Promise<PushResult> {
   const list = await weekShoppingList(db, weekStart, opts);
   const name = shoppingListName(weekStart);
@@ -115,8 +115,8 @@ export async function pushShoppingList(
     try {
       const current = new Set(
         (await getShoppingListItems(previous.mealieListId, mealie)).map(
-          (i) => i.id,
-        ),
+          (i) => i.id
+        )
       );
       listId = previous.mealieListId;
       const stale = previous.mealieItemIds.filter((id) => current.has(id));
@@ -124,7 +124,9 @@ export async function pushShoppingList(
       replaced = stale.length;
     } catch (err) {
       // The list was deleted in Mealie: start a new one.
-      if (!(err instanceof MealieError && err.notFound)) throw err;
+      if (!(err instanceof MealieError && err.notFound)) {
+        throw err;
+      }
     }
   }
   listId ??=

@@ -12,31 +12,36 @@ type SearchState = {
   error?: string;
 };
 
-function useRecipeSearch(query: string, enabled: boolean): SearchState {
+const useRecipeSearch = (query: string, enabled: boolean): SearchState => {
   const [state, setState] = useState<SearchState>({
     status: "idle",
     items: [],
   });
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      return;
+    }
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
       setState((s) => ({ ...s, status: "loading" }));
       try {
         const res = await fetch(
           `/api/recipes/search?q=${encodeURIComponent(query)}`,
-          { signal: ctrl.signal },
+          { signal: ctrl.signal }
         );
         const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? "Search failed");
+        if (!res.ok) {
+          throw new Error(body.error ?? "Search failed");
+        }
         setState({ status: "done", items: body.items });
       } catch (err) {
-        if (!ctrl.signal.aborted)
+        if (!ctrl.signal.aborted) {
           setState({
             status: "error",
             items: [],
             error: (err as Error).message,
           });
+        }
       }
     }, 250);
     return () => {
@@ -45,9 +50,9 @@ function useRecipeSearch(query: string, enabled: boolean): SearchState {
     };
   }, [query, enabled]);
   return state;
-}
+};
 
-export function AddMeal({
+export const AddMeal = ({
   date,
   slot,
   label,
@@ -55,7 +60,7 @@ export function AddMeal({
   date: string;
   slot: SlotType;
   label: string;
-}) {
+}) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -77,8 +82,11 @@ export function AddMeal({
   const pick = (slug: string) =>
     startTransition(async () => {
       const res = await addMealAction({ date, slot, slug });
-      if (res.error) setError(res.error);
-      else close();
+      if (res.error) {
+        setError(res.error);
+      } else {
+        close();
+      }
     });
 
   return (
@@ -137,7 +145,7 @@ export function AddMeal({
                       className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-background disabled:opacity-60"
                     >
                       {r.imagePath && r.id ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- proxied Mealie thumbnails
+                        // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails
                         <img
                           src={`/api/recipe-images/${r.id}`}
                           alt=""
@@ -174,4 +182,4 @@ export function AddMeal({
       </dialog>
     </>
   );
-}
+};

@@ -1,14 +1,25 @@
-import "server-only";
-
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 
+import "server-only";
+
 import type { Db } from "./db/client";
-import { adherence, dayOverrides, mealSlots, mealSlotType, slotPortions, users } from "./db/schema";
+import {
+  adherence,
+  dayOverrides,
+  mealSlots,
+  mealSlotType,
+  slotPortions,
+  users,
+} from "./db/schema";
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
-import { type CachedRecipe, loadRecipes, type RecipeFetcher } from "./recipe-cache";
+import {
+  type CachedRecipe,
+  loadRecipes,
+  type RecipeFetcher,
+} from "./recipe-cache";
 
 export type SlotType = (typeof mealSlotType.enumValues)[number];
 export const SLOT_TYPES = mealSlotType.enumValues;
@@ -20,7 +31,13 @@ export class PlanError extends UserFacingError {
 export type Member = {
   id: string;
   name: string;
-  targets: { kcal: number | null; protein: number | null; carbs: number | null; fat: number | null; fibre: number | null };
+  targets: {
+    kcal: number | null;
+    protein: number | null;
+    carbs: number | null;
+    fat: number | null;
+    fibre: number | null;
+  };
   defaultFastingDays: number[];
 };
 
@@ -35,14 +52,21 @@ export type PlannedMeal = {
   /** What each person logged for this meal, by user id. */
   adherence: Record<string, { status: AdherenceStatus; note: string | null }>;
   /** Null if the recipe no longer exists in Mealie (and we have no cached copy). */
-  recipe: Pick<CachedRecipe, "mealieId" | "name" | "imagePath" | "servings" | "nutrition"> | null;
+  recipe: Pick<
+    CachedRecipe,
+    "mealieId" | "name" | "imagePath" | "servings" | "nutrition"
+  > | null;
 };
 
 export type WeekPlan = {
   weekStart: string;
   members: Member[];
   /** `fasting` maps member id -> whether they fast that day (default weekdays or a day override). */
-  days: { date: string; meals: PlannedMeal[]; fasting: Record<string, boolean> }[];
+  days: {
+    date: string;
+    meals: PlannedMeal[];
+    fasting: Record<string, boolean>;
+  }[];
 };
 
 export async function listMembers(db: Db): Promise<Member[]> {
@@ -61,7 +85,11 @@ export async function listMembers(db: Db): Promise<Member[]> {
   }));
 }
 
-export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: RecipeFetcher } = {}): Promise<WeekPlan> {
+export async function getWeekPlan(
+  db: Db,
+  weekStart: string,
+  opts: { fetch?: RecipeFetcher } = {}
+): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
   const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
   const [members, slots, portions, overrides, logs] = await Promise.all([
@@ -72,16 +100,27 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
       .where(inWeek)
       .orderBy(asc(mealSlots.date), asc(mealSlots.position)),
     db
-      .select({ mealSlotId: slotPortions.mealSlotId, userId: slotPortions.userId, multiplier: slotPortions.multiplier })
+      .select({
+        mealSlotId: slotPortions.mealSlotId,
+        userId: slotPortions.userId,
+        multiplier: slotPortions.multiplier,
+      })
       .from(slotPortions)
       .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
       .where(inWeek),
     db
       .select()
       .from(dayOverrides)
-      .where(and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))),
+      .where(
+        and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))
+      ),
     db
-      .select({ mealSlotId: adherence.mealSlotId, userId: adherence.userId, status: adherence.status, note: adherence.note })
+      .select({
+        mealSlotId: adherence.mealSlotId,
+        userId: adherence.userId,
+        status: adherence.status,
+        note: adherence.note,
+      })
       .from(adherence)
       .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
       .where(inWeek),
@@ -90,7 +129,7 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
   const recipes = await loadRecipes(
     db,
     slots.map((s) => s.mealieRecipeSlug),
-    opts,
+    opts
   );
   const portionsBySlot = new Map<string, Record<string, number>>();
   for (const p of portions) {
@@ -117,12 +156,20 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
       portions: portionsBySlot.get(s.id) ?? {},
       adherence: logsBySlot.get(s.id) ?? {},
       recipe: r
-        ? { mealieId: r.mealieId, name: r.name, imagePath: r.imagePath, servings: r.servings, nutrition: r.nutrition }
+        ? {
+            mealieId: r.mealieId,
+            name: r.name,
+            imagePath: r.imagePath,
+            servings: r.servings,
+            nutrition: r.nutrition,
+          }
         : null,
     };
   });
 
-  const override = new Map(overrides.map((o) => [`${o.userId}|${o.date}`, o.isFasting]));
+  const override = new Map(
+    overrides.map((o) => [`${o.userId}|${o.date}`, o.isFasting])
+  );
   return {
     weekStart,
     members,
@@ -130,16 +177,32 @@ export async function getWeekPlan(db: Db, weekStart: string, opts: { fetch?: Rec
       date,
       meals: meals.filter((m) => m.date === date),
       fasting: Object.fromEntries(
-        members.map((m) => [m.id, isFasting(m.defaultFastingDays, date, override.get(`${m.id}|${date}`))]),
+        members.map((m) => [
+          m.id,
+          isFasting(
+            m.defaultFastingDays,
+            date,
+            override.get(`${m.id}|${date}`)
+          ),
+        ])
       ),
     })),
   };
 }
 
 /** Whether `userId` fasts on `date`. */
-export async function isUserFasting(db: Db, userId: string, date: string): Promise<boolean> {
-  const [user] = await db.select({ days: users.defaultFastingDays }).from(users).where(eq(users.id, userId));
-  if (!user) throw new PlanError("Unknown user");
+export async function isUserFasting(
+  db: Db,
+  userId: string,
+  date: string
+): Promise<boolean> {
+  const [user] = await db
+    .select({ days: users.defaultFastingDays })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user) {
+    throw new PlanError("Unknown user");
+  }
   const [o] = await db
     .select({ isFasting: dayOverrides.isFasting })
     .from(dayOverrides)
@@ -152,22 +215,41 @@ export async function isUserFasting(db: Db, userId: string, date: string): Promi
  * for that day to 0; ending one leaves portions as they are, to adjust by hand.
  * Returns how many portions were zeroed.
  */
-export async function setFasting(db: Db, userId: string, date: string, fasting: boolean): Promise<number> {
+export async function setFasting(
+  db: Db,
+  userId: string,
+  date: string,
+  fasting: boolean
+): Promise<number> {
   return db.transaction(async (tx) => {
-    const [user] = await tx.select({ days: users.defaultFastingDays }).from(users).where(eq(users.id, userId));
-    if (!user) throw new PlanError("Unknown user");
+    const [user] = await tx
+      .select({ days: users.defaultFastingDays })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (!user) {
+      throw new PlanError("Unknown user");
+    }
 
     // Matching the weekday default needs no override row; keeps defaults editable later.
     if (isFasting(user.days, date) === fasting) {
-      await tx.delete(dayOverrides).where(and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date)));
+      await tx
+        .delete(dayOverrides)
+        .where(
+          and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date))
+        );
     } else {
       await tx
         .insert(dayOverrides)
         .values({ userId, date, isFasting: fasting })
-        .onConflictDoUpdate({ target: [dayOverrides.userId, dayOverrides.date], set: { isFasting: fasting } });
+        .onConflictDoUpdate({
+          target: [dayOverrides.userId, dayOverrides.date],
+          set: { isFasting: fasting },
+        });
     }
 
-    if (!fasting) return 0;
+    if (!fasting) {
+      return 0;
+    }
     const zeroed = await tx
       .update(slotPortions)
       .set({ multiplier: 0 })
@@ -175,8 +257,8 @@ export async function setFasting(db: Db, userId: string, date: string, fasting: 
         and(
           eq(slotPortions.userId, userId),
           sql`${slotPortions.multiplier} > 0`,
-          sql`${slotPortions.mealSlotId} IN (SELECT ${mealSlots.id} FROM ${mealSlots} WHERE ${mealSlots.date} = ${date})`,
-        ),
+          sql`${slotPortions.mealSlotId} IN (SELECT ${mealSlots.id} FROM ${mealSlots} WHERE ${mealSlots.date} = ${date})`
+        )
       )
       .returning({ id: slotPortions.mealSlotId });
     return zeroed.length;
@@ -187,14 +269,23 @@ export async function setFasting(db: Db, userId: string, date: string, fasting: 
 export async function addMeal(
   db: Db,
   input: { date: string; slot: SlotType; slug: string; createdBy: string },
-  opts: { fetch?: RecipeFetcher } = {},
+  opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
-  const recipe = (await loadRecipes(db, [input.slug], { ...opts, force: true })).get(input.slug);
-  if (!recipe) throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
+  const recipe = (
+    await loadRecipes(db, [input.slug], { ...opts, force: true })
+  ).get(input.slug);
+  if (!recipe) {
+    throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
+  }
 
-  const members = await db.select({ id: users.id, days: users.defaultFastingDays }).from(users);
-  const overrides = await db.select().from(dayOverrides).where(eq(dayOverrides.date, input.date));
+  const members = await db
+    .select({ id: users.id, days: users.defaultFastingDays })
+    .from(users);
+  const overrides = await db
+    .select()
+    .from(dayOverrides)
+    .where(eq(dayOverrides.date, input.date));
   const override = new Map(overrides.map((o) => [o.userId, o.isFasting]));
 
   // Two people adding to the same slot at once can collide on position; retry.
@@ -202,9 +293,13 @@ export async function addMeal(
     try {
       return await db.transaction(async (tx) => {
         const [{ next }] = await tx
-          .select({ next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int` })
+          .select({
+            next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
+          })
           .from(mealSlots)
-          .where(and(eq(mealSlots.date, input.date), eq(mealSlots.slot, input.slot)));
+          .where(
+            and(eq(mealSlots.date, input.date), eq(mealSlots.slot, input.slot))
+          );
         const [slot] = await tx
           .insert(mealSlots)
           .values({
@@ -220,30 +315,55 @@ export async function addMeal(
             members.map((m) => ({
               mealSlotId: slot.id,
               userId: m.id,
-              multiplier: isFasting(m.days, input.date, override.get(m.id)) ? 0 : 1,
-            })),
+              multiplier: isFasting(m.days, input.date, override.get(m.id))
+                ? 0
+                : 1,
+            }))
           );
         }
         return slot.id;
       });
     } catch (err) {
-      const unique = (err as { cause?: { code?: string }; code?: string }).cause?.code ?? (err as { code?: string }).code;
-      if (unique !== "23505" || attempt >= 3) throw err;
+      const unique =
+        (err as { cause?: { code?: string }; code?: string }).cause?.code ??
+        (err as { code?: string }).code;
+      if (unique !== "23505" || attempt >= 3) {
+        throw err;
+      }
     }
   }
 }
 
-export async function setPortion(db: Db, mealSlotId: string, userId: string, multiplier: number): Promise<void> {
-  if (!(multiplier >= 0 && multiplier <= 20)) throw new PlanError("Portion must be between 0 and 20");
+export async function setPortion(
+  db: Db,
+  mealSlotId: string,
+  userId: string,
+  multiplier: number
+): Promise<void> {
+  if (!(multiplier >= 0 && multiplier <= 20)) {
+    throw new PlanError("Portion must be between 0 and 20");
+  }
   await db
     .insert(slotPortions)
     .values({ mealSlotId, userId, multiplier })
-    .onConflictDoUpdate({ target: [slotPortions.mealSlotId, slotPortions.userId], set: { multiplier } });
+    .onConflictDoUpdate({
+      target: [slotPortions.mealSlotId, slotPortions.userId],
+      set: { multiplier },
+    });
 }
 
-export async function setBaseServings(db: Db, mealSlotId: string, baseServings: number): Promise<void> {
-  if (!(baseServings > 0 && baseServings <= 100)) throw new PlanError("Servings must be between 0 and 100");
-  await db.update(mealSlots).set({ baseServings }).where(eq(mealSlots.id, mealSlotId));
+export async function setBaseServings(
+  db: Db,
+  mealSlotId: string,
+  baseServings: number
+): Promise<void> {
+  if (!(baseServings > 0 && baseServings <= 100)) {
+    throw new PlanError("Servings must be between 0 and 100");
+  }
+  await db
+    .update(mealSlots)
+    .set({ baseServings })
+    .where(eq(mealSlots.id, mealSlotId));
 }
 
 export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
@@ -251,8 +371,14 @@ export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
 }
 
 /** The date a slot belongs to, for revalidating the right week. */
-export async function mealDate(db: Db, mealSlotId: string): Promise<string | null> {
-  const [row] = await db.select({ date: mealSlots.date }).from(mealSlots).where(eq(mealSlots.id, mealSlotId));
+export async function mealDate(
+  db: Db,
+  mealSlotId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ date: mealSlots.date })
+    .from(mealSlots)
+    .where(eq(mealSlots.id, mealSlotId));
   return row?.date ?? null;
 }
 
@@ -262,16 +388,25 @@ export async function setAdherence(
   mealSlotId: string,
   userId: string,
   status: AdherenceStatus | null,
-  note?: string | null,
+  note?: string | null
 ): Promise<void> {
   if (status === null) {
-    await db.delete(adherence).where(and(eq(adherence.mealSlotId, mealSlotId), eq(adherence.userId, userId)));
+    await db
+      .delete(adherence)
+      .where(
+        and(eq(adherence.mealSlotId, mealSlotId), eq(adherence.userId, userId))
+      );
     return;
   }
   const clean = note?.trim().slice(0, 500) || null;
-  if (status === "swapped" && !clean) throw new PlanError("Say what you had instead");
+  if (status === "swapped" && !clean) {
+    throw new PlanError("Say what you had instead");
+  }
   await db
     .insert(adherence)
     .values({ mealSlotId, userId, status, note: clean })
-    .onConflictDoUpdate({ target: [adherence.mealSlotId, adherence.userId], set: { status, note: clean } });
+    .onConflictDoUpdate({
+      target: [adherence.mealSlotId, adherence.userId],
+      set: { status, note: clean },
+    });
 }

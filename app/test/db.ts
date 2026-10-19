@@ -1,7 +1,6 @@
+import { sql } from "drizzle-orm";
 // Shared setup for *.db.test.ts: one migrated throwaway database, emptied per test.
 import path from "node:path";
-
-import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach } from "vitest";
 
 import { createDb } from "@/server/db/client";
@@ -16,7 +15,7 @@ export function useTestDb() {
   });
   beforeEach(async () => {
     await db.execute(
-      sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes CASCADE`,
+      sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes CASCADE`
     );
   });
   afterAll(async () => {

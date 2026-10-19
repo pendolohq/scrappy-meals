@@ -21,7 +21,10 @@ export type RecipeNutrition = {
   status: "complete" | "partial" | "missing";
 };
 
-const FIELDS: Record<MacroKey, { key: keyof MealieNutrition; units: string[] }> = {
+const FIELDS: Record<
+  MacroKey,
+  { key: keyof MealieNutrition; units: string[] }
+> = {
   kcal: { key: "calories", units: ["kcal", "cal", "calories"] },
   protein: { key: "proteinContent", units: ["g", "grams"] },
   carbs: { key: "carbohydrateContent", units: ["g", "grams"] },
@@ -32,27 +35,45 @@ const FIELDS: Record<MacroKey, { key: keyof MealieNutrition; units: string[] }> 
 const NUMBER_WITH_UNIT = /^(\d+(?:[.,]\d+)?)\s*([a-z]*)$/i;
 
 /** Parses one Mealie nutrition string ("12", "12.5", "12,5 g", "250 kcal"); null if not clean. */
-export function parseNutritionValue(raw: string | null | undefined, units: string[]): number | null {
+export function parseNutritionValue(
+  raw: string | null | undefined,
+  units: string[]
+): number | null {
   const text = raw?.trim();
-  if (!text) return null;
+  if (!text) {
+    return null;
+  }
   const m = NUMBER_WITH_UNIT.exec(text);
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
   const unit = m[2].toLowerCase();
-  if (unit && !units.includes(unit)) return null;
+  if (unit && !units.includes(unit)) {
+    return null;
+  }
   const value = Number(m[1].replace(",", "."));
   return Number.isFinite(value) ? value : null;
 }
 
-export function normaliseNutrition(nutrition: MealieNutrition | null | undefined): RecipeNutrition {
+export function normaliseNutrition(
+  nutrition: MealieNutrition | null | undefined
+): RecipeNutrition {
   const perServing: Partial<Macros> = {};
   const missing: MacroKey[] = [];
   for (const macro of MACRO_KEYS) {
     const { key, units } = FIELDS[macro];
     const value = parseNutritionValue(nutrition?.[key], units);
-    if (value === null) missing.push(macro);
-    else perServing[macro] = value;
+    if (value === null) {
+      missing.push(macro);
+    } else {
+      perServing[macro] = value;
+    }
   }
   const status =
-    missing.length === 0 ? "complete" : missing.length === MACRO_KEYS.length ? "missing" : "partial";
+    missing.length === 0
+      ? "complete"
+      : missing.length === MACRO_KEYS.length
+        ? "missing"
+        : "partial";
   return { perServing, missing, status };
 }

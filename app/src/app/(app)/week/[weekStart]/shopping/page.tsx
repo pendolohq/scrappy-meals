@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { formatRange } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import { addDays, isIsoDate, weekStartOf } from "@/server/domain/week";
-import { lastPush, weekShoppingList } from "@/server/shopping";
 import { requireUser } from "@/server/session";
+import { lastPush, weekShoppingList } from "@/server/shopping";
 
 import { PushButton } from "./push-button";
 
@@ -20,9 +20,12 @@ export default async function ShoppingPage({
 }) {
   await requireUser();
   const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) redirect("/week");
-  if (weekStartOf(weekStart) !== weekStart)
+  if (!isIsoDate(weekStart)) {
+    redirect("/week");
+  }
+  if (weekStartOf(weekStart) !== weekStart) {
     redirect(`/week/${weekStartOf(weekStart)}/shopping`);
+  }
 
   const db = getDb();
   const [list, pushed] = await Promise.all([
@@ -84,7 +87,7 @@ export default async function ShoppingPage({
       ) : (
         <>
           <section className="rounded-xl border border-border bg-card p-3">
-            <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+            <h2 className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">
               {list.lines.length} item{list.lines.length === 1 ? "" : "s"}
             </h2>
             <ul className="divide-y divide-border" data-testid="lines">
@@ -111,7 +114,7 @@ export default async function ShoppingPage({
 
           {list.freeText.length > 0 && (
             <section className="rounded-xl border border-border bg-card p-3">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-muted">
+              <h2 className="text-xs font-medium tracking-wide text-muted uppercase">
                 Check these
               </h2>
               <p className="mb-2 text-xs text-muted">

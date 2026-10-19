@@ -6,7 +6,11 @@ const PAGES = `pages-${VERSION}`;
 const OFFLINE_URL = "/offline";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, "/icons/icon-192.png"])));
+  event.waitUntil(
+    caches
+      .open(STATIC)
+      .then((c) => c.addAll([OFFLINE_URL, "/icons/icon-192.png"]))
+  );
   self.skipWaiting();
 });
 
@@ -14,24 +18,39 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== STATIC && k !== PAGES).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== STATIC && k !== PAGES)
+            .map((k) => caches.delete(k))
+        )
+      )
+      .then(() => self.clients.claim())
   );
 });
 
 // Signing out clears cached pages, which contain the household's plan.
 self.addEventListener("message", (event) => {
-  if (event.data === "clear-pages") event.waitUntil(caches.delete(PAGES));
+  if (event.data === "clear-pages") {
+    event.waitUntil(caches.delete(PAGES));
+  }
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  if (req.method !== "GET") return;
+  if (req.method !== "GET") {
+    return;
+  }
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
   // Build output is content-hashed: cache first.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/")
+  ) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>
@@ -42,8 +61,8 @@ self.addEventListener("fetch", (event) => {
               caches.open(STATIC).then((c) => c.put(req, copy));
             }
             return res;
-          }),
-      ),
+          })
+      )
     );
     return;
   }
@@ -60,7 +79,10 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(async () => (await caches.match(req)) || (await caches.match(OFFLINE_URL))),
+        .catch(
+          async () =>
+            (await caches.match(req)) || (await caches.match(OFFLINE_URL))
+        )
     );
     return;
   }

@@ -1,6 +1,6 @@
+import { formatAmount } from "@/lib/format";
 import type { PersonDayTotals } from "@/server/domain/macros";
 import type { Member } from "@/server/plan";
-import { formatAmount } from "@/lib/format";
 
 import { FastingToggle } from "./fasting-toggle";
 
@@ -11,14 +11,18 @@ const MACROS = [
   { key: "fibre", label: "Fi" },
 ] as const;
 
-function tone(total: number, target: number) {
+const tone = (total: number, target: number) => {
   const ratio = total / target;
-  if (ratio > 1.1) return "bg-danger";
-  if (ratio >= 0.9) return "bg-accent";
+  if (ratio > 1.1) {
+    return "bg-danger";
+  }
+  if (ratio >= 0.9) {
+    return "bg-accent";
+  }
   return "bg-muted";
-}
+};
 
-function Bar({ total, target }: { total: number; target: number }) {
+const Bar = ({ total, target }: { total: number; target: number }) => {
   const pct = Math.min(100, (total / target) * 100);
   return (
     <div
@@ -31,7 +35,7 @@ function Bar({ total, target }: { total: number; target: number }) {
       />
     </div>
   );
-}
+};
 
 const NO_TARGETS: Member["targets"] = {
   kcal: null,
@@ -41,7 +45,7 @@ const NO_TARGETS: Member["targets"] = {
   fibre: null,
 };
 
-export function PersonTotals({
+export const PersonTotals = ({
   member,
   totals,
   date,
@@ -56,7 +60,7 @@ export function PersonTotals({
   /** Only you can change your own fasting days. */
   isSelf: boolean;
   plannedPortions: number;
-}) {
+}) => {
   // Targets don't apply on a fasting day; whatever is still eaten is shown plainly.
   const targets = fasting ? NO_TARGETS : member.targets;
   const kcal = totals.macros.kcal;
@@ -131,4 +135,4 @@ export function PersonTotals({
       )}
     </div>
   );
-}
+};

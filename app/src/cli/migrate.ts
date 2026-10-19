@@ -8,12 +8,13 @@ if (!url) {
   console.error("DATABASE_URL must be set");
   process.exit(1);
 }
-const folder = process.env.MIGRATIONS_DIR ?? path.join(process.cwd(), "drizzle");
+const folder =
+  process.env.MIGRATIONS_DIR ?? path.join(process.cwd(), "drizzle");
 
 runMigrations(url, folder).then(
   () => console.log("migrations: up to date"),
   (err) => {
     console.error("migrations failed:", err);
     process.exit(1);
-  },
+  }
 );

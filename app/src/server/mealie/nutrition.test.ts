@@ -17,15 +17,25 @@ describe("parseNutritionValue", () => {
     expect(parseNutritionValue(raw, grams)).toBe(expected);
   });
 
-  it.each([null, undefined, "", "  ", "10-12", "about 5", "5 mg", "-3", "n/a", "1.2.3"])(
-    "rejects %j instead of guessing",
-    (raw) => {
-      expect(parseNutritionValue(raw, grams)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    undefined,
+    "",
+    "  ",
+    "10-12",
+    "about 5",
+    "5 mg",
+    "-3",
+    "n/a",
+    "1.2.3",
+  ])("rejects %j instead of guessing", (raw) => {
+    expect(parseNutritionValue(raw, grams)).toBeNull();
+  });
 
   it("accepts calorie units only for kcal", () => {
-    expect(parseNutritionValue("250 kcal", ["kcal", "cal", "calories"])).toBe(250);
+    expect(parseNutritionValue("250 kcal", ["kcal", "cal", "calories"])).toBe(
+      250
+    );
     expect(parseNutritionValue("250 kcal", grams)).toBeNull();
   });
 });
@@ -48,7 +58,11 @@ describe("normaliseNutrition", () => {
   });
 
   it("flags a partially filled recipe", () => {
-    const n = normaliseNutrition({ calories: "300", proteinContent: "", fatContent: "10-12" });
+    const n = normaliseNutrition({
+      calories: "300",
+      proteinContent: "",
+      fatContent: "10-12",
+    });
     expect(n.status).toBe("partial");
     expect(n.perServing).toEqual({ kcal: 300 });
     expect(n.missing).toEqual(["protein", "carbs", "fat", "fibre"]);

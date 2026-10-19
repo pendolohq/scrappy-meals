@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 
 /** Registers the service worker (production only) and shows a banner while offline. */
-export function Pwa() {
+export const Pwa = () => {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("service worker:", err));
+      navigator.serviceWorker
+        .register("/sw.js")
+        .catch((err) => console.warn("service worker:", err));
     }
     const update = () => setOffline(!navigator.onLine);
     update();
@@ -20,15 +22,18 @@ export function Pwa() {
     };
   }, []);
 
-  if (!offline) return null;
+  if (!offline) {
+    return null;
+  }
   return (
-    <div role="status" className="sticky top-0 z-10 bg-danger px-4 py-1.5 text-center text-sm text-white">
-      Offline: showing the last saved copy. Changes won&apos;t save until you&apos;re back online.
-    </div>
+    <output className="sticky top-0 z-10 block bg-danger px-4 py-1.5 text-center text-sm text-white">
+      Offline: showing the last saved copy. Changes won&apos;t save until
+      you&apos;re back online.
+    </output>
   );
-}
+};
 
 /** Asks the service worker to drop cached pages (call on sign-out). */
-export function clearCachedPages() {
+export const clearCachedPages = () => {
   navigator.serviceWorker?.controller?.postMessage("clear-pages");
-}
+};

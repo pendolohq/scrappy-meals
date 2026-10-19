@@ -39,7 +39,7 @@ export const addMealAction = userAction(
   async (data, user) => {
     await addMeal(getDb(), { ...data, createdBy: user.id });
     return refreshWeek(data.date);
-  },
+  }
 );
 
 // The plan is shared: either person can set anyone's portion.
@@ -48,7 +48,7 @@ export const setPortionAction = userAction(
   async (data) => {
     await setPortion(getDb(), data.mealId, data.userId, data.multiplier);
     return refreshWeek(await mealDate(getDb(), data.mealId));
-  },
+  }
 );
 
 export const setServingsAction = userAction(
@@ -56,7 +56,7 @@ export const setServingsAction = userAction(
   async (data) => {
     await setBaseServings(getDb(), data.mealId, data.baseServings);
     return refreshWeek(await mealDate(getDb(), data.mealId));
-  },
+  }
 );
 
 export const removeMealAction = userAction(
@@ -65,7 +65,7 @@ export const removeMealAction = userAction(
     const day = await mealDate(getDb(), mealId);
     await removeMeal(getDb(), mealId);
     return refreshWeek(day);
-  },
+  }
 );
 
 /** Each person sets only their own fasting days. */
@@ -74,7 +74,7 @@ export const setFastingAction = userAction(
   async (data, user) => {
     await setFasting(getDb(), user.id, data.date, data.fasting);
     return refreshWeek(data.date);
-  },
+  }
 );
 
 /** Each person logs only their own meals, and only from the day itself onwards. */
@@ -94,5 +94,5 @@ export const setAdherenceAction = userAction(
     }
     await setAdherence(getDb(), data.mealId, user.id, data.status, data.note);
     return refreshWeek(day);
-  },
+  }
 );

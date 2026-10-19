@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { setFastingAction } from "@/app/(app)/week/actions";
 import { formatDay } from "@/lib/format";
 
-export function FastingToggle({
+export const FastingToggle = ({
   date,
   fasting,
   plannedPortions,
@@ -14,7 +14,7 @@ export function FastingToggle({
   fasting: boolean;
   /** How many of your portions that day are above 0 (zeroed if you start fasting). */
   plannedPortions: number;
-}) {
+}) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
@@ -24,7 +24,7 @@ export function FastingToggle({
       next &&
       plannedPortions > 0 &&
       !window.confirm(
-        `Fast on ${formatDay(date)}? Your ${plannedPortions} planned portion${plannedPortions === 1 ? "" : "s"} that day will be set to 0.`,
+        `Fast on ${formatDay(date)}? Your ${plannedPortions} planned portion${plannedPortions === 1 ? "" : "s"} that day will be set to 0.`
       )
     ) {
       return;
@@ -32,7 +32,9 @@ export function FastingToggle({
     startTransition(async () => {
       setError(undefined);
       const res = await setFastingAction({ date, fasting: next });
-      if (res.error) setError(res.error);
+      if (res.error) {
+        setError(res.error);
+      }
     });
   };
 
@@ -58,4 +60,4 @@ export function FastingToggle({
       )}
     </>
   );
-}
+};

@@ -1,9 +1,14 @@
 import { createInterface } from "node:readline/promises";
 
 /** Reads a line; with `hidden`, nothing is echoed. Falls back to plain reads when stdin isn't a TTY. */
-export async function ask(question: string, opts: { hidden?: boolean } = {}): Promise<string> {
+export async function ask(
+  question: string,
+  opts: { hidden?: boolean } = {}
+): Promise<string> {
   const { stdin, stdout } = process;
-  if (!stdin.isTTY) return readPipedLine();
+  if (!stdin.isTTY) {
+    return readPipedLine();
+  }
   if (!opts.hidden) {
     const rl = createInterface({ input: stdin, output: stdout });
     try {
@@ -28,10 +33,17 @@ export async function ask(question: string, opts: { hidden?: boolean } = {}): Pr
     };
     const onData = (chunk: string) => {
       for (const ch of chunk) {
-        if (ch === "\r" || ch === "\n" || ch === "\u0004") return done(() => resolve(value));
-        if (ch === "\u0003") return done(() => reject(new Error("cancelled")));
-        if (ch === "\u007f" || ch === "\b") value = value.slice(0, -1);
-        else value += ch;
+        if (ch === "\r" || ch === "\n" || ch === "\u0004") {
+          return done(() => resolve(value));
+        }
+        if (ch === "\u0003") {
+          return done(() => reject(new Error("cancelled")));
+        }
+        if (ch === "\u007f" || ch === "\b") {
+          value = value.slice(0, -1);
+        } else {
+          value += ch;
+        }
       }
     };
     stdin.on("data", onData);
@@ -42,8 +54,12 @@ export async function ask(question: string, opts: { hidden?: boolean } = {}): Pr
 let piped: AsyncIterator<string> | undefined;
 
 async function readPipedLine(): Promise<string> {
-  piped ??= createInterface({ input: process.stdin, terminal: false })[Symbol.asyncIterator]();
+  piped ??= createInterface({ input: process.stdin, terminal: false })[
+    Symbol.asyncIterator
+  ]();
   const next = await piped.next();
-  if (next.done) throw new Error("unexpected end of input");
+  if (next.done) {
+    throw new Error("unexpected end of input");
+  }
   return next.value.replace(/\r$/, "");
 }

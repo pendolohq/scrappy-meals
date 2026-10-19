@@ -8,23 +8,30 @@ import {
   setServingsAction,
 } from "@/app/(app)/week/actions";
 import { formatPortion } from "@/lib/format";
+import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
-import type { Member, PlannedMeal } from "@/server/plan";
 
 const STEP = 0.25;
 
-function Flags({ meal }: { meal: PlannedMeal }) {
+const Flags = ({ meal }: { meal: PlannedMeal }) => {
   const flags: string[] = [];
-  if (!meal.recipe) flags.push("Not found in Mealie");
-  else {
-    if (meal.recipe.nutrition.status === "missing")
+  if (!meal.recipe) {
+    flags.push("Not found in Mealie");
+  } else {
+    if (meal.recipe.nutrition.status === "missing") {
       flags.push("No nutrition data");
-    if (meal.recipe.nutrition.status === "partial")
+    }
+    if (meal.recipe.nutrition.status === "partial") {
       flags.push(`No ${meal.recipe.nutrition.missing.join(", ")} data`);
-    if (!meal.recipe.servings) flags.push("No servings count in Mealie");
+    }
+    if (!meal.recipe.servings) {
+      flags.push("No servings count in Mealie");
+    }
   }
-  if (flags.length === 0) return null;
+  if (flags.length === 0) {
+    return null;
+  }
   return (
     <ul className="text-xs text-danger">
       {flags.map((f) => (
@@ -32,9 +39,9 @@ function Flags({ meal }: { meal: PlannedMeal }) {
       ))}
     </ul>
   );
-}
+};
 
-function Stepper({
+const Stepper = ({
   label,
   value,
   onChange,
@@ -44,13 +51,12 @@ function Stepper({
   value: number;
   onChange: (v: number) => void;
   min?: number;
-}) {
+}) => {
   const btn =
     "h-8 w-8 rounded-full border border-border text-lg leading-none disabled:opacity-40";
   return (
-    <div
-      className="flex items-center justify-center gap-1.5"
-      role="group"
+    <fieldset
+      className="flex min-w-0 items-center justify-center gap-1.5"
       aria-label={label}
     >
       <button
@@ -77,11 +83,11 @@ function Stepper({
       >
         +
       </button>
-    </div>
+    </fieldset>
   );
-}
+};
 
-export function MealRow({
+export const MealRow = ({
   meal,
   members,
   currentUserId,
@@ -92,7 +98,7 @@ export function MealRow({
   currentUserId: string;
   /** True from the meal's day onwards: adherence can't be logged in advance. */
   canLog: boolean;
-}) {
+}) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [open, setOpen] = useState(false);
@@ -100,15 +106,17 @@ export function MealRow({
     meal.portions,
     (
       current,
-      { userId, multiplier }: { userId: string; multiplier: number },
-    ) => ({ ...current, [userId]: multiplier }),
+      { userId, multiplier }: { userId: string; multiplier: number }
+    ) => ({ ...current, [userId]: multiplier })
   );
 
   const act = (work: () => Promise<{ error?: string }>) =>
     startTransition(async () => {
       setError(undefined);
       const res = await work();
-      if (res.error) setError(res.error);
+      if (res.error) {
+        setError(res.error);
+      }
     });
 
   const name = meal.recipe?.name ?? meal.slug;
@@ -123,7 +131,7 @@ export function MealRow({
     >
       <div className="flex items-start gap-3">
         {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element -- proxied Mealie thumbnails, already small
+          // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails, already small
           <img
             src={thumb}
             alt=""
@@ -203,7 +211,7 @@ export function MealRow({
                 const baseServings = Number(e.currentTarget.value);
                 if (baseServings > 0 && baseServings !== meal.baseServings) {
                   act(() =>
-                    setServingsAction({ mealId: meal.id, baseServings }),
+                    setServingsAction({ mealId: meal.id, baseServings })
                   );
                 }
               }}
@@ -225,4 +233,4 @@ export function MealRow({
       )}
     </li>
   );
-}
+};

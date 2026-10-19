@@ -1,6 +1,5 @@
 // Renders the app icons from one SVG. Run after changing the design: node scripts/icons.mjs
 import { mkdir, writeFile } from "node:fs/promises";
-
 import sharp from "sharp";
 
 const out = new URL("../public/icons/", import.meta.url);
@@ -20,7 +19,10 @@ const svg = (pad) => `
 await mkdir(out, { recursive: true });
 await writeFile(new URL("icon.svg", out), svg(0.12).trim() + "\n");
 const render = (pad, size, name) =>
-  sharp(Buffer.from(svg(pad))).resize(size, size).png({ compressionLevel: 9 }).toFile(new URL(name, out).pathname);
+  sharp(Buffer.from(svg(pad)))
+    .resize(size, size)
+    .png({ compressionLevel: 9 })
+    .toFile(new URL(name, out).pathname);
 
 await Promise.all([
   render(0.12, 192, "icon-192.png"),

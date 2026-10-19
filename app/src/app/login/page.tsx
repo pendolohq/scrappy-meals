@@ -8,7 +8,11 @@ import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   if (await currentUser()) {
     redirect("/");
   }
@@ -22,7 +26,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="space-y-2 rounded-lg border border-border bg-card p-4 text-sm">
           <p className="font-medium">No accounts yet.</p>
           <p className="text-muted">Create one on the server:</p>
-          <pre className="overflow-x-auto rounded bg-background p-2">docker compose exec app scrappy user add</pre>
+          <pre className="overflow-x-auto rounded bg-background p-2">
+            docker compose exec app scrappy user add
+          </pre>
         </div>
       ) : (
         <LoginForm next={next} />

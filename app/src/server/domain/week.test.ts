@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { addDays, isIsoDate, isoWeekday, today, weekDays, weekStartOf } from "./week";
+import {
+  addDays,
+  isIsoDate,
+  isoWeekday,
+  today,
+  weekDays,
+  weekStartOf,
+} from "./week";
 
 describe("week helpers", () => {
   it("validates dates strictly", () => {

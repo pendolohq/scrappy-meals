@@ -15,6 +15,7 @@ import {
   setPassword,
   UserError,
 } from "../server/users";
+
 import { ask } from "./prompt";
 
 const USAGE = `Usage: scrappy <command>
@@ -26,9 +27,13 @@ const USAGE = `Usage: scrappy <command>
 `;
 
 async function askNewPassword(): Promise<string> {
-  const password = await ask(`Password (min ${MIN_PASSWORD_LENGTH} chars): `, { hidden: true });
+  const password = await ask(`Password (min ${MIN_PASSWORD_LENGTH} chars): `, {
+    hidden: true,
+  });
   const again = await ask("Repeat password: ", { hidden: true });
-  if (password !== again) throw new UserError("Passwords do not match");
+  if (password !== again) {
+    throw new UserError("Passwords do not match");
+  }
   return password;
 }
 
@@ -50,7 +55,9 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const url = process.env.DATABASE_URL;
-  if (!url) throw new UserError("DATABASE_URL must be set");
+  if (!url) {
+    throw new UserError("DATABASE_URL must be set");
+  }
   const { db, pool } = createDb(url, { max: 1 });
 
   try {
@@ -58,27 +65,47 @@ async function main(argv: string[]): Promise<number> {
       case "add": {
         const name = values.name ?? (await ask("Name: "));
         const email = values.email ?? (await ask("Email: "));
-        const user = await createUser(db, { name, email, password: await askNewPassword() });
+        const user = await createUser(db, {
+          name,
+          email,
+          password: await askNewPassword(),
+        });
         console.log(`Created ${user.name} <${user.email}>`);
         return 0;
       }
       case "passwd": {
-        if (!arg) throw new UserError("Usage: scrappy user passwd EMAIL");
+        if (!arg) {
+          throw new UserError("Usage: scrappy user passwd EMAIL");
+        }
         await setPassword(db, arg, await askNewPassword());
-        console.log(`Password updated for ${arg}; existing sessions are signed out`);
+        console.log(
+          `Password updated for ${arg}; existing sessions are signed out`
+        );
         return 0;
       }
       case "list": {
         const rows = await listUsers(db);
-        if (rows.length === 0) console.log("No users yet. Create one with: scrappy user add");
-        for (const u of rows) console.log(`${u.email}\t${u.name}\tcreated ${u.createdAt.toISOString().slice(0, 10)}`);
+        if (rows.length === 0) {
+          console.log("No users yet. Create one with: scrappy user add");
+        }
+        for (const u of rows) {
+          console.log(
+            `${u.email}\t${u.name}\tcreated ${u.createdAt.toISOString().slice(0, 10)}`
+          );
+        }
         return 0;
       }
       case "remove": {
-        if (!arg) throw new UserError("Usage: scrappy user remove EMAIL");
+        if (!arg) {
+          throw new UserError("Usage: scrappy user remove EMAIL");
+        }
         if (!values.yes) {
-          const answer = await ask(`Delete ${arg} and all their portions and adherence? Type the email to confirm: `);
-          if (answer.toLowerCase() !== arg.toLowerCase()) throw new UserError("Not confirmed; nothing deleted");
+          const answer = await ask(
+            `Delete ${arg} and all their portions and adherence? Type the email to confirm: `
+          );
+          if (answer.toLowerCase() !== arg.toLowerCase()) {
+            throw new UserError("Not confirmed; nothing deleted");
+          }
         }
         await removeUser(db, arg);
         console.log(`Removed ${arg}`);
@@ -96,7 +123,11 @@ async function main(argv: string[]): Promise<number> {
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (err) => {
-    console.error(err instanceof UserError || err?.code === "ERR_PARSE_ARGS_UNKNOWN_OPTION" ? err.message : err);
+    console.error(
+      err instanceof UserError || err?.code === "ERR_PARSE_ARGS_UNKNOWN_OPTION"
+        ? err.message
+        : err
+    );
     process.exit(1);
-  },
+  }
 );

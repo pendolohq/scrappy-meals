@@ -1,9 +1,9 @@
-import "server-only";
-
-import { redirect } from "next/navigation";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+
+import "server-only";
 
 // The one place that decides who is signed in. Pages, layouts, server actions
 // and route handlers all go through these helpers instead of calling auth().
@@ -30,7 +30,7 @@ export async function requireUser(): Promise<SessionUser> {
 
 /** For route handlers: answers 401 unless someone is signed in. */
 export function userRoute<Req extends Request, Ctx>(
-  handler: (req: Req, ctx: Ctx, user: SessionUser) => Promise<Response>,
+  handler: (req: Req, ctx: Ctx, user: SessionUser) => Promise<Response>
 ): (req: Req, ctx: Ctx) => Promise<Response> {
   return async (req, ctx) => {
     const user = await currentUser();
