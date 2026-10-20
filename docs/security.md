@@ -67,7 +67,9 @@ portions, servings) are household-wide on purpose.
   database, and ends on the first request after Postgres is back.
 - Auth.js sets the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` when
   `AUTH_URL` is https. Caddy terminates TLS; the app port isn't published.
-- Sign-in is rate-limited per IP and per email (`src/auth.ts`).
+- Sign-in failures are rate-limited per IP, per email from one IP, and per
+  email overall (`createSignInLimits` in `src/server/rate-limit.ts`), so
+  guessing someone's password can't lock them out of their own device.
 
 ## Tests
 
@@ -77,7 +79,11 @@ page under `src/app` and fails if:
 - an action answers anything but `{ error }` without a session, or touches the
   database or Mealie;
 - a route handler answers anything but `401` without a session;
-- a page that reads data doesn't call `requireUser()`.
+- a page or layout that reads data (itself, or through a component it renders)
+  doesn't call `requireUser()`, in any route group;
+- a `"use server"` appears anywhere but the first line of a file under `src`
+  (an inline server action would skip the checks above).
 
-Public exceptions (the login action, `/api/auth`, `/api/health`) are listed
+Public exceptions (the login action and page, `/offline`, `/api/auth`,
+`/api/health`) are listed
 in that file. Adding one is a deliberate, reviewed change.

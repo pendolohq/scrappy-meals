@@ -51,9 +51,9 @@ const actionFiles = files.filter(
     /\.tsx?$/.test(f) && /^["']use server["']/.test(readFileSync(f, "utf8"))
 );
 const routeFiles = files.filter((f) => path.basename(f) === "route.ts");
-const pageFiles = files.filter(
-  (f) => /\/(page|layout)\.tsx$/.test(f) && rel(f).startsWith("(app)/")
-);
+const pageFiles = files.filter((f) => /\/(page|layout)\.tsx$/.test(f));
+/** Pages anyone may open. The login page counts users, nothing more. */
+const PUBLIC_PAGES = ["layout.tsx", "login/page.tsx", "offline/page.tsx"];
 
 beforeEach(() => touched.mockClear());
 
@@ -117,19 +117,48 @@ describe("route handlers", () => {
 
 describe("pages", () => {
   // A layout doesn't always re-render on navigation, so each page that reads
-  // data must check the session itself.
+  // data must check the session itself. "Reads data": imports a server module
+  // other than the pure domain helpers or the session, itself or through a
+  // component it renders (one level deep).
+  const SERVER_IMPORT =
+    /^import (?!type )[^;]*?from "@\/server\/(?!domain\/|session")/m;
+  const COMPONENT_IMPORT =
+    /^import (?!type )[^;]*?from "@\/components\/([^"]+)"/gm;
   const readsData = (src: string) =>
-    /getDb\(|^import \{[^}]*\} from "@\/server\/(?!domain\/|session")/m.test(
-      src
-    );
+    /getDb\(/.test(src) ||
+    SERVER_IMPORT.test(src) ||
+    [...src.matchAll(COMPONENT_IMPORT)].some(([, name]) => {
+      const file = path.resolve(APP, "../components", `${name}.tsx`);
+      return SERVER_IMPORT.test(readFileSync(file, "utf8"));
+    });
 
-  for (const file of pageFiles) {
+  for (const file of pageFiles.filter((f) => !PUBLIC_PAGES.includes(rel(f)))) {
     const src = readFileSync(file, "utf8");
     if (!readsData(src)) {
       continue;
     }
     it(`${rel(file)} calls requireUser()`, () => {
       expect(src).toMatch(/\brequireUser\(\)/);
+    });
+  }
+
+  it("finds the data pages", () => {
+    expect(
+      pageFiles.filter((f) => readsData(readFileSync(f, "utf8"))).length
+    ).toBeGreaterThan(3);
+  });
+});
+
+describe("server actions are only declared at the top of a file", () => {
+  // An inline "use server" function would skip the check above.
+  const src = path.resolve(APP, "..");
+  const code = (f: string) => /\.tsx?$/.test(f) && !f.endsWith(".test.ts");
+  for (const file of filesUnder(src).filter(code)) {
+    const text = readFileSync(file, "utf8");
+    it(`${path.relative(src, file)}`, () => {
+      expect(text.replace(/^["']use server["'];?/, "")).not.toMatch(
+        /["']use server["']/
+      );
     });
   }
 });

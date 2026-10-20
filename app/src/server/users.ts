@@ -152,7 +152,8 @@ export async function verifyCredentials(
 const target = (max: number) =>
   z
     .number({ error: "must be a number" })
-    .positive("must be more than 0")
+    // The columns keep one decimal, so anything smaller would be stored as 0.
+    .min(0.1, "must be at least 0.1")
     .max(max, `must be at most ${max}`)
     .nullable();
 

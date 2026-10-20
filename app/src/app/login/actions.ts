@@ -4,16 +4,9 @@ import { AuthError, CredentialsSignin } from "next-auth";
 
 import { signIn } from "@/auth";
 
-export type LoginState = { error?: string };
+import { safeNext } from "./safe-next";
 
-/** Only same-origin paths; anything else falls back to the home page. */
-function safeNext(next: FormDataEntryValue | null): string {
-  return typeof next === "string" &&
-    next.startsWith("/") &&
-    !next.startsWith("//")
-    ? next
-    : "/";
-}
+export type LoginState = { error?: string };
 
 export async function login(
   _prev: LoginState,

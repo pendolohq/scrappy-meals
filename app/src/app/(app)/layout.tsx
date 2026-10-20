@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { signOut } from "@/auth";
 import { SignOut } from "@/components/sign-out";
 import { requireUser } from "@/server/session";
 
@@ -20,13 +19,7 @@ export default async function AppLayout({
           <Link href="/week">Plan</Link>
           <Link href="/settings">Settings</Link>
         </nav>
-        <SignOut
-          name={user.name}
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        />
+        <SignOut name={user.name} />
       </header>
       <main>{children}</main>
     </div>

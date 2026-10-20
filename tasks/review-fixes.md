@@ -328,7 +328,7 @@ They become one page.
 
 ## M8 — Security hardening
 
-- [ ] **Task 25: `access.test.ts` has no blind spots**
+- [x] **Task 25: `access.test.ts` has no blind spots**
   **Complexity:** S
   **Do:**
   - Check every `page.tsx`/`layout.tsx` under `src/app` except an explicit public list
@@ -338,7 +338,7 @@ They become one page.
   - Broaden the import regex to catch namespace and default imports.
   **Done when:** the test fails when you add an unguarded page in a new route group.
 
-- [ ] **Task 26: Small input tightening**
+- [x] **Task 26: Small input tightening**
   **Complexity:** XS
   **Do:**
   - `safeNext` rejects `\` and control characters (or compares `new URL(next, base).origin`).
@@ -348,7 +348,7 @@ They become one page.
     so tiny values don't hit the DB check or read as "no target".
   **Done when:** unit tests for `safeNext` and the schemas.
 
-- [ ] **Task 27: Sign-in limits can't lock the household out**
+- [x] **Task 27: Sign-in limits can't lock the household out**
   **Complexity:** S
   **Do:**
   - Count per-email failures per (email, IP) pair, with a higher global per-email ceiling (for

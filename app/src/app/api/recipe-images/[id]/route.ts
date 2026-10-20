@@ -22,14 +22,15 @@ export const GET = userRoute(
         status: upstream?.status === 404 ? 404 : 502,
       });
     }
-    const type = upstream.headers.get("content-type") ?? "image/webp";
-    if (!type.startsWith("image/")) {
+    // The path asks for a webp; anything else (an SVG, say, which can carry
+    // script) isn't served from our origin.
+    if (!upstream.headers.get("content-type")?.startsWith("image/webp")) {
       return new Response(null, { status: 502 });
     }
 
     return new Response(upstream.body, {
       headers: {
-        "Content-Type": type,
+        "Content-Type": "image/webp",
         "Cache-Control": "private, max-age=86400",
         "X-Content-Type-Options": "nosniff",
       },
