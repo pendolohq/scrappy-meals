@@ -76,8 +76,7 @@ lives in a doc; the trigger for reading each one is below.
 
 ## Workflow
 
-- Small and medium tasks: do them directly (implement, write the tests, run the checks below),
-  then commit.
+- Small and medium tasks: do them directly (implement, write the tests), then commit.
 - Large or risky tasks (auth, data migrations, anything hard to reverse): a full round. Write
   the tests first (`unit-test-writer` / `e2e-test-writer`), build with `implementer`, validate
   with `code-reviewer`, re-invoke `implementer` with any blockers, commit when LGTM.
@@ -105,11 +104,15 @@ task in the file, in dependency order.
 
 ## Verification
 
-After every change, from `app/`:
+The checks run as a hook, not by hand. In Claude Code, a Stop hook
+(`.claude/hooks/checks.sh`) runs them when you finish, whenever `app/` changed since they last
+passed, and hands any failure back to you to fix:
 
 ```sh
 bun run format:check && bun run lint && bun run typecheck && bun run test
-DATABASE_TEST_URL=postgres://… bun run test:db     # if server/db code changed
+bun run test:db     # too, when DATABASE_TEST_URL is set
 ```
 
-then the `next-dev-loop` skill for anything user-visible.
+Don't run these yourself in Claude Code. Without the hook (e.g. in Cursor), run them before you
+finish. Running a single test file while writing it is fine either way. Anything user-visible
+still gets the `next-dev-loop` skill.
