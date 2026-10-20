@@ -7,13 +7,19 @@ import Link from "next/link";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { inputClass } from "@/components/ui/input";
-import { Pill, type PillTone } from "@/components/ui/pill";
+import { Pill, pillClass, type PillTone } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import {
   parseDecimal,
   THREE_DIGIT_GROUP,
   type ThreeDigitGroup,
 } from "@/server/domain/decimal";
+import {
+  isQuick,
+  QUICK_MAX_MINUTES,
+  RECIPE_CATEGORIES,
+  RECIPE_TAGS,
+} from "@/server/domain/taxonomy";
 import type { ReviewDraft } from "@/server/recipe-review";
 
 import { saveReviewAction } from "./actions";
@@ -62,8 +68,72 @@ const macroTexts = (draft: ReviewDraft) =>
     MACROS.map((m) => [m.key, String(draft.nutrition[m.key] ?? "")])
   );
 
+/**
+ * The agreed tags or categories as toggles. Ones added in Mealie outside the
+ * list are shown, and kept on save, but not edited here.
+ */
+const ToggleGroup = <T extends string>({
+  label,
+  hint,
+  options,
+  selected,
+  onChange,
+  others,
+}: {
+  label: string;
+  hint: string;
+  options: readonly { name: string; slug: T }[];
+  selected: T[];
+  onChange: (next: T[]) => void;
+  others: { name: string }[];
+}) => (
+  <fieldset className="min-w-0">
+    <legend className={fieldLabel}>{label}</legend>
+    <p className="text-xs text-muted">{hint}</p>
+    <div className="mt-2 flex flex-wrap gap-2">
+      {options.map((o) => {
+        const on = selected.includes(o.slug);
+        return (
+          <button
+            key={o.slug}
+            type="button"
+            aria-pressed={on}
+            onClick={() =>
+              onChange(
+                on
+                  ? selected.filter((s) => s !== o.slug)
+                  : options
+                      .map((x) => x.slug)
+                      .filter((s) => s === o.slug || selected.includes(s))
+              )
+            }
+            className={cx(
+              pillClass(on ? "solid" : "neutral", true),
+              "min-h-tap px-3 text-sm",
+              !on && "hover:text-foreground"
+            )}
+          >
+            {on && <Check className="size-3.5" aria-hidden />}
+            {o.name}
+          </button>
+        );
+      })}
+    </div>
+    {others.length > 0 && (
+      <p className="mt-2 text-xs text-muted">
+        Also in Mealie: {others.map((o) => o.name).join(", ")}
+      </p>
+    )}
+  </fieldset>
+);
+
 export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
   const [servings, setServings] = useState(String(draft.servings ?? ""));
+  const [totalMinutes, setTotalMinutes] = useState(
+    String(draft.totalMinutes ?? "")
+  );
+  const [tags, setTags] = useState(draft.tags);
+  const [categories, setCategories] = useState(draft.categories);
   const [nutrition, setNutrition] = useState(macroTexts(draft));
   // What the fields held when loaded or last saved, to tell edits apart.
   const [baseline, setBaseline] = useState(macroTexts(draft));
@@ -100,6 +170,8 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
     });
   };
 
+  const minutes = toNumber(totalMinutes);
+
   const anyMacro = Object.values(nutrition).some((v) => v.trim() !== "");
   const edited = MACROS.some((m) => nutrition[m.key] !== baseline[m.key]);
   const nutritionLabel = !anyMacro
@@ -117,6 +189,9 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
         slug: draft.slug,
         // NaN is refused by the server with a message about servings.
         servings: toNumber(servings) ?? Number.NaN,
+        totalMinutes: toNumber(totalMinutes),
+        tags,
+        categories,
         nutrition: Object.fromEntries(
           MACROS.map((m) => [
             m.key,
@@ -151,17 +226,64 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
-      <Card>
-        <label className="block max-w-40">
-          <span className={fieldLabel}>Servings</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={servings}
-            onChange={(e) => setServings(e.target.value)}
-            className={field}
-          />
-        </label>
+      <Card className="space-y-3">
+        <div className="flex flex-wrap gap-3">
+          <label className="block w-36">
+            <span className={fieldLabel}>Servings</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={servings}
+              onChange={(e) => setServings(e.target.value)}
+              className={field}
+            />
+          </label>
+          <label className="block w-36">
+            <span className={fieldLabel}>Total time (min)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={totalMinutes}
+              onChange={(e) => setTotalMinutes(e.target.value)}
+              aria-describedby="total-time-hint"
+              className={field}
+            />
+          </label>
+        </div>
+        <p id="total-time-hint" className="text-sm text-muted">
+          {minutes === null ? (
+            <>
+              The source gave no total time. Add one so the <q>Quick</q> filter
+              can find this recipe.
+            </>
+          ) : isQuick(minutes) ? (
+            <>Counts as quick ({QUICK_MAX_MINUTES} minutes or less).</>
+          ) : (
+            <>Prep and cooking together, start to finish.</>
+          )}
+        </p>
+      </Card>
+
+      <Card as="section" className="space-y-4" aria-labelledby="organizers">
+        <h2 id="organizers" className="font-serif text-heading font-semibold">
+          Tags and categories
+        </h2>
+        <ToggleGroup
+          label="Tags"
+          hint="When or how you'd eat it."
+          options={RECIPE_TAGS}
+          selected={tags}
+          onChange={setTags}
+          others={draft.otherTags}
+        />
+        <ToggleGroup
+          label="Categories"
+          hint="What's in it. Usually one."
+          options={RECIPE_CATEGORIES}
+          selected={categories}
+          onChange={setCategories}
+          others={draft.otherCategories}
+        />
       </Card>
 
       <Card as="fieldset" className="min-w-0">

@@ -55,7 +55,9 @@ import { loadReview, saveReview } from "./recipe-review";
  *   { title, quantity: quantity ?? 0, unit: {id,name} | null, food: {id,name}, note }.
  * - Distinct names are resolved once each (trimmed, case-insensitive key),
  *   units and foods separately; note-only lines resolve nothing.
- * - One `patch(slug, { recipeServings, nutrition, recipeIngredient, extras })`.
+ * - One `patch(slug, { recipeServings, tags, recipeCategory, nutrition,
+ *   recipeIngredient, extras })`, plus `totalTimeSeconds` when the minutes
+ *   changed.
  *   `nutrition` is the recipe's existing nutrition with the five mapped
  *   fields overwritten (calories, proteinContent, carbohydrateContent,
  *   fatContent, fiberContent) as strings, null staying null.
@@ -478,7 +480,15 @@ const NO_NUTRITION = {
 };
 
 function input(overrides: Partial<SaveInput> = {}): SaveInput {
-  return { servings: 4, nutrition: NO_NUTRITION, lines: [], ...overrides };
+  return {
+    servings: 4,
+    totalMinutes: null,
+    tags: [],
+    categories: [],
+    nutrition: NO_NUTRITION,
+    lines: [],
+    ...overrides,
+  };
 }
 
 function line(
@@ -523,6 +533,8 @@ describe("saveReview", () => {
     expect(patch).toHaveBeenCalledTimes(1);
     expect(patch).toHaveBeenCalledWith("soup", {
       recipeServings: 2,
+      tags: [],
+      recipeCategory: [],
       nutrition: {
         calories: "320",
         proteinContent: "12.5",
@@ -1228,5 +1240,72 @@ describe("linked recipes and parsed lines on save", () => {
     );
 
     expect((await loadReview("soup", deps))?.lines[0].linked).toBe(true);
+  });
+});
+
+describe("tags, categories and total time", () => {
+  const stored = {
+    name: "Soup",
+    totalTimeSeconds: 1500,
+    tags: [
+      { id: "t1", name: "dinner", slug: "dinner" },
+      { id: "t2", name: "Autumn", slug: "autumn" },
+    ],
+    recipeCategory: [{ id: "c1", name: "Vegan", slug: "vegan" }],
+  };
+
+  it("loads the agreed ones as slugs and the rest as they are", async () => {
+    const { deps, getRecipe } = makeDeps();
+    getRecipe.mockResolvedValue(stored);
+    await expect(loadReview("soup", deps)).resolves.toMatchObject({
+      totalMinutes: 25,
+      tags: ["dinner"],
+      categories: ["vegan"],
+      otherTags: [{ name: "Autumn", slug: "autumn" }],
+      otherCategories: [],
+    });
+  });
+
+  it("has no total time when Mealie has none", async () => {
+    const { deps } = makeDeps();
+    await expect(loadReview("soup", deps)).resolves.toMatchObject({
+      totalMinutes: null,
+      tags: [],
+      categories: [],
+    });
+  });
+
+  it("saves the picked agreed ones and keeps the others by id", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(stored);
+    await saveReview(
+      "soup",
+      input({
+        totalMinutes: 25,
+        tags: ["lunch", "high-protein"],
+        categories: ["vegetarian"],
+      }),
+      deps
+    );
+    const [, fields] = patch.mock.calls[0];
+    expect(fields.tags).toEqual([
+      { name: "Lunch", slug: "lunch" },
+      { name: "High protein", slug: "high-protein" },
+      { id: "t2", name: "Autumn", slug: "autumn" },
+    ]);
+    expect(fields.recipeCategory).toEqual([
+      { name: "Vegetarian", slug: "vegetarian" },
+    ]);
+    // 25 minutes is what was shown: Mealie's seconds stay as they are.
+    expect(fields).not.toHaveProperty("totalTimeSeconds");
+  });
+
+  it("writes a changed or cleared total time as seconds", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue(stored);
+    await saveReview("soup", input({ totalMinutes: 40 }), deps);
+    expect(patch.mock.calls[0][1]).toMatchObject({ totalTimeSeconds: 2400 });
+    await saveReview("soup", input({ totalMinutes: null }), deps);
+    expect(patch.mock.calls[1][1]).toMatchObject({ totalTimeSeconds: null });
   });
 });

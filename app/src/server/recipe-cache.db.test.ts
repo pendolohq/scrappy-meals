@@ -16,12 +16,31 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   ingredients: [],
   instructions: [],
   notes: [],
+  tags: [],
+  categories: [],
+  totalMinutes: null,
   nutrition: { perServing: {}, missing: [], status: "missing" },
   ...over,
 });
 
 describe.skipIf(!testDbUrl)("recipe cache (Postgres)", () => {
   const db = useTestDb();
+
+  it("caches tags, categories and total time", async () => {
+    const tagged = recipe({
+      tags: [{ name: "Dinner", slug: "dinner" }],
+      categories: [{ name: "Vegan", slug: "vegan" }],
+      totalMinutes: 25,
+    });
+    const rows = await loadRecipes(db, ["soup"], {
+      fetch: async () => tagged,
+    });
+    expect(rows.get("soup")).toMatchObject({
+      tags: [{ name: "Dinner", slug: "dinner" }],
+      categories: [{ name: "Vegan", slug: "vegan" }],
+      totalMinutes: 25,
+    });
+  });
 
   it("caches where an imported recipe came from and its import state", async () => {
     const imported = recipe({

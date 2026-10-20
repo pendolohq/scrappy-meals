@@ -6,6 +6,7 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
+import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { isIsoDate } from "@/server/domain/week";
 import {
@@ -46,11 +47,7 @@ export const addMealAction = userAction(
       .min(0)
       .max(MAX_SNACK_SLOTS - 1)
       .default(0),
-    // Mealie's slugs; also keeps "..", "/" and the like out of its API paths.
-    slug: z
-      .string()
-      .max(200)
-      .regex(/^[a-z0-9-]+$/),
+    slug: recipeSlug,
   }),
   async (data, user) => {
     await addMeal(getDb(), { ...data, createdBy: user.id });

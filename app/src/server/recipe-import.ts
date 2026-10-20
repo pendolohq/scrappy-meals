@@ -1,5 +1,6 @@
 import "server-only";
 
+import { classifyRecipe, type Organizer } from "./domain/taxonomy";
 import { RetryableError, UserFacingError } from "./errors";
 import { isMealieUnavailable } from "./mealie/client";
 import {
@@ -11,7 +12,11 @@ import {
   patchRecipe,
 } from "./mealie/import";
 import { IMPORT_EXTRAS, withImportState } from "./mealie/import-state";
-import { MACRO_KEYS, NUTRITION_FIELDS } from "./mealie/nutrition";
+import {
+  MACRO_KEYS,
+  normaliseNutrition,
+  NUTRITION_FIELDS,
+} from "./mealie/nutrition";
 import { createRateLimiter } from "./rate-limit";
 
 export type ImportResult =
@@ -19,18 +24,32 @@ export type ImportResult =
   | { status: "exists"; slug: string; name: string };
 
 type FetchedRecipe = {
+  name?: string | null;
   nutrition?: Record<string, string | null> | null;
   extras?: Record<string, unknown> | null;
+  recipeIngredient?:
+    | {
+        originalText?: string | null;
+        note?: string | null;
+        display?: string | null;
+      }[]
+    | null;
+  tags?: unknown[] | null;
+  recipeCategory?: unknown[] | null;
+};
+
+type ImportPatch = {
+  extras: Record<string, string>;
+  orgURL?: string;
+  tags?: Organizer[];
+  recipeCategory?: Organizer[];
 };
 
 type Deps = {
   find: (url: string) => Promise<{ slug: string; name: string } | null>;
   importFromUrl: (url: string) => Promise<string | null>;
   getRecipe: (slug: string) => Promise<FetchedRecipe | null>;
-  patch: (
-    slug: string,
-    fields: { extras: Record<string, string>; orgURL?: string }
-  ) => Promise<void>;
+  patch: (slug: string, fields: ImportPatch) => Promise<void>;
   limiter: { hit: (key: string) => boolean };
   aiSettings: () => Promise<{
     aiEnabled: boolean;
@@ -204,5 +223,31 @@ async function markPending(
       nutrition: hasNutrition ? "source" : null,
     }),
     ...(orgURL ? { orgURL } : {}),
+    ...organizersFor(recipe),
   });
+}
+
+/**
+ * Tags and categories from the agreed list, worked out from the recipe
+ * itself. Mealie's own `includeTags` would copy whatever keywords the page
+ * uses. A recipe that already has some (tagged by hand before a retried
+ * import finished) keeps them.
+ */
+function organizersFor(
+  recipe: FetchedRecipe
+): Pick<ImportPatch, "tags" | "recipeCategory"> {
+  if (recipe.tags?.length || recipe.recipeCategory?.length) {
+    return {};
+  }
+  const { tags, categories } = classifyRecipe({
+    name: recipe.name ?? "",
+    ingredients: (recipe.recipeIngredient ?? []).map(
+      (i) => i.originalText || i.note || i.display || ""
+    ),
+    proteinPerServing: normaliseNutrition(recipe.nutrition).perServing.protein,
+  });
+  return {
+    ...(tags.length > 0 ? { tags } : {}),
+    ...(categories.length > 0 ? { recipeCategory: categories } : {}),
+  };
 }

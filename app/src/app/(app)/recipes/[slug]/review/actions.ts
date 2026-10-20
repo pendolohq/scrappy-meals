@@ -3,21 +3,23 @@
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
+import { recipeSlug } from "@/server/domain/recipe-slug";
 import { reviewInputSchema } from "@/server/domain/review-input";
 import { saveReview } from "@/server/recipe-review";
 
-const schema = reviewInputSchema.extend({
-  slug: z
-    .string()
-    .max(200)
-    .regex(/^[a-z0-9-]+$/),
-});
+const schema = reviewInputSchema.extend({ slug: recipeSlug });
 
 /** The first problem, in words the person can act on. */
 function explain(err: z.ZodError): string {
   const [area, , field] = err.issues[0].path;
   if (area === "servings") {
     return "Servings must be a number above 0 and at most 1000.";
+  }
+  if (area === "totalMinutes") {
+    return "Total time must be a whole number of minutes, from 1 to 10000.";
+  }
+  if (area === "tags" || area === "categories") {
+    return "Pick tags and categories from the list.";
   }
   if (area === "nutrition") {
     return "Nutrition values must be numbers, 0 or more.";

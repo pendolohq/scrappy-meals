@@ -27,12 +27,39 @@ const line = {
 };
 
 function valid(overrides: Record<string, unknown> = {}) {
-  return { servings: 4, nutrition, lines: [line], ...overrides };
+  return {
+    servings: 4,
+    totalMinutes: 25,
+    tags: ["dinner"],
+    categories: ["vegan"],
+    nutrition,
+    lines: [line],
+    ...overrides,
+  };
 }
 
 describe("reviewInputSchema", () => {
   it("accepts a full review", () => {
     expect(reviewInputSchema.safeParse(valid()).success).toBe(true);
+  });
+
+  it("takes only tags and categories from the agreed list", () => {
+    const ok = (o: Record<string, unknown>) =>
+      reviewInputSchema.safeParse(valid(o)).success;
+    expect(ok({ tags: [], categories: [] })).toBe(true);
+    expect(ok({ tags: ["meal-prep", "high-protein"] })).toBe(true);
+    expect(ok({ tags: ["autumn"] })).toBe(false);
+    expect(ok({ categories: ["dinner"] })).toBe(false);
+  });
+
+  it("takes a whole number of minutes, or none", () => {
+    const ok = (totalMinutes: unknown) =>
+      reviewInputSchema.safeParse(valid({ totalMinutes })).success;
+    expect(ok(null)).toBe(true);
+    expect(ok(90)).toBe(true);
+    expect(ok(0)).toBe(false);
+    expect(ok(12.5)).toBe(false);
+    expect(ok(20_000)).toBe(false);
   });
 
   it("accepts null amounts, units and foods, and no lines", () => {

@@ -28,6 +28,8 @@ until every place names the same version (`mealie-version.test.ts`).
 | Purpose | Endpoint |
 |---|---|
 | Search / list recipes | `GET /api/recipes?search=&page=&perPage=` (paginated: `items`, `total`, `total_pages`) |
+| Discover (filter) | `GET /api/recipes?tags=&categories=&requireAllTags=true&queryFilter=totalTimeSeconds…` (see below) |
+| Tags / categories | `GET /api/organizers/tags\|categories?perPage=-1` (`recipeCount` per organizer) |
 | Recipe detail | `GET /api/recipes/{slug}` (404 if unknown; also takes the recipe's id, which survives a rename); `recipeInstructions`, `notes` for the recipe page |
 | Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` (proxied by the app at `/api/recipe-images/{id}`, signed-in users only) |
 | Find list by name | `GET /api/households/shopping/lists?queryFilter=name = "..."` |
@@ -60,6 +62,41 @@ until every place names the same version (`mealie-version.test.ts`).
   optional expected unit (`12`, `12,5`, `7 g`, `250 kcal`). Blanks, ranges
   (`10-12`) and other units count as **missing**, and the recipe is flagged
   `partial` / `missing`; we never estimate.
+
+## Tags, categories and total time
+
+The Discover page (`/recipes`) filters on Mealie's own tags and categories,
+so they stay editable in Mealie. The agreed set is `RECIPE_TAGS` /
+`RECIPE_CATEGORIES` in `src/server/domain/taxonomy.ts`; imports and the review
+page only ever assign those.
+
+- **Writing by name.** `PATCH` takes `tags` / `recipeCategory` as
+  `[{ name }]`: Mealie finds the organizer by name (trimmed,
+  case-insensitive) or creates it, and slugifies the name ("Meal prep" →
+  `meal-prep`). An entry with an `id` of this group keeps that very
+  organizer. The planner sends agreed ones by name and keeps others by id.
+- **Filtering by slug.** `tags` and `categories` on `GET /api/recipes` take
+  ids or slugs. `requireAllTags=true` makes tags AND; categories stay OR
+  (`requireAllCategories=false`), since a recipe mostly has one. Picking
+  *vegetarian* also asks for *vegan*. **A filter whose slugs Mealie doesn't
+  know is dropped, not empty**, so the page only passes slugs from
+  `/api/organizers/…`.
+- **Total time is `totalTimeSeconds`** (integer). The text `totalTime` is
+  no longer filled on import (an ISO `PT25M` ends up as 1500 seconds and a
+  null text), and `PATCH`ing the text doesn't update the seconds. So the
+  planner reads and writes seconds only, shown as whole minutes.
+- **"Quick"** is `queryFilter=totalTimeSeconds > 0 AND totalTimeSeconds <= 1800`,
+  in Mealie. Recipes without a time aren't quick.
+- **Imports** are tagged in our code, not with Mealie's `includeTags` /
+  `includeCategories` (those copy whatever keywords the page uses):
+  keyword rules over the name and ingredient lines plus protein per serving
+  (`classifyRecipe`), applied while marking the import pending, and only to
+  a recipe with no tags or categories yet. The review page shows them as
+  toggles, keeps any outside the agreed list, and asks for a total time when
+  the source gave none.
+- **Older recipes** need tags, categories and missing total times added by
+  hand (in Mealie). Create the agreed tags and categories first, with the
+  names above, so nothing near-duplicate gets made.
 
 ## Importing recipes
 
@@ -161,8 +198,15 @@ checked and a recipe's ingredients, servings and nutrition are edited.
 ## The recipe page
 
 `/week/<monday>/meals/<meal id>` shows a planned meal's recipe to everyone
-signed in, so cooking needs no Mealie account.
+signed in, so cooking needs no Mealie account. `/recipes/<slug>` shows any
+recipe the same way (the components are in `src/components/recipe/`), with
+"cooking for" starting at the recipe's servings and an "Add to meal plan"
+dialog that calls the week's `addMealAction`. Its slot starts where the tags
+make it obvious (exactly one of breakfast, lunch, dinner, snack).
 
+- **Tags, categories and total time** are shown under the title and cached
+  with the rest; rows cached before they were kept are refetched on the
+  recipe page's first visit.
 - **Fields:** besides servings, nutrition and ingredients it shows
   `recipeInstructions` (`title` is an optional section heading above the step,
   `text` the step; `summary` is not used) and `notes` (`title`, `text`).

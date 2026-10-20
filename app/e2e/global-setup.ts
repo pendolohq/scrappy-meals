@@ -164,12 +164,40 @@ export default async function globalSetup() {
     extras: { scrappyReview: "pending", scrappyNutrition: "estimated" },
   });
 
+  // A tagged, quick recipe for the Discover page. Its own tag keeps it apart
+  // from whatever else a reused Mealie holds; Breakfast picks its slot.
+  const discover = {
+    name: `E2E Discover Oats ${run}`,
+    tag: { name: `E2E Discover ${run}`, slug: `e2e-discover-${run}` },
+  };
+  const discoverSlug: string = await api("POST", "/api/recipes", {
+    name: discover.name,
+  });
+  await api("PATCH", `/api/recipes/${discoverSlug}`, {
+    recipeServings: 1,
+    totalTimeSeconds: 10 * 60,
+    tags: [{ name: discover.tag.name }, { name: "Breakfast" }],
+    recipeCategory: [{ name: "Vegan" }],
+    recipeIngredient: [{ quantity: 0, note: "80 g oats" }],
+  });
+  // Same tag, vegetarian and slow: what the other filters leave out.
+  const slowName = `E2E Discover Pancakes ${run}`;
+  const slowSlug: string = await api("POST", "/api/recipes", {
+    name: slowName,
+  });
+  await api("PATCH", `/api/recipes/${slowSlug}`, {
+    totalTimeSeconds: 45 * 60,
+    tags: [{ name: discover.tag.name }],
+    recipeCategory: [{ name: "Vegetarian" }],
+  });
+
   await writeFile(
     STATE_FILE,
     JSON.stringify({
       recipe: { name, slug },
       imported: { ...imported, slug: importedSlug },
       reel: { ...reel, slug: reelSlug },
+      discover: { ...discover, slug: discoverSlug, slowName },
       food: food.name,
       extra: `coffee ${run}`,
     })

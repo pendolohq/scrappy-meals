@@ -1,5 +1,11 @@
 import "server-only";
 
+import {
+  categoryFilter,
+  type Organizer,
+  QUICK_MAX_MINUTES,
+} from "../domain/taxonomy";
+
 import { type MealieClient, mealie, unwrap } from "./client";
 import { type ImportState, readImportState } from "./import-state";
 import { normaliseNutrition, type RecipeNutrition } from "./nutrition";
@@ -18,6 +24,8 @@ export type RecipeListItem = {
   /** Mealie media path, e.g. /api/media/recipes/<id>/images/min-original.webp */
   imagePath: string | null;
   servings: number | null;
+  /** Mealie's total time, rounded to minutes; null when not set. */
+  totalMinutes: number | null;
 };
 
 export type Ingredient = {
@@ -59,6 +67,8 @@ export type Recipe = RecipeListItem & {
   /** The page or post the recipe was imported from (Mealie's orgURL). */
   sourceUrl: string | null;
   importState: ImportState;
+  tags: Organizer[];
+  categories: Organizer[];
 };
 
 export type RecipePage = { items: RecipeListItem[] };
@@ -86,6 +96,87 @@ export async function searchRecipes(
   );
   return {
     items: page.items.map(toListItem),
+  };
+}
+
+export type DiscoverFilters = {
+  /** Tag slugs; a recipe needs all of them. */
+  tags: string[];
+  /** Category slugs; a recipe needs any of them. */
+  categories: string[];
+  /** Total time of 30 minutes or less. */
+  quick: boolean;
+};
+
+export const DISCOVER_PAGE_SIZE = 48;
+
+/**
+ * Recipes matching the filters, by name. Every filter runs in Mealie: tags
+ * and categories by slug, "quick" as a filter on the total time in seconds.
+ * Callers pass only slugs that exist: Mealie drops a filter whose slugs it
+ * doesn't know rather than matching nothing.
+ */
+export async function discoverRecipes(
+  filters: DiscoverFilters,
+  opts: { page?: number; client?: MealieClient } = {}
+): Promise<{ items: RecipeListItem[]; total: number; totalPages: number }> {
+  const client = opts.client ?? mealie();
+  const categories = categoryFilter(filters.categories);
+  const result = unwrap(
+    await client.GET("/api/recipes", {
+      params: {
+        query: {
+          tags: filters.tags.length > 0 ? filters.tags : undefined,
+          requireAllTags: true,
+          categories: categories.length > 0 ? categories : undefined,
+          requireAllCategories: false,
+          queryFilter: filters.quick
+            ? `totalTimeSeconds > 0 AND totalTimeSeconds <= ${QUICK_MAX_MINUTES * 60}`
+            : undefined,
+          orderBy: "name",
+          orderDirection: "asc",
+          page: opts.page ?? 1,
+          perPage: DISCOVER_PAGE_SIZE,
+        },
+      },
+    })
+  );
+  return {
+    items: result.items.map(toListItem),
+    total: result.total ?? result.items.length,
+    totalPages: result.total_pages ?? 1,
+  };
+}
+
+export type OrganizerCount = Organizer & { recipeCount: number };
+
+/** Every tag and category in Mealie, with how many recipes carry each. */
+export async function listOrganizers(
+  opts: { client?: MealieClient } = {}
+): Promise<{ tags: OrganizerCount[]; categories: OrganizerCount[] }> {
+  const client = opts.client ?? mealie();
+  // perPage -1 is Mealie's "everything": a household has a few dozen at most.
+  const query = {
+    perPage: -1,
+    orderBy: "name",
+    orderDirection: "asc" as const,
+  };
+  const [tags, categories] = await Promise.all([
+    client.GET("/api/organizers/tags", { params: { query } }),
+    client.GET("/api/organizers/categories", { params: { query } }),
+  ]);
+  const counted = (o: {
+    name: string;
+    slug: string;
+    recipeCount?: number;
+  }) => ({
+    name: o.name,
+    slug: o.slug,
+    recipeCount: o.recipeCount ?? 0,
+  });
+  return {
+    tags: unwrap(tags).items.map(counted),
+    categories: unwrap(categories).items.map(counted),
   };
 }
 
@@ -117,8 +208,15 @@ export function toRecipe(r: MealieRecipe): Recipe {
     notes: (r.notes ?? []).flatMap(toNote),
     sourceUrl: r.orgURL || null,
     importState: readImportState(r.extras),
+    tags: (r.tags ?? []).map(toOrganizer),
+    categories: (r.recipeCategory ?? []).map(toOrganizer),
   };
 }
+
+const toOrganizer = (o: { name: string; slug: string }): Organizer => ({
+  name: o.name,
+  slug: o.slug,
+});
 
 function toListItem(r: MealieSummary | MealieRecipe): RecipeListItem {
   return {
@@ -132,6 +230,11 @@ function toListItem(r: MealieSummary | MealieRecipe): RecipeListItem {
     // recipeYield is free text ("1 loaf"), so only recipeServings counts as servings.
     servings:
       r.recipeServings && r.recipeServings > 0 ? r.recipeServings : null,
+    // Mealie keeps times as seconds; the older text field (`totalTime`) is
+    // no longer filled in on import, and can't be filtered on.
+    totalMinutes: r.totalTimeSeconds
+      ? Math.max(1, Math.round(r.totalTimeSeconds / 60))
+      : null,
   };
 }
 

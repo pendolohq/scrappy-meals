@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpen,
   BookPlus,
   CalendarDays,
   ChartNoAxesColumn,
@@ -60,10 +61,16 @@ const useItems = (currentWeek: string): Item[] => {
       active: sub === "/adherence",
     },
     {
+      label: "Recipes",
+      href: "/recipes",
+      icon: BookOpen,
+      active: pathname.startsWith("/recipes") && pathname !== "/recipes/new",
+    },
+    {
       label: "Add recipe",
       href: "/recipes/new",
       icon: BookPlus,
-      active: pathname.startsWith("/recipes"),
+      active: pathname === "/recipes/new",
     },
     {
       label: "Settings",
@@ -99,7 +106,7 @@ export const SideNav = ({ currentWeek }: { currentWeek: string }) => (
   </nav>
 );
 
-/** What phones reach from the top bar instead, to keep four tabs. */
+/** What phones reach from the top bar instead, to keep five tabs. */
 const IN_TOP_BAR = new Set(["Add recipe", "Settings"]);
 
 /** Phones: a tab bar along the bottom, above the home indicator. */
@@ -108,7 +115,7 @@ export const TabBar = ({ currentWeek }: { currentWeek: string }) => (
     aria-label="Main"
     className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
   >
-    <ul className="mx-auto grid max-w-lg grid-cols-4">
+    <ul className="mx-auto grid max-w-lg grid-cols-5">
       {useItems(currentWeek)
         .filter((i) => !IN_TOP_BAR.has(i.label))
         .map(({ label, href, icon: Icon, active }) => (

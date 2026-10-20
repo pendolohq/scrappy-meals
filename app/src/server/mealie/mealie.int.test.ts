@@ -21,7 +21,12 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./import";
-import { getRecipe, searchRecipes } from "./recipes";
+import {
+  discoverRecipes,
+  getRecipe,
+  listOrganizers,
+  searchRecipes,
+} from "./recipes";
 import {
   addShoppingItems,
   createShoppingList,
@@ -288,6 +293,85 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       { client }
     );
     expect(await getShoppingListItems(listId, { client })).toEqual([]);
+  });
+
+  describe("discovering", () => {
+    const tag = { name: `IT Dinner ${run}`, slug: `it-dinner-${run}` };
+    const category = { name: `IT Veg ${run}`, slug: `it-veg-${run}` };
+
+    beforeAll(async () => {
+      // By name only, as imports and the review page send them: Mealie
+      // finds or creates the organizer.
+      await patchRecipe(
+        ids.fullSlug,
+        {
+          tags: [{ name: tag.name }],
+          recipeCategory: [{ name: category.name }],
+          totalTimeSeconds: 20 * 60,
+        },
+        { client }
+      );
+      await patchRecipe(
+        ids.bareSlug,
+        { tags: [{ name: tag.name }], totalTimeSeconds: 31 * 60 },
+        { client }
+      );
+    });
+
+    afterAll(async () => {
+      const query = { perPage: -1 };
+      const tags = unwrap(
+        await admin.GET("/api/organizers/tags", { params: { query } })
+      ).items;
+      const categories = unwrap(
+        await admin.GET("/api/organizers/categories", { params: { query } })
+      ).items;
+      const idsOf = (
+        items: { id?: string | null; slug: string }[],
+        slug: string
+      ) => items.flatMap((o) => (o.slug === slug && o.id ? [o.id] : []));
+      for (const item_id of idsOf(tags, tag.slug)) {
+        await admin.DELETE("/api/organizers/tags/{item_id}", {
+          params: { path: { item_id } },
+        });
+      }
+      for (const item_id of idsOf(categories, category.slug)) {
+        await admin.DELETE("/api/organizers/categories/{item_id}", {
+          params: { path: { item_id } },
+        });
+      }
+    });
+
+    it("reads tags, categories and total time on a recipe", async () => {
+      const recipe = await getRecipe(ids.fullSlug, { client });
+      expect(recipe).toMatchObject({
+        tags: [tag],
+        categories: [category],
+        totalMinutes: 20,
+      });
+    });
+
+    it("lists organizers with their recipe counts", async () => {
+      const { tags, categories } = await listOrganizers({ client });
+      expect(tags).toContainEqual({ ...tag, recipeCount: 2 });
+      expect(categories).toContainEqual({ ...category, recipeCount: 1 });
+    });
+
+    it("filters by tag, category and quick", async () => {
+      const slugs = async (filters: Parameters<typeof discoverRecipes>[0]) =>
+        (await discoverRecipes(filters, { client })).items.map((r) => r.slug);
+      const none = { tags: [], categories: [], quick: false };
+
+      expect((await slugs({ ...none, tags: [tag.slug] })).toSorted()).toEqual(
+        [ids.fullSlug, ids.bareSlug].toSorted()
+      );
+      expect(await slugs({ ...none, tags: [tag.slug], quick: true })).toEqual([
+        ids.fullSlug,
+      ]);
+      expect(
+        await slugs({ ...none, tags: [tag.slug], categories: [category.slug] })
+      ).toEqual([ids.fullSlug]);
+    });
   });
 
   describe("importing", () => {

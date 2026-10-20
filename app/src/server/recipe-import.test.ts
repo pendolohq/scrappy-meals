@@ -17,7 +17,9 @@ import { importRecipe, importSocialRecipe } from "./recipe-import";
  *                           i.e. the raw Mealie recipe fields the import needs.
  *                           "Has nutrition" = at least one macro field (calories,
  *                           protein, carbs, fat, fibre) that is a non-blank string.
- *   patch(slug, fields)  -> void; called once with { extras } and nothing else
+ *   patch(slug, fields)  -> void; called once with { extras }, plus tags and
+ *                           categories from the agreed list for a recipe with
+ *                           neither yet
  *   limiter              -> { hit(key: string): boolean }; false = over the limit.
  *                           Called with the userId, before find/importFromUrl.
  *
@@ -335,6 +337,51 @@ function makeSocialDeps(overrides: Partial<SocialDeps> = {}) {
   };
   return { deps, find, aiSettings, importFromAi, getRecipe, patch, hit };
 }
+
+describe("tagging an import", () => {
+  it("assigns tags and categories from the agreed list", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue({
+      name: "Salmon tacos",
+      nutrition: { proteinContent: "34" },
+      extras: {},
+      recipeIngredient: [
+        { originalText: "2 salmon fillets", note: "" },
+        { note: "8 tortillas" },
+      ],
+      tags: [],
+      recipeCategory: [],
+    });
+
+    await importRecipe(URL_, "u1", deps);
+    expect(patch).toHaveBeenCalledWith("soup", {
+      extras: {
+        scrappyReview: "pending",
+        scrappyNutrition: "source",
+      },
+      tags: [
+        { name: "Dinner", slug: "dinner" },
+        { name: "High protein", slug: "high-protein" },
+      ],
+      recipeCategory: [{ name: "Fish", slug: "fish" }],
+    });
+  });
+
+  it("keeps tags someone already set", async () => {
+    const { deps, getRecipe, patch } = makeDeps();
+    getRecipe.mockResolvedValue({
+      name: "Salmon tacos",
+      extras: {},
+      recipeIngredient: [{ note: "2 salmon fillets" }],
+      tags: [{ name: "Lunch", slug: "lunch" }],
+    });
+
+    await importRecipe(URL_, "u1", deps);
+    expect(patch).toHaveBeenCalledWith("soup", {
+      extras: { scrappyReview: "pending" },
+    });
+  });
+});
 
 describe("importSocialRecipe", () => {
   it("links to a post already imported without calling the AI", async () => {
