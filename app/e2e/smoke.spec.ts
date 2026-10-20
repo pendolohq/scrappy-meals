@@ -98,9 +98,8 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await page.getByRole("button", { name: "Send to Mealie" }).click();
   await expect(page.getByRole("status")).toContainText("Added 1 item");
 
-  // Shop from the planner: tick the item off and add a line of our own.
-  await page.getByRole("link", { name: "Start shopping" }).click();
-  await expect(page).toHaveURL(/\/shop$/);
+  // The same page turns into the checklist: tick the item off and add a line of our own.
+  await expect(page).toHaveURL(/\/shopping$/);
   await page
     .getByTestId("shop-item")
     .filter({ hasText: food })
@@ -156,6 +155,11 @@ test("the other person sees the plan and logs only their own meals", async ({
     .filter({ hasText: recipe.name });
   await expect(meal.getByTestId("adherence-badge")).toHaveText("✓ Stuck to it");
   await expect(meal.getByRole("group", { name: /How did/ })).toHaveCount(1); // Sam's own buttons only
+
+  // One shopping page only: the header has no separate "Shop" link.
+  await expect(
+    page.getByRole("link", { name: "Shop", exact: true })
+  ).toHaveCount(0);
 });
 
 test("the other person sees the ticks, and ticks saved offline sync later", async ({
@@ -164,8 +168,21 @@ test("the other person sees the ticks, and ticks saved offline sync later", asyn
 }) => {
   const { extra } = state();
   await signIn(page, USERS.sam);
-  await page.goto(`/week/${weekStartOf(today())}/shop`);
+  const week = weekStartOf(today());
+
+  // The old /shop URL may still be cached by an installed app.
+  await page.goto(`/week/${week}/shop`);
+  await expect(page).toHaveURL(new RegExp(`/week/${week}/shopping$`));
   await expect(page.getByText("Done (1)")).toBeVisible();
+
+  // The plan's preview stays reachable, folded away under the checklist.
+  const needs = page.locator("details", { hasText: "What the plan needs" });
+  await expect(needs).not.toHaveAttribute("open", "");
+  await needs.getByText("What the plan needs").click();
+  await expect(needs.getByTestId("lines")).toContainText(state().food);
+  await expect(needs.getByTestId("qty")).toHaveText("150 g");
+  await needs.getByText("What the plan needs").click();
+
   const coffee = page.getByTestId("shop-item").filter({ hasText: extra });
   await expect(coffee).toBeVisible();
 

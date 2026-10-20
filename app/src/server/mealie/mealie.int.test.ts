@@ -185,21 +185,21 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
 
   it("creates, fills, finds and empties a shopping list", async () => {
     const name = `IT Week ${run}`;
-    const list = await createShoppingList(name, { client });
+    const listId = await createShoppingList(name, { client });
     cleanup.push(() =>
       admin.DELETE("/api/households/shopping/lists/{item_id}", {
-        params: { path: { item_id: list.id } },
+        params: { path: { item_id: listId } },
       })
     );
 
-    expect(await findShoppingListByName(name, { client })).toEqual(list);
+    expect(await findShoppingListByName(name, { client })).toEqual(listId);
     expect(
       await findShoppingListByName(`IT Missing ${run}`, { client })
     ).toBeNull();
 
     const recipe = (await getRecipe(ids.fullSlug, { client }))!;
     const first = await addShoppingItems(
-      list.id,
+      listId,
       [
         {
           quantity: 450,
@@ -219,7 +219,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
 
     // Same food + unit again: Mealie merges into the existing line.
     const second = await addShoppingItems(
-      list.id,
+      listId,
       [{ quantity: 50, foodId: ids.food, unitId: ids.unit }],
       { client }
     );
@@ -228,13 +228,13 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     )!;
     expect(merged.quantity).toBe(500);
 
-    const items = await getShoppingListItems(list.id, { client });
+    const items = await getShoppingListItems(listId, { client });
     expect(items).toHaveLength(2);
 
     await deleteShoppingItems(
       items.map((i) => i.id),
       { client }
     );
-    expect(await getShoppingListItems(list.id, { client })).toEqual([]);
+    expect(await getShoppingListItems(listId, { client })).toEqual([]);
   });
 });

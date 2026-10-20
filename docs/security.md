@@ -46,7 +46,7 @@ arguments, whatever the UI allows. So every action is built with `userAction`
 4. turns errors into `{ error }`: a `UserFacingError` (e.g. `PlanError`) keeps
    its message, anything else is logged and replaced by a generic message.
    Being signed out and a `RetryableError` (Mealie down) add `retry: true`, so
-   a caller with a queue (the shop page) keeps the change and tries again.
+   a caller with a queue (the shopping page) keeps the change and tries again.
 
 Per-person data is keyed by `user.id` from the session, never by an id from
 the input: fasting, adherence and settings work this way. Plan edits (meals,

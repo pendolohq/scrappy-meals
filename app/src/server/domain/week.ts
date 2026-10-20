@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** Calendar helpers on plain `YYYY-MM-DD` strings (no time zones involved). Weeks start on Monday. */
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,3 +45,8 @@ export function today(now: Date = new Date()): string {
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/** A week's Monday as it arrives from the browser, for server action input. */
+export const weekStartSchema = z
+  .string()
+  .refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week");

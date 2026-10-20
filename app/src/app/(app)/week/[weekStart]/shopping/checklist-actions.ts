@@ -6,14 +6,11 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { isDbUnreachable } from "@/server/db/errors";
-import { isIsoDate, weekStartOf } from "@/server/domain/week";
+import { weekStartSchema } from "@/server/domain/week";
 import { RetryableError, UserFacingError } from "@/server/errors";
 import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
-import { addShopItem, checkShopItem, removeShopItem } from "@/server/shopping";
+import { addShopItem, checkShopItem, removeShopItem } from "@/server/shop";
 
-const weekStart = z
-  .string()
-  .refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week");
 const itemId = z.uuid();
 
 /**
@@ -23,7 +20,7 @@ const itemId = z.uuid();
 async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
   try {
     const result = await work();
-    revalidatePath(`/week/${week}/shop`);
+    revalidatePath(`/week/${week}/shopping`);
     return result;
   } catch (err) {
     // Errors that go away on their own keep the device's queue; dropping the
@@ -55,7 +52,7 @@ async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
 }
 
 export const checkShopItemAction = userAction(
-  z.object({ weekStart, itemId, checked: z.boolean() }),
+  z.object({ weekStart: weekStartSchema, itemId, checked: z.boolean() }),
   async (data) => {
     await viaMealie(data.weekStart, () =>
       checkShopItem(getDb(), data.weekStart, data.itemId, data.checked)
@@ -65,7 +62,10 @@ export const checkShopItemAction = userAction(
 );
 
 export const addShopItemAction = userAction(
-  z.object({ weekStart, text: z.string().trim().min(1).max(200) }),
+  z.object({
+    weekStart: weekStartSchema,
+    text: z.string().trim().min(1).max(200),
+  }),
   async (data) => {
     const item = await viaMealie(data.weekStart, () =>
       addShopItem(getDb(), data.weekStart, data.text)
@@ -75,7 +75,7 @@ export const addShopItemAction = userAction(
 );
 
 export const removeShopItemAction = userAction(
-  z.object({ weekStart, itemId }),
+  z.object({ weekStart: weekStartSchema, itemId }),
   async (data) => {
     await viaMealie(data.weekStart, () =>
       removeShopItem(getDb(), data.weekStart, data.itemId)

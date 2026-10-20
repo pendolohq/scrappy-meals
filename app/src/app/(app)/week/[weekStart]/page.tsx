@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { DayCard } from "@/components/plan/day-card";
-import { formatRange } from "@/lib/format";
+import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
-import { addDays, isIsoDate, today, weekStartOf } from "@/server/domain/week";
+import { today, weekStartOf } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
+
+import { canonicalWeek } from "../week-route";
 
 export const dynamic = "force-dynamic";
 
@@ -17,66 +18,33 @@ export default async function WeekPage({
 }: {
   params: Promise<{ weekStart: string }>;
 }) {
-  const { weekStart } = await params;
-  if (!isIsoDate(weekStart)) {
-    redirect("/week");
-  }
-  if (weekStartOf(weekStart) !== weekStart) {
-    redirect(`/week/${weekStartOf(weekStart)}`);
-  }
-
   const user = await requireUser();
+  const weekStart = canonicalWeek((await params).weekStart);
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
   const now = today();
-  const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";
 
   return (
     <div className="space-y-4 pb-8">
       <AutoRefresh />
-      <div className="flex items-center justify-between gap-2">
+      <WeekHeader weekStart={weekStart}>
         <Link
-          href={`/week/${addDays(weekStart, -7)}`}
-          className={nav}
-          aria-label="Previous week"
+          href={`/week/${weekStart}/shopping`}
+          className="mr-3 text-xs text-accent"
         >
-          ←
+          Shopping
         </Link>
-        <div className="text-center">
-          <h1 className="font-semibold">
-            {formatRange(weekStart, addDays(weekStart, 6))}
-          </h1>
-          <Link
-            href={`/week/${weekStart}/shopping`}
-            className="mr-3 text-xs text-accent"
-          >
-            Shopping
-          </Link>
-          <Link
-            href={`/week/${weekStart}/shop`}
-            className="mr-3 text-xs text-accent"
-          >
-            Shop
-          </Link>
-          <Link
-            href={`/week/${weekStart}/adherence`}
-            className="mr-3 text-xs text-accent"
-          >
-            Adherence
-          </Link>
-          {weekStartOf(now) !== weekStart && (
-            <Link href="/week" className="text-xs text-accent">
-              Back to this week
-            </Link>
-          )}
-        </div>
         <Link
-          href={`/week/${addDays(weekStart, 7)}`}
-          className={nav}
-          aria-label="Next week"
+          href={`/week/${weekStart}/adherence`}
+          className="mr-3 text-xs text-accent"
         >
-          →
+          Adherence
         </Link>
-      </div>
+        {weekStartOf(now) !== weekStart && (
+          <Link href="/week" className="text-xs text-accent">
+            Back to this week
+          </Link>
+        )}
+      </WeekHeader>
 
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>

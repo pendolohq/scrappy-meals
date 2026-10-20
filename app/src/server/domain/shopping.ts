@@ -33,7 +33,7 @@ export type FreeTextLine = {
   times: number;
 };
 
-export type ShoppingList = {
+export type WeekIngredients = {
   lines: ShoppingLine[];
   /** Ingredients Mealie hasn't parsed into a food: passed through as written, never merged. */
   freeText: FreeTextLine[];
@@ -51,7 +51,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
  * servings count; amounts are then summed per food and unit. There is no unit
  * conversion: "200 g flour" and "1 cup flour" stay separate lines.
  */
-export function buildShoppingList(meals: MealForShopping[]): ShoppingList {
+export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   const lines = new Map<string, ShoppingLine>();
   const freeText = new Map<string, FreeTextLine>();
   const unscaled = new Set<string>();

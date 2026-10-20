@@ -89,8 +89,10 @@ then run `pnpm typecheck` and `pnpm test:integration`.
 
 ## Shopping from the planner
 
-`/week/<monday>/shop` is a checklist over the week's Mealie list, so nobody
-needs Mealie's own UI in the shop. Mealie stays the only copy of the list.
+`/week/<monday>/shopping` previews what the plan needs until the week is sent;
+after that it is a checklist over the week's Mealie list (the preview folds
+away under it), so nobody needs Mealie's own UI in the shop. Mealie stays the
+only copy of the list. The old `/shop` URL redirects there.
 
 - **Reading:** the page reads the list's items straight from Mealie on every
   load (and every 15 s while open), ticks and hand-added lines included.

@@ -262,7 +262,7 @@ Today:
 
 They become one page.
 
-- [ ] **Task 19: Merge Shopping and Shop**
+- [x] **Task 19: Merge Shopping and Shop**
   **Complexity:** L
   **Depends on:** Tasks 9, 16, 17
   **Do:** one route, `/week/X/shopping`.
@@ -277,7 +277,7 @@ They become one page.
   - Update the e2e and `docs/mealie-api.md`.
   **Done when:** e2e covers preview → send → tick; `next-dev-loop` on a phone viewport.
 
-- [ ] **Task 20: Shared week header and week param**
+- [x] **Task 20: Shared week header and week param**
   **Complexity:** S
   **Depends on:** Task 19
   **Do:** a `<WeekHeader weekStart title back>` server component for the prev/next arrows, title

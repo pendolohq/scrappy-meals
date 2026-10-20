@@ -11,8 +11,6 @@ type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 // time rather than give up halfway with the old items already deleted.
 const BULK_TIMEOUT_MS = 30_000;
 
-export type ShoppingList = { id: string; name: string };
-
 export type ShoppingItem = {
   id: string;
   listId: string;
@@ -40,7 +38,7 @@ export type NewShoppingItem = {
 export async function findShoppingListByName(
   name: string,
   opts: { client?: MealieClient } = {}
-): Promise<ShoppingList | null> {
+): Promise<string | null> {
   const client = opts.client ?? mealie();
   const page = unwrap(
     await client.GET("/api/households/shopping/lists", {
@@ -53,18 +51,18 @@ export async function findShoppingListByName(
     })
   );
   const list = page.items[0];
-  return list ? { id: list.id, name: list.name ?? name } : null;
+  return list?.id ?? null;
 }
 
 export async function createShoppingList(
   name: string,
   opts: { client?: MealieClient } = {}
-): Promise<ShoppingList> {
+): Promise<string> {
   const client = opts.client ?? mealie();
   const list = unwrap(
     await client.POST("/api/households/shopping/lists", { body: { name } })
   );
-  return { id: list.id, name: list.name ?? name };
+  return list.id;
 }
 
 export async function getShoppingListItems(

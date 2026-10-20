@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import Link from "next/link";
 
 import { pushShoppingAction, type PushState } from "./actions";
 
@@ -29,7 +28,7 @@ export const PushButton = ({
         {pending
           ? "Sending to Mealie…"
           : pushedBefore
-            ? "Update list in Mealie"
+            ? "Update from plan"
             : "Send to Mealie"}
       </button>
       {pushedBefore && !state.ok && (
@@ -47,13 +46,7 @@ export const PushButton = ({
         <output className="block text-sm">
           Added {state.ok.added} item{state.ok.added === 1 ? "" : "s"} to “
           {state.ok.listName}”
-          {state.ok.replaced ? `, replacing ${state.ok.replaced}` : ""}.{" "}
-          <Link
-            href={`/week/${weekStart}/shop`}
-            className="text-accent underline"
-          >
-            Start shopping
-          </Link>
+          {state.ok.replaced ? `, replacing ${state.ok.replaced}` : ""}.
         </output>
       )}
       {state.ok && state.ok.merged > 0 && (

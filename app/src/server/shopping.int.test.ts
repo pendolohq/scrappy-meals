@@ -18,11 +18,13 @@ import { addMeal, setPortion } from "./plan";
 import {
   addShopItem,
   checkShopItem,
-  pushShoppingList,
   removeShopItem,
+  weekShopList,
+} from "./shop";
+import {
+  pushShoppingList,
   shoppingListName,
   weekShoppingList,
-  weekShopList,
 } from "./shopping";
 import { createUser } from "./users";
 
@@ -237,21 +239,21 @@ describe.skipIf(!baseUrl || !testDbUrl)(
         { fetch: fromMealie }
       );
       // Someone already put lentils on the week's list in Mealie.
-      const list = await createShoppingList(shoppingListName(WEEK), opts);
+      const listId = await createShoppingList(shoppingListName(WEEK), opts);
       cleanup.push(() =>
         admin.DELETE("/api/households/shopping/lists/{item_id}", {
-          params: { path: { item_id: list.id } },
+          params: { path: { item_id: listId } },
         })
       );
       await addShoppingItems(
-        list.id,
+        listId,
         [{ quantity: 100, foodId: ids.lentils, unitId: ids.gram }],
         opts
       );
 
       const pushed = await pushShoppingList(db, WEEK, opts);
-      expect(pushed).toMatchObject({ listId: list.id, added: 1, merged: 1 });
-      const items = await getShoppingListItems(list.id, opts);
+      expect(pushed).toMatchObject({ listId, added: 1, merged: 1 });
+      const items = await getShoppingListItems(listId, opts);
       expect(items.find((i) => i.foodId === ids.lentils)?.quantity).toBe(200);
     });
 
