@@ -17,7 +17,7 @@ import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
 import type { Member, PlannedMeal } from "@/server/plan";
 
-import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
+import { AdherenceButtons, AdherenceMark } from "./adherence-cell";
 import { RecipeFlags } from "./recipe-flags";
 import { Stepper } from "./stepper";
 
@@ -58,6 +58,10 @@ export const MealRow = ({
     });
 
   const name = meal.recipe?.name ?? meal.slug;
+  const ordered = [
+    ...members.filter((m) => m.id === currentUserId),
+    ...members.filter((m) => m.id !== currentUserId),
+  ];
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
 
   return (
@@ -92,34 +96,38 @@ export const MealRow = ({
         </IconButton>
       </div>
 
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))`,
-        }}
-      >
-        {members.map((m) => (
-          <div key={m.id} className="min-w-0 space-y-2">
-            {/* Portions are nearly always 1×: shown as text, changed from the options. */}
-            <p className="text-center text-[0.6875rem] font-medium tracking-wider text-muted uppercase tabular-nums">
-              {members.length > 1 && `${m.name} · `}
-              <span data-testid="portion-text">
+      {/* The viewer's log and portion; everyone else's portion stays in one
+          short line, so a shared meal still reads as shared. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {canLog && (
+          <div className="w-52 max-w-full">
+            <AdherenceButtons
+              mealId={meal.id}
+              mealName={name}
+              log={meal.adherence[currentUserId]}
+            />
+          </div>
+        )}
+        <p className="text-xs text-muted tabular-nums" data-testid="portions">
+          {ordered.map((m, i) => (
+            <span key={m.id} className="whitespace-nowrap">
+              {i > 0 && " · "}
+              {members.length > 1 &&
+                `${m.id === currentUserId ? "You" : m.name} `}
+              <span
+                data-testid="portion-text"
+                className={cx(
+                  m.id === currentUserId && "font-semibold text-foreground"
+                )}
+              >
                 {formatPortion(portions[m.id] ?? 0)}×
               </span>
-            </p>
-            {m.id === currentUserId ? (
-              canLog && (
-                <AdherenceButtons
-                  mealId={meal.id}
-                  mealName={name}
-                  log={meal.adherence[m.id]}
-                />
-              )
-            ) : (
-              <AdherenceBadge log={meal.adherence[m.id]} />
-            )}
-          </div>
-        ))}
+              {m.id !== currentUserId && (
+                <AdherenceMark log={meal.adherence[m.id]} />
+              )}
+            </span>
+          ))}
+        </p>
       </div>
 
       {open && (

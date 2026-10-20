@@ -3,20 +3,12 @@
 import { useOptimistic, useState, useTransition } from "react";
 
 import { setAdherenceAction } from "@/app/(app)/week/actions";
-import { pillClass, type PillTone } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import {
   ADHERENCE_STATUSES,
   type AdherenceStatus,
   STATUS_LABEL,
 } from "@/server/domain/adherence";
-
-const TONE: Record<AdherenceStatus, PillTone> = {
-  stuck: "highlight",
-  partial: "neutral",
-  swapped: "neutral",
-  skipped: "danger",
-};
 
 type Log = { status: AdherenceStatus; note: string | null } | undefined;
 
@@ -115,21 +107,17 @@ export const AdherenceButtons = ({
   );
 };
 
-/** Someone else's log, read-only. */
-export const AdherenceBadge = ({ log }: { log: Log }) => {
+/** Someone else's log, read-only, as just its icon beside their portion. */
+export const AdherenceMark = ({ log }: { log: Log }) => {
   if (!log) {
     return null;
   }
   const { icon, label } = STATUS_LABEL[log.status];
+  const text = log.note ? `${label}: ${log.note}` : label;
   return (
-    <p className="text-center">
-      <span
-        className={cx(pillClass(TONE[log.status]), "max-w-full truncate")}
-        data-testid="adherence-badge"
-      >
-        {icon} {label}
-        {log.note ? `: ${log.note}` : ""}
-      </span>
-    </p>
+    <span className="ml-1" title={text} data-testid="adherence-mark">
+      <span aria-hidden>{icon}</span>
+      <span className="sr-only">{text}</span>
+    </span>
   );
 };
