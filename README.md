@@ -31,6 +31,7 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 | Path | What |
 |---|---|
 | `docker-compose.yml` | Postgres 18, Mealie, the app, Caddy, plus on-demand `backup` / `restore` services |
+| `docker-compose.dev.yml` | Local development only: Postgres and Mealie on localhost, set up by `scripts/dev-up.sh` |
 | `Caddyfile` | `app.<domain>` → app, `recipes.<domain>` → Mealie, automatic HTTPS |
 | `postgres/init/` | First-boot script: separate role + database for `planner` and `mealie` |
 | `backup/` | Image and script for encrypted nightly backups to S3 |
@@ -96,6 +97,20 @@ Restore with `scripts/restore.sh` using read credentials and the age key;
 see `docs/aws-backup-setup.md` §6.
 
 ## Development
+
+Run it locally against throwaway Postgres and Mealie containers
+(`docker-compose.dev.yml`, published on localhost only):
+
+```sh
+scripts/dev-up.sh     # starts them, writes app/.env.local, migrates, asks for your first login
+cd app && bun run dev # http://localhost:3000
+```
+
+Mealie is at http://localhost:9000 (`changeme@example.com` / `MyPassword`); add
+a few recipes there first. The script is safe to re-run and fetches a new Mealie
+token if the old one stops working. Stop the containers with
+`docker compose -f docker-compose.dev.yml stop`, or wipe them with `down -v`.
+It also creates empty `planner_test` and `planner_e2e` databases for the commands below.
 
 ```sh
 cd app

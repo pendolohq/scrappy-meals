@@ -194,7 +194,7 @@ upgrading across a migration.
 
 **Upgrading Mealie** is a code change, not just a pull: the planner's Mealie
 client is generated from a specific Mealie version. Bump the tag in
-`docker-compose.yml` in the repo, regenerate the client
+`docker-compose.yml` and `docker-compose.dev.yml` in the repo, regenerate the client
 (`docs/mealie-api.md` → Upgrading Mealie), let CI pass, then deploy. The
 health check reports `"versionMatches": false` if they drift.
 
