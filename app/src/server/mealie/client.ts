@@ -102,19 +102,24 @@ export function unwrap<T>(result: {
   throw new MealieError(response.status, url.pathname, error);
 }
 
-let shared: MealieClient | undefined;
+const shared = new Map<number, MealieClient>();
 
-/** Process-wide client configured from MEALIE_URL / MEALIE_API_TOKEN. */
-export function mealie(): MealieClient {
-  if (!shared) {
+/**
+ * Process-wide client configured from MEALIE_URL / MEALIE_API_TOKEN. The few
+ * slow calls (creating a whole week's items) pass a longer timeout.
+ */
+export function mealie(timeoutMs = DEFAULT_TIMEOUT_MS): MealieClient {
+  let client = shared.get(timeoutMs);
+  if (!client) {
     const baseUrl = process.env.MEALIE_URL;
     const token = process.env.MEALIE_API_TOKEN;
     if (!baseUrl || !token) {
       throw new Error("MEALIE_URL and MEALIE_API_TOKEN must be set");
     }
-    shared = createMealieClient({ baseUrl, token });
+    client = createMealieClient({ baseUrl, token, timeoutMs });
+    shared.set(timeoutMs, client);
   }
-  return shared;
+  return client;
 }
 
 /** Compares the running Mealie version with the one our types were generated from. */

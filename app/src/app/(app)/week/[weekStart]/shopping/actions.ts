@@ -15,6 +15,7 @@ export type PushState = {
   ok?: {
     added: number;
     replaced: number;
+    merged: number;
     listName: string;
   };
 };
@@ -41,13 +42,13 @@ export const pushShoppingAction = userFormAction(
       if (isMealieUnavailable(err)) {
         console.error("shopping push failed", err);
         throw new UserFacingError(
-          "Mealie didn't answer. Is it running? Nothing was changed on our side."
+          "Mealie didn't answer. The list may be partly updated: send it again once Mealie is back."
         );
       }
       if (err instanceof MealieError) {
         console.error("Mealie refused the shopping list", err);
         throw new UserFacingError(
-          "Mealie didn't accept the list. Nothing was changed on our side."
+          "Mealie didn't accept the list. It may be partly updated: try sending it again."
         );
       }
       throw err;

@@ -9,6 +9,10 @@ type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 
 const CLIENT_ID = "scrappyClientId";
 
+// Mealie merges and labels every line of a week's list in one request; give it
+// time rather than give up halfway with the old items already deleted.
+const BULK_TIMEOUT_MS = 30_000;
+
 export type ShoppingList = { id: string; name: string };
 
 export type ShoppingItem = {
@@ -94,7 +98,7 @@ export async function addShoppingItems(
   if (items.length === 0) {
     return { created: [], updated: [] };
   }
-  const client = opts.client ?? mealie();
+  const client = opts.client ?? mealie(BULK_TIMEOUT_MS);
   const body: MealieItemCreate[] = items.map((item) => ({
     shoppingListId: listId,
     quantity: item.quantity,
@@ -131,26 +135,32 @@ export async function deleteShoppingItems(
   );
 }
 
+/** One item as Mealie stores it, so it can be written back whole. */
+export type StoredShoppingItem = MealieItemOut;
+
 export async function getShoppingItem(
   itemId: string,
   opts: { client?: MealieClient } = {}
-): Promise<ShoppingItem> {
+): Promise<StoredShoppingItem> {
   const client = opts.client ?? mealie();
-  return toItem(await getItemOut(client, itemId));
+  return unwrap(
+    await client.GET("/api/households/shopping/items/{item_id}", {
+      params: { path: { item_id: itemId } },
+    })
+  );
 }
 
 /**
- * Ticks or unticks one item. Mealie's update replaces the whole item, so the
- * current item is read first and written back with only `checked` changed;
+ * Ticks or unticks one item. Mealie's update replaces the whole item, so it
+ * takes the item as just read and writes it back with only `checked` changed;
  * otherwise quantity, note and recipe references would reset to defaults.
  */
 export async function setShoppingItemChecked(
-  itemId: string,
+  current: StoredShoppingItem,
   checked: boolean,
   opts: { client?: MealieClient } = {}
-): Promise<ShoppingItem> {
+): Promise<void> {
   const client = opts.client ?? mealie();
-  const current = await getItemOut(client, itemId);
   const body: MealieItemUpdate = {
     shoppingListId: current.shoppingListId,
     quantity: current.quantity,
@@ -171,26 +181,10 @@ export async function setShoppingItemChecked(
       recipeNote: r.recipeNote,
     })),
   };
-  const out = unwrap(
+  unwrap(
     await client.PUT("/api/households/shopping/items/{item_id}", {
-      params: { path: { item_id: itemId } },
+      params: { path: { item_id: current.id } },
       body,
-    })
-  );
-  // Unticking can merge the item into a matching unticked one, so prefer
-  // what Mealie sent back over our copy.
-  const saved = [...(out.updatedItems ?? []), ...(out.createdItems ?? [])];
-  const item = saved.find((i) => i.id === itemId) ?? saved[0];
-  return item ? toItem(item) : toItem({ ...current, checked });
-}
-
-async function getItemOut(
-  client: MealieClient,
-  itemId: string
-): Promise<MealieItemOut> {
-  return unwrap(
-    await client.GET("/api/households/shopping/items/{item_id}", {
-      params: { path: { item_id: itemId } },
     })
   );
 }

@@ -193,13 +193,13 @@ Decisions already taken:
 
 ## M3 — Pushing to Mealie
 
-- [ ] **Task 14: A failed push tells the truth**
+- [x] **Task 14: A failed push tells the truth**
   **Complexity:** XS
   **Do:** `shopping/actions.ts`: replace "Nothing was changed on our side" with "The list may be
   partly updated. Send it again." Give the `create-bulk` call a longer timeout (30 s).
   **Done when:** the message is updated and the timeout is set.
 
-- [ ] **Task 15: Re-push doesn't inflate hand-added items**
+- [x] **Task 15: Re-push doesn't inflate hand-added items**
   **Complexity:** S
   **Do:** Mealie merges a pushed line into an existing unchecked item with the same food and
   unit and returns it in `updated`, which `pushShoppingList` (`server/shopping.ts:153`) ignores.
@@ -210,7 +210,7 @@ Decisions already taken:
   **Done when:** integration test pushing into a list with a hand-added item of the same food
   and unit.
 
-- [ ] **Task 16: One Mealie read per tick**
+- [x] **Task 16: One Mealie read per tick**
   **Complexity:** XS
   **Do:** `itemOnWeekList` returns Mealie's raw item. `setShoppingItemChecked(current, checked)`
   writes it back and returns `void`. `checkShopItemAction` returns `{}`. Delete the

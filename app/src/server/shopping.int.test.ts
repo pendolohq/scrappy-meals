@@ -9,7 +9,11 @@ import { addDays, weekStartOf } from "./domain/week";
 import { UserFacingError } from "./errors";
 import { createMealieClient, type MealieClient, unwrap } from "./mealie/client";
 import { getRecipe } from "./mealie/recipes";
-import { addShoppingItems, getShoppingListItems } from "./mealie/shopping";
+import {
+  addShoppingItems,
+  createShoppingList,
+  getShoppingListItems,
+} from "./mealie/shopping";
 import { addMeal, setPortion } from "./plan";
 import {
   addShopItem,
@@ -219,6 +223,38 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       expect(second.added).toBe(2);
     });
 
+    it("reports lines Mealie merged into ones added by hand", async () => {
+      const WEEK = uniqueWeek();
+      const opts = { client: admin };
+      const a = await createUser(db, {
+        name: "A",
+        email: "a@example.test",
+        password: "correct horse battery",
+      });
+      await addMeal(
+        db,
+        { date: WEEK, slot: "dinner", slug: ids.slug, createdBy: a.id },
+        { fetch: fromMealie }
+      );
+      // Someone already put lentils on the week's list in Mealie.
+      const list = await createShoppingList(shoppingListName(WEEK), opts);
+      cleanup.push(() =>
+        admin.DELETE("/api/households/shopping/lists/{item_id}", {
+          params: { path: { item_id: list.id } },
+        })
+      );
+      await addShoppingItems(
+        list.id,
+        [{ quantity: 100, foodId: ids.lentils, unitId: ids.gram }],
+        opts
+      );
+
+      const pushed = await pushShoppingList(db, WEEK, opts);
+      expect(pushed).toMatchObject({ listId: list.id, added: 1, merged: 1 });
+      const items = await getShoppingListItems(list.id, opts);
+      expect(items.find((i) => i.foodId === ids.lentils)?.quantity).toBe(200);
+    });
+
     it("ticks, adds and removes items on the week's list, and only there", async () => {
       const WEEK = uniqueWeek();
       const OTHER = addDays(WEEK, 7);
@@ -258,9 +294,7 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       const lentils = list.items.find((i) => i.foodId === ids.lentils)!;
 
       // Ticking keeps everything else about the item, recipe link included.
-      expect(
-        (await checkShopItem(db, WEEK, lentils.id, true, opts)).checked
-      ).toBe(true);
+      await checkShopItem(db, WEEK, lentils.id, true, opts);
       await checkShopItem(db, WEEK, lentils.id, true, opts); // replayed: no-op
       const raw = unwrap(
         await admin.GET("/api/households/shopping/items/{item_id}", {

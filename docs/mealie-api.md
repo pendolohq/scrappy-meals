@@ -67,8 +67,10 @@ then run `pnpm typecheck` and `pnpm test:integration`.
 - **Mealie merges server-side:** an item with the same food and unit as an
   existing unchecked item on the list increases that item's quantity, and comes
   back in `updatedItems`, not `createdItems`. Free-text items (no food) are not
-  merged. The planner pushes to its own list per week, so merging only ever
-  combines its own lines.
+  merged. The planner pushes to its own list per week, but a line someone added
+  by hand with the same food and unit gets merged too. The planner only owns
+  the items it created, so such a merged item keeps growing with every push;
+  the push reports these merges and the page asks to check their quantities.
 - `recipeReferences: [{ recipeId }]` links an item to the recipes it came from;
   Mealie shows these on the item.
 
@@ -96,14 +98,13 @@ needs Mealie's own UI in the shop. Mealie stays the only copy of the list.
   aisles; unlabelled items go under "Other".
 - **Ticking:** `PUT /items/{id}` **replaces the whole item**: fields left out
   fall back to defaults (quantity 1, empty note, no recipe references). So a
-  tick reads the item first and writes it back with only `checked` changed
-  (`setShoppingItemChecked`). Ticks set a value, never toggle, so a replayed
-  tick is harmless.
+  tick writes back the item it just read (to check ownership, below) with
+  only `checked` changed (`setShoppingItemChecked`). Ticks set a value, never
+  toggle, so a replayed tick is harmless. Unticking may merge the item into a
+  matching unticked one; the page reloads the list after every change anyway.
 - **Ownership:** item ids come from the browser, so every change first checks
   that the item is on the list recorded for that week in `shopping_pushes`;
   anything else is refused.
-- **Ticking (cont.):** the update's response is used as the result: Mealie
-  may merge an unticked item into a matching one, changing its id.
 - **Adding:** a quick-added line is a note item (quantity 0) with
   `extras.scrappyClientId` set to the id the device gave it. Sending the
   same add again (a lost response) returns the existing line instead of
