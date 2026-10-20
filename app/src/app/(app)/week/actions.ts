@@ -22,10 +22,13 @@ import {
 const date = z.string().refine(isIsoDate, "invalid date");
 const id = z.uuid();
 
-/** Refreshes the week that `day` belongs to; returns the empty success result. */
+/**
+ * Refreshes the week that `day` belongs to, and the pages under it (a meal's
+ * recipe page, shopping); returns the empty success result.
+ */
 function refreshWeek(day: string | null) {
   if (day) {
-    revalidatePath(`/week/${weekStartOf(day)}`);
+    revalidatePath(`/week/${weekStartOf(day)}`, "layout");
   }
   return {};
 }

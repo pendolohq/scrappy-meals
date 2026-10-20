@@ -123,8 +123,14 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
               quantity: 0,
               note: "salt to taste",
               originalText: "salt to taste",
+              title: "To serve",
             },
           ],
+          recipeInstructions: [
+            { title: "Soup", text: "Rinse the lentils." },
+            { text: "Simmer for 20 minutes." },
+          ],
+          notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
         },
       })
     );
@@ -178,8 +184,20 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       food: { id: ids.food },
       unit: { id: ids.unit, abbreviation: "g" },
     });
-    expect(salt).toMatchObject({ quantity: null, food: null, unit: null });
+    expect(salt).toMatchObject({
+      quantity: null,
+      food: null,
+      unit: null,
+      title: "To serve",
+    });
     expect(salt.display).toContain("salt to taste");
+    expect(r.instructions).toEqual([
+      { title: "Soup", text: "Rinse the lentils." },
+      { title: null, text: "Simmer for 20 minutes." },
+    ]);
+    expect(r.notes).toEqual([
+      { title: "Freezing", text: "Keeps for 3 months." },
+    ]);
   });
 
   it("flags a recipe without nutrition or servings", async () => {

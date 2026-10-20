@@ -28,7 +28,7 @@ until every place names the same version (`mealie-version.test.ts`).
 | Purpose | Endpoint |
 |---|---|
 | Search / list recipes | `GET /api/recipes?search=&page=&perPage=` (paginated: `items`, `total`, `total_pages`) |
-| Recipe detail | `GET /api/recipes/{slug}` (404 if unknown; also takes the recipe's id, which survives a rename) |
+| Recipe detail | `GET /api/recipes/{slug}` (404 if unknown; also takes the recipe's id, which survives a rename); `recipeInstructions`, `notes` for the recipe page |
 | Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` (proxied by the app at `/api/recipe-images/{id}`, signed-in users only) |
 | Find list by name | `GET /api/households/shopping/lists?queryFilter=name = "..."` |
 | Create list | `POST /api/households/shopping/lists` |
@@ -137,7 +137,7 @@ Mealie 3.29 with Claude Sonnet 5.5 as the provider:
 ## Reviewing a recipe
 
 `/recipes/<slug>/review` (`src/server/recipe-review.ts`) is where an import is
-checked, and the planner's view of any recipe.
+checked and a recipe's ingredients, servings and nutrition are edited.
 
 - **Loading:** lines Mealie already has parsed (a food or unit id) are shown
   as they are. The rest go through the parser as suggestions, unless the
@@ -157,6 +157,27 @@ checked, and the planner's view of any recipe.
   planner can't read ("10-12") is kept as Mealie has it and shown beside the
   empty field. Other nutrition fields (sodium etc.) are kept.
 - **Links to Mealie** use `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`.
+
+## The recipe page
+
+`/week/<monday>/meals/<meal id>` shows a planned meal's recipe to everyone
+signed in, so cooking needs no Mealie account.
+
+- **Fields:** besides servings, nutrition and ingredients it shows
+  `recipeInstructions` (`title` is an optional section heading above the step,
+  `text` the step; `summary` is not used) and `notes` (`title`, `text`).
+  `title` on an ingredient is a heading too. Empty steps and notes are
+  dropped.
+- **Cached** in `recipe_cache` with the rest of the recipe, so the page opens
+  while Mealie is down. Rows cached before instructions were kept have
+  `instructions` null and are fetched on the page's first visit.
+- **Scaling:** ingredients are scaled to "cooking for" in the browser with
+  the same rounding and units as the shopping list
+  (`src/server/domain/ingredients.ts`), so at the planned servings both show
+  the same amounts. "Cooking for" is never saved; portions are.
+- **"Edit in Mealie"** links to `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`
+  (`src/server/mealie/links.ts`). The link streams in after the page, so a
+  Mealie that is down only leaves it out.
 
 ## Servings and ingredients
 

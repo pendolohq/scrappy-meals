@@ -79,6 +79,8 @@ export async function loadRecipes(
         servings: recipe.servings,
         nutrition: recipe.nutrition,
         ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        notes: recipe.notes,
         sourceUrl: recipe.sourceUrl,
         reviewState: recipe.importState.review,
         nutritionSource: recipe.importState.nutrition,

@@ -1,5 +1,12 @@
 import type { Ingredient } from "../mealie/recipes";
 
+import {
+  plannedServings,
+  roundQuantity,
+  servingsScale,
+  unitLabel,
+} from "./ingredients";
+
 export type MealForShopping = {
   /** Null when the recipe is gone from Mealie. */
   recipe: {
@@ -43,8 +50,6 @@ export type WeekIngredients = {
   missing: string[];
 };
 
-const round = (n: number) => Math.round(n * 100) / 100;
-
 /**
  * Builds the week's shopping list. Each recipe is scaled by the servings
  * everyone eats (base servings x sum of portions) over the recipe's own
@@ -58,9 +63,7 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   const missing = new Set<string>();
 
   for (const meal of meals) {
-    const eaten =
-      meal.baseServings *
-      Object.values(meal.portions).reduce((a, b) => a + b, 0);
+    const eaten = plannedServings(meal.baseServings, meal.portions);
     if (eaten <= 0) {
       continue;
     }
@@ -69,7 +72,7 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       continue;
     }
     const { recipe } = meal;
-    const scale = recipe.servings ? eaten / recipe.servings : null;
+    const scale = servingsScale(recipe.servings, eaten);
     if (scale === null) {
       unscaled.add(recipe.name);
     }
@@ -110,12 +113,14 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
         foodId: ing.food.id,
         foodName: ing.food.name,
         unitId: ing.unit?.id ?? null,
-        unit: ing.unit ? ing.unit.abbreviation || ing.unit.name : null,
+        unit: unitLabel(ing.unit),
         quantity: null,
         recipes: [],
       };
       if (ing.quantity !== null) {
-        line.quantity = round((line.quantity ?? 0) + ing.quantity * scale);
+        line.quantity = roundQuantity(
+          (line.quantity ?? 0) + ing.quantity * scale
+        );
       }
       if (!line.recipes.some((r) => r.id === recipe.id)) {
         line.recipes.push(source);

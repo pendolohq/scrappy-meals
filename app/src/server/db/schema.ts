@@ -18,7 +18,7 @@ import {
 
 import type { ImportState } from "../mealie/import-state";
 import type { RecipeNutrition } from "../mealie/nutrition";
-import type { Ingredient } from "../mealie/recipes";
+import type { Ingredient, RecipeNote, RecipeStep } from "../mealie/recipes";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -188,6 +188,9 @@ export const recipeCache = pgTable(
     servings: numeric("servings", { precision: 6, scale: 2, mode: "number" }),
     nutrition: jsonb("nutrition").$type<RecipeNutrition>().notNull(),
     ingredients: jsonb("ingredients").$type<Ingredient[]>().notNull(),
+    // Null on rows cached before the recipe page needed them.
+    instructions: jsonb("instructions").$type<RecipeStep[]>(),
+    notes: jsonb("notes").$type<RecipeNote[]>(),
     sourceUrl: text("source_url"),
     // Rows cached before imports existed refresh within the hour; until then
     // they read as plain Mealie recipes.

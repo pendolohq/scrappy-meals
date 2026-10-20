@@ -22,6 +22,13 @@
       "when": 1792479679740,
       "tag": "0002_recipe-import-state",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792490751154,
+      "tag": "0003_recipe-instructions",
+      "breakpoints": true
     }
   ]
 }

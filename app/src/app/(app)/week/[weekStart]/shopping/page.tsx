@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { Card, cardClass } from "@/components/ui/card";
 import { WeekHeader } from "@/components/week-header";
 import { cx } from "@/lib/cx";
+import { formatQuantity } from "@/lib/format";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
 import type { WeekIngredients } from "@/server/domain/shopping";
@@ -16,8 +17,6 @@ import { canonicalWeek } from "../../week-route";
 
 import { PushButton } from "./push-button";
 import { ShopChecklist } from "./shop-checklist";
-
-const formatQty = (n: number) => String(Math.round(n * 100) / 100);
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h2 className="mb-1 text-xs font-semibold tracking-wider text-muted uppercase">
@@ -61,9 +60,7 @@ const Preview = ({ list }: { list: WeekIngredients }) => {
                 className="shrink-0 font-semibold text-accent-ink tabular-nums"
                 data-testid="qty"
               >
-                {l.quantity === null
-                  ? "–"
-                  : `${formatQty(l.quantity)}${l.unit ? ` ${l.unit}` : ""}`}
+                {l.quantity === null ? "–" : formatQuantity(l.quantity, l.unit)}
               </span>
             </li>
           ))}

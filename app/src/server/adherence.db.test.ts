@@ -15,6 +15,8 @@ const fetch = async (slug: string): Promise<Recipe> => ({
   sourceUrl: null,
   importState: { review: "done", nutrition: null },
   ingredients: [],
+  instructions: [],
+  notes: [],
   nutrition: {
     perServing: {},
     missing: ["kcal", "protein", "carbs", "fat", "fibre"],

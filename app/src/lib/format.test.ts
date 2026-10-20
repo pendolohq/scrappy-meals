@@ -4,6 +4,7 @@ import {
   dayParts,
   formatDay,
   formatPortion,
+  formatQuantity,
   formatRange,
   formatWeekLabel,
 } from "./format";
@@ -24,6 +25,14 @@ describe("format", () => {
     [1.3, "1.3"],
   ])("portion %d -> %s", (n, s) => {
     expect(formatPortion(n)).toBe(s);
+  });
+});
+
+describe("formatQuantity", () => {
+  it("shows up to two decimals and the unit", () => {
+    expect(formatQuantity(150, "g")).toBe("150 g");
+    expect(formatQuantity(1 / 3, "cup")).toBe("0.33 cup");
+    expect(formatQuantity(2, null)).toBe("2");
   });
 });
 

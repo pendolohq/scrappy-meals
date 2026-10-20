@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useOptimistic, useState, useTransition } from "react";
-import { Ellipsis, Minus, Plus, Trash2 } from "lucide-react";
+import { Ellipsis, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -12,120 +12,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { pillClass } from "@/components/ui/pill";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
-import { formatPortion } from "@/lib/format";
 import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
-
-const STEP = 0.25;
-
-const Flags = ({ meal }: { meal: PlannedMeal }) => {
-  const flags: string[] = [];
-  if (!meal.recipe) {
-    flags.push("Not found in Mealie");
-  } else {
-    if (meal.recipe.nutrition.status === "missing") {
-      flags.push("No nutrition data");
-    }
-    if (meal.recipe.nutrition.status === "partial") {
-      flags.push(`No ${meal.recipe.nutrition.missing.join(", ")} data`);
-    }
-    if (!meal.recipe.servings) {
-      flags.push("No servings count in Mealie");
-    }
-  }
-  const estimated = meal.recipe?.nutritionSource === "estimated";
-  const needsReview = meal.recipe?.reviewState === "pending";
-  if (flags.length === 0 && !estimated && !needsReview) {
-    return null;
-  }
-  return (
-    <ul className="mt-1.5 flex flex-wrap gap-1.5">
-      {flags.map((f) => (
-        <li key={f} className={pillClass("danger")}>
-          ⚠ {f}
-        </li>
-      ))}
-      {estimated && <li className={pillClass()}>≈ Estimated nutrition</li>}
-      {needsReview && (
-        <li className="-my-2 flex min-h-tap items-center">
-          <Link
-            href={reviewHref(meal.slug)}
-            className={cx(
-              pillClass("highlight"),
-              "underline-offset-2 hover:underline"
-            )}
-          >
-            Needs review
-          </Link>
-        </li>
-      )}
-    </ul>
-  );
-};
-
-const reviewHref = (slug: string) =>
-  `/recipes/${encodeURIComponent(slug)}/review`;
-
-const Stepper = ({
-  label,
-  value,
-  onChange,
-  min = 0,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  min?: number;
-}) => {
-  const btn =
-    "flex size-tap items-center justify-center rounded-button border border-border-strong bg-card text-foreground transition hover:bg-sunken disabled:opacity-40";
-  return (
-    <fieldset
-      className="flex min-w-0 items-center justify-center gap-1"
-      aria-label={label}
-    >
-      <button
-        type="button"
-        className={btn}
-        aria-label={`Less (${label})`}
-        disabled={value <= min}
-        onClick={() => onChange(Math.max(min, value - STEP))}
-      >
-        <Minus className="size-4" aria-hidden />
-      </button>
-      <span
-        className={cx(
-          "w-9 text-center text-[0.9375rem] font-semibold tabular-nums",
-          value === 0 && "font-normal text-muted"
-        )}
-        data-testid="portion"
-      >
-        {formatPortion(value)}×
-      </span>
-      <button
-        type="button"
-        className={btn}
-        aria-label={`More (${label})`}
-        disabled={value >= 20}
-        onClick={() => onChange(Math.min(20, value + STEP))}
-      >
-        <Plus className="size-4" aria-hidden />
-      </button>
-    </fieldset>
-  );
-};
+import { RecipeFlags } from "./recipe-flags";
+import { Stepper } from "./stepper";
 
 export const MealRow = ({
   meal,
   members,
+  weekStart,
   currentUserId,
   canLog,
 }: {
   meal: PlannedMeal;
+  /** The Monday of the meal's week, for the link to its recipe page. */
+  weekStart: string;
   members: Member[];
   currentUserId: string;
   /** True from the meal's day onwards: adherence can't be logged in advance. */
@@ -166,7 +70,7 @@ export const MealRow = ({
           <p className="line-clamp-2 font-serif text-[1.0625rem] leading-snug font-semibold">
             {meal.recipe ? (
               <Link
-                href={reviewHref(meal.slug)}
+                href={`/week/${weekStart}/meals/${meal.id}`}
                 className="underline-offset-2 hover:underline"
               >
                 {name}
@@ -175,7 +79,7 @@ export const MealRow = ({
               name
             )}
           </p>
-          <Flags meal={meal} />
+          <RecipeFlags recipe={meal.recipe} slug={meal.slug} />
         </div>
         <IconButton
           label={`Options for ${name}`}

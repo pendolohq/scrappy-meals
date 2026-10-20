@@ -3,7 +3,7 @@ import "server-only";
 import { getDb } from "./db/client";
 import type { ReviewInput } from "./domain/review-input";
 import { RetryableError, UserFacingError } from "./errors";
-import { isMealieUnavailable, mealie, unwrap } from "./mealie/client";
+import { isMealieUnavailable } from "./mealie/client";
 import {
   findOrCreateFood,
   findOrCreateUnit,
@@ -18,6 +18,7 @@ import {
   withImportState,
 } from "./mealie/import-state";
 import type { ImportState } from "./mealie/import-state";
+import { groupSlug, mealieRecipeUrl } from "./mealie/links";
 import {
   MACRO_KEYS,
   type MacroKey,
@@ -98,20 +99,6 @@ export type ReviewDraft = {
   /** Text Mealie has for a macro that can't be read as a number ("10-12"). */
   unreadableNutrition: Partial<Record<MacroKey, string>>;
   lines: ReviewLine[];
-};
-
-let cachedGroupSlug: Promise<string> | undefined;
-
-// The group never changes while the app runs; a failed lookup is retried.
-const groupSlug = () => {
-  cachedGroupSlug ??= mealie()
-    .GET("/api/groups/self")
-    .then((r) => unwrap(r).slug)
-    .catch((err: unknown) => {
-      cachedGroupSlug = undefined;
-      throw err;
-    });
-  return cachedGroupSlug;
 };
 
 const defaults = (): Deps => ({
@@ -235,7 +222,8 @@ export async function loadReview(
       name: recipe.name,
       servings: recipe.recipeServings || null,
       sourceUrl: recipe.orgURL || null,
-      mealieUrl: mealieBase ? `${mealieBase}/g/${group}/r/${slug}` : null,
+      mealieUrl:
+        mealieBase && group ? mealieRecipeUrl(mealieBase, group, slug) : null,
       photoId: recipe.id && recipe.image ? recipe.id : null,
       importState: readImportState(recipe.extras),
       nutrition: {

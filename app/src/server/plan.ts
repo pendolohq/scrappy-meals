@@ -210,6 +210,71 @@ export async function getWeekPlan(
   };
 }
 
+export type MealDetail = {
+  id: string;
+  date: string;
+  slot: SlotType;
+  slug: string;
+  baseServings: number;
+  portions: Record<string, number>;
+  members: Member[];
+  /** Null if the recipe no longer exists in Mealie (and we have no cached copy). */
+  recipe: CachedRecipe | null;
+};
+
+/**
+ * One planned meal with its whole recipe, for the recipe page. The recipe
+ * comes from the cache like the week's, so the page still opens while Mealie
+ * is down.
+ */
+export async function getMeal(
+  db: Db,
+  mealSlotId: string,
+  opts: { fetch?: RecipeFetcher; defer?: Defer } = {}
+): Promise<MealDetail | null> {
+  const [slot] = await db
+    .select()
+    .from(mealSlots)
+    .where(eq(mealSlots.id, mealSlotId));
+  if (!slot) {
+    return null;
+  }
+  const [members, portions] = await Promise.all([
+    listMembers(db),
+    db
+      .select({
+        userId: slotPortions.userId,
+        multiplier: slotPortions.multiplier,
+      })
+      .from(slotPortions)
+      .where(eq(slotPortions.mealSlotId, mealSlotId)),
+  ]);
+
+  const slug = slot.mealieRecipeSlug;
+  let recipe = (await loadRecipes(db, [slug], opts)).get(slug) ?? null;
+  if (recipe && recipe.instructions === null) {
+    // Cached before the cache kept instructions: fetch them now, or show the
+    // rest of the recipe while Mealie can't be reached.
+    recipe = await loadRecipes(db, [slug], { fetch: opts.fetch, force: true })
+      .then((fresh) => fresh.get(slug) ?? null)
+      .catch((err: unknown) => {
+        console.warn(`recipe ${slug}: no instructions cached yet`, err);
+        return recipe;
+      });
+  }
+
+  return {
+    id: slot.id,
+    date: slot.date,
+    slot: slot.slot,
+    slug: recipe?.slug ?? slug,
+    baseServings: slot.baseServings,
+    portions: Object.fromEntries(portions.map((p) => [p.userId, p.multiplier])),
+    members,
+    recipe,
+  };
+}
+
 /**
  * Sets whether a person fasts on a day. Starting a fast sets their portions
  * for that day to 0; ending one leaves portions as they are, to adjust by hand.

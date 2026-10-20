@@ -87,6 +87,10 @@ export function formatPortion(n: number): string {
 
 export const formatAmount = (n: number) => String(Math.round(n));
 
+/** An ingredient amount as the shopping list shows it: "150 g", "2", "0.33 cup". */
+export const formatQuantity = (n: number, unit: string | null) =>
+  `${Math.round(n * 100) / 100}${unit ? ` ${unit}` : ""}`;
+
 /** "This week", "Next week", "Last week", or "Week of 9 Nov" further away. */
 export const formatWeekLabel = (
   weekStart: string,
