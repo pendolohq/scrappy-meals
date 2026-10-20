@@ -26,7 +26,7 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
       └───┬───┘ └───┬────┘
           │         │
       ┌───┴─────────┴───┐
-      │   Postgres 16   │  databases `planner` and `mealie`, one role each
+      │   Postgres 18   │  databases `planner` and `mealie`, one role each
       └─────────────────┘
 ```
 

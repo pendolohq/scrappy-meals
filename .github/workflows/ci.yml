@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
         env:
           # Throwaway database that only exists for this job, so no password.
           POSTGRES_HOST_AUTH_METHOD: trust
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: planner_e2e
@@ -260,7 +260,7 @@ jobs:
           docker run -d --name db --network smoke \
             -e POSTGRES_PASSWORD=smoke -e PLANNER_DB_PASSWORD=smoke -e MEALIE_DB_PASSWORD=smoke \
             -v "$PWD/postgres/init:/docker-entrypoint-initdb.d:ro" \
-            postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+            postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
           for i in $(seq 1 30); do docker exec db pg_isready -h 127.0.0.1 -U postgres && break; sleep 1; done
           docker run -d --name app --network smoke -p 3000:3000 \
             -e DATABASE_URL=postgres://planner:smoke@db:5432/planner \

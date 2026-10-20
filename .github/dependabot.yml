@@ -13,7 +13,15 @@ updates:
     directories: [/app, /backup]
     schedule:
       interval: monthly
+    ignore:
+      # A Postgres major is a dump and restore (docs/deploy.md), not a bump.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # A Postgres major is a dump and restore (docs/deploy.md), not a bump.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]

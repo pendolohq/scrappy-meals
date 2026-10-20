@@ -198,6 +198,35 @@ client is generated from a specific Mealie version. Bump the tag in
 (`docs/mealie-api.md` → Upgrading Mealie), let CI pass, then deploy. The
 health check reports `"versionMatches": false` if they drift.
 
+**Upgrading Postgres** to a new major version (18 → 19) is a dump and restore:
+a new major can't read the old one's data. Each major keeps its data in its own
+directory of the `pgdata` volume (`/var/lib/postgresql/18/docker`), so the new
+version starts on an empty cluster next to the old one, and the old one stays
+untouched for a rollback. Bump the image in `docker-compose.yml`,
+`backup/Dockerfile` (`pg_dump` must match the server) and the three places in
+`.github/workflows/ci.yml` together, release, then on the server:
+
+```sh
+cd /opt/scrappy-meals
+# 1. On the release still running: stop writes, back up with the old pg_dump.
+docker compose stop app mealie
+scripts/backup.sh
+# 2. Switch to the new release; Postgres comes up empty and postgres/init
+#    creates the roles and databases again.
+git fetch --tags && git checkout v0.5.0
+docker compose --profile ops build
+docker compose up -d --wait postgres
+# 3. Restore the backup from step 1 (it prints which one; check the time).
+RESTORE_AWS_ACCESS_KEY_ID=... RESTORE_AWS_SECRET_ACCESS_KEY=... \
+  AGE_IDENTITY_FILE=/path/to/age-identity.txt scripts/restore.sh daily latest
+docker compose pull && docker compose up -d --wait
+```
+
+To roll back, check out the previous release and `docker compose up -d --wait`:
+the old version finds its data where it left it, as of step 1. Once the new
+version has run for a while, free the space:
+`docker compose exec postgres rm -rf /var/lib/postgresql/18`.
+
 ## 8. Checking on it
 
 ```sh
