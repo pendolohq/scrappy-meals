@@ -60,11 +60,12 @@ export const PlanMeal = ({
   const name = meal.recipe?.name ?? meal.slug;
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
 
-  // Portions are nearly always 1× each, so they read as a line of text and
-  // the steppers wait behind the options button.
+  // Portions are nearly always 1× each: the steppers wait behind the options
+  // button, and the portions only show when someone's differs.
   const eating = members.filter((m) => (portions[m.id] ?? 0) > 0);
-  const summary =
-    eating.length === 0
+  const summary = members.every((m) => (portions[m.id] ?? 0) === 1)
+    ? null
+    : eating.length === 0
       ? "Nobody eats this"
       : eating
           .map((m) => `${m.name} ${formatPortion(portions[m.id])}×`)
@@ -169,7 +170,9 @@ export const PlanMeal = ({
             <Ellipsis className="size-4" aria-hidden />
           </IconButton>
         </div>
-        <p className="truncate text-xs text-muted tabular-nums">{summary}</p>
+        {summary && (
+          <p className="truncate text-xs text-muted tabular-nums">{summary}</p>
+        )}
         {options}
         {errorText}
       </li>
@@ -202,7 +205,7 @@ export const PlanMeal = ({
         </IconButton>
       </div>
 
-      <p className="text-xs text-muted tabular-nums">{summary}</p>
+      {summary && <p className="text-xs text-muted tabular-nums">{summary}</p>}
       {options}
       {errorText}
     </li>
