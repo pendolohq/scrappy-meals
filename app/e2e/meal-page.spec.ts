@@ -84,6 +84,27 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   await page.getByRole("link", { name: "Back to the plan" }).click();
   await expect(alexKcal).toHaveText("500");
 
+  // With everyone at 0, the recipe is shown for one, and never for fewer.
+  await meal.getByRole("link", { name: recipe.name }).click();
+  for (const name of ["Alex", "Sam"]) {
+    const portion = page.getByRole("group", {
+      name: `${name}'s portion of ${recipe.name}`,
+    });
+    const less = portion.getByRole("button", { name: /^Less/ });
+    while (await less.isEnabled()) {
+      const before = await portion.getByTestId("portion").textContent();
+      await less.click();
+      await expect(portion.getByTestId("portion")).not.toHaveText(before ?? "");
+    }
+  }
+  await expect(page.getByText("Nobody eats this in the plan")).toBeVisible();
+  await expect(page.getByTestId("cooking-for")).toHaveText("1");
+  await expect(qty).toHaveText("100 g");
+  await expect(
+    page.getByRole("button", { name: "Less (Cooking for)" })
+  ).toBeDisabled();
+  await page.getByRole("link", { name: "Back to the plan" }).click();
+
   // The smoke test pushes this week's shopping list and expects only its own
   // meal on it.
   await meal

@@ -54,7 +54,10 @@ export const CookingPanel = ({
   const [cookingFor, setCookingFor] = useState<number | null>(null);
 
   const planned = plannedServings(baseServings, portions);
-  const servings = cookingFor ?? planned;
+  // Nobody eating it still leaves a recipe worth reading, so show it for one
+  // rather than a list of zeros.
+  const fromPlan = planned > 0 ? planned : 1;
+  const servings = cookingFor ?? fromPlan;
   const lines = recipe
     ? scaleIngredients(recipe.ingredients, recipe.servings, servings)
     : [];
@@ -75,7 +78,7 @@ export const CookingPanel = ({
       Math.min(
         MAX_SERVINGS,
         Math.max(
-          0,
+          1,
           next > servings ? Math.floor(servings) + 1 : Math.ceil(servings) - 1
         )
       )
@@ -131,6 +134,7 @@ export const CookingPanel = ({
                   label="Cooking for"
                   value={servings}
                   onChange={stepCookingFor}
+                  min={1}
                   max={MAX_SERVINGS}
                   step={1}
                   suffix=""
@@ -142,9 +146,11 @@ export const CookingPanel = ({
           {recipe.servings ? (
             <p className="mt-1 flex min-h-tap flex-wrap items-center gap-x-2 text-xs text-muted">
               <span>
-                {cookingFor === null
-                  ? `The plan's ${formatPortion(planned)} serving${planned === 1 ? "" : "s"}.`
-                  : "Only this list changes, not the plan."}
+                {cookingFor !== null
+                  ? "Only this list changes, not the plan."
+                  : planned > 0
+                    ? `The plan's ${formatPortion(planned)} serving${planned === 1 ? "" : "s"}.`
+                    : "Nobody eats this in the plan; shown for 1."}
               </span>
               {cookingFor !== null && (
                 <Button
@@ -153,7 +159,7 @@ export const CookingPanel = ({
                   onClick={() => setCookingFor(null)}
                 >
                   <RotateCcw className="size-3.5" aria-hidden />
-                  Reset to plan ({formatPortion(planned)})
+                  Reset to plan ({formatPortion(fromPlan)})
                 </Button>
               )}
             </p>
