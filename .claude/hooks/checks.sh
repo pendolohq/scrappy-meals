@@ -6,8 +6,8 @@ cd "$CLAUDE_PROJECT_DIR" || exit 0
 cat >/dev/null # the hook's JSON input; nothing in it is needed
 
 # Skip when app/ is unchanged since the last run that passed.
-passed=$(git rev-parse --git-path claude-checks-passed)
-blocked=$(git rev-parse --git-path claude-checks-blocked)
+passed=$(git rev-parse --path-format=absolute --git-path claude-checks-passed)
+blocked=$(git rev-parse --path-format=absolute --git-path claude-checks-blocked)
 fingerprint=$(
   {
     git rev-parse HEAD:app
