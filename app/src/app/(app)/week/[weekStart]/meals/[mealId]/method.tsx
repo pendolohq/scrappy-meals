@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { formatQuantity } from "@/lib/format";
 import {
   type IngredientLine,
@@ -17,7 +16,7 @@ const numberSteps = (steps: RecipeStep[]) => {
 
 /** "3 clove Garlic": the amount reads first, so it carries the weight. */
 const IngredientChip = ({ line }: { line: IngredientLine }) => (
-  <li className="rounded-full bg-sunken/70 px-3.5 py-1.5">
+  <li className="rounded-full bg-foreground/10 px-3 py-1.5">
     {line.scaled ? (
       <>
         <span className="font-semibold tabular-nums">
@@ -36,7 +35,8 @@ const IngredientChip = ({ line }: { line: IngredientLine }) => (
 
 /**
  * The recipe's steps, each with the ingredients Mealie links to it, in the
- * amounts the Ingredients card shows (`lines`).
+ * amounts the Ingredients card shows (`lines`). Straight on the page, not in
+ * a card: it is the part you read at the stove, so it gets the full width.
  */
 export const Method = ({
   steps,
@@ -45,7 +45,7 @@ export const Method = ({
   steps: RecipeStep[];
   lines: IngredientLine[];
 }) => (
-  <Card as="section" aria-labelledby="method">
+  <section aria-labelledby="method" className="pt-2">
     <h2
       id="method"
       className="mb-4 text-xs font-semibold tracking-wider text-muted uppercase"
@@ -74,7 +74,7 @@ export const Method = ({
                 </p>
                 {linked.length > 0 && (
                   <ul
-                    className="mt-5 flex flex-wrap gap-2.5"
+                    className="mt-5 flex flex-wrap gap-2"
                     aria-label={`Ingredients for step ${step.number}`}
                     data-testid="step-ingredients"
                   >
@@ -89,5 +89,5 @@ export const Method = ({
         );
       })}
     </ol>
-  </Card>
+  </section>
 );
