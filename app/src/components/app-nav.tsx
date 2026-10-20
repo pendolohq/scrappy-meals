@@ -75,9 +75,9 @@ export const SideNav = ({ currentWeek }: { currentWeek: string }) => (
             href={href}
             aria-current={active ? "page" : undefined}
             className={cx(
-              "flex min-h-tap items-center gap-3 rounded-control px-3 text-[0.9375rem] font-medium transition",
+              "flex min-h-tap items-center gap-3 rounded-button px-3 text-[0.9375rem] font-medium transition",
               active
-                ? "bg-accent-soft text-accent"
+                ? "bg-accent-soft text-accent-ink"
                 : "text-foreground/80 hover:bg-sunken hover:text-foreground"
             )}
           >
@@ -109,7 +109,7 @@ export const TabBar = ({ currentWeek }: { currentWeek: string }) => (
               aria-current={active ? "page" : undefined}
               className={cx(
                 "flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium transition",
-                active ? "text-accent" : "text-muted hover:text-foreground"
+                active ? "text-accent-ink" : "text-muted hover:text-foreground"
               )}
             >
               <Icon

@@ -103,7 +103,7 @@ export const AddMeal = ({
       <button
         type="button"
         onClick={show}
-        className="-mr-2 inline-flex min-h-tap items-center gap-1 rounded-full px-3 text-sm font-medium text-accent transition hover:bg-accent-soft"
+        className="-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
       >
         <Plus className="size-4" aria-hidden />
         Add {what}
@@ -170,7 +170,7 @@ export const AddMeal = ({
                       type="button"
                       disabled={pending}
                       onClick={() => pick(r.slug)}
-                      className="flex w-full items-center gap-3 rounded-control p-2 text-left transition hover:bg-sunken disabled:opacity-60"
+                      className="flex w-full items-center gap-3 rounded-button p-2 text-left transition hover:bg-sunken disabled:opacity-60"
                     >
                       <RecipeImage
                         mealieId={r.imagePath && r.id ? r.id : null}

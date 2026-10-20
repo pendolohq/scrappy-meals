@@ -14,7 +14,7 @@ const VARIANTS: Record<IconButtonVariant, string> = {
 /** The icon button look, for links (`<Link className={iconButtonClass()}>`). */
 export const iconButtonClass = (variant: IconButtonVariant = "plain") =>
   cx(
-    "inline-flex size-tap shrink-0 items-center justify-center rounded-full transition disabled:opacity-40",
+    "inline-flex size-tap shrink-0 items-center justify-center rounded-button transition disabled:opacity-40",
     VARIANTS[variant]
   );
 

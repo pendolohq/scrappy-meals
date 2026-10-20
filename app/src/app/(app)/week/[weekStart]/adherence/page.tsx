@@ -82,7 +82,7 @@ export default async function AdherencePage({
                 </div>
               </div>
               <span
-                className="font-serif text-display font-semibold text-accent tabular-nums"
+                className="font-serif text-display font-semibold text-highlight tabular-nums"
                 data-testid="score"
               >
                 {summary.score === null

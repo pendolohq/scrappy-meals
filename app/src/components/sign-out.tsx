@@ -36,7 +36,7 @@ export const SignOut = ({
         <button
           type="submit"
           className={cx(
-            "flex min-h-tap w-full items-center gap-3 rounded-control px-3 text-left text-sm text-muted transition hover:bg-sunken hover:text-foreground"
+            "flex min-h-tap w-full items-center gap-3 rounded-button px-3 text-left text-sm text-muted transition hover:bg-sunken hover:text-foreground"
           )}
         >
           <span

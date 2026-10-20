@@ -39,9 +39,9 @@ const fieldLabel = "text-sm font-medium text-muted";
 
 const NUTRITION_TONE: Record<string, PillTone> = {
   Missing: "danger",
-  Edited: "highlight",
+  Edited: "accent",
   Estimated: "neutral",
-  Reviewed: "accent",
+  Reviewed: "highlight",
   "From the page": "neutral",
 };
 
@@ -312,7 +312,7 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? "Saving…" : "Save recipe"}
         </Button>
-        <output className="flex items-center gap-1.5 text-sm font-medium text-accent">
+        <output className="flex items-center gap-1.5 text-sm font-medium text-accent-ink">
           {saved ? (
             <>
               <Check className="size-4" aria-hidden />

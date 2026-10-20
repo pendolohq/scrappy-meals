@@ -9,7 +9,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-accent text-accent-foreground shadow-card hover:brightness-110",
   secondary:
     "border border-border-strong bg-card text-foreground hover:bg-sunken",
-  ghost: "text-accent hover:bg-accent-soft",
+  ghost: "text-accent-ink hover:bg-accent-soft",
   danger: "text-danger hover:bg-danger-soft",
 };
 
@@ -27,7 +27,7 @@ export const buttonClass = ({
   block = false,
 }: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean } = {}) =>
   cx(
-    "inline-flex items-center justify-center gap-2 rounded-control font-medium transition select-none",
+    "inline-flex items-center justify-center gap-2 rounded-button font-medium transition select-none",
     "disabled:opacity-55 disabled:shadow-none disabled:hover:brightness-100 aria-disabled:opacity-55",
     VARIANTS[variant],
     SIZES[size],
