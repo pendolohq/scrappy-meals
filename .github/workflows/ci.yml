@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           # Throwaway database that only exists for this job, so no password.
           POSTGRES_HOST_AUTH_METHOD: trust
@@ -37,11 +37,11 @@ jobs:
           ALLOW_SIGNUP: "false"
         ports: ["9000:9000"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           package_json_file: app/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: planner_e2e
@@ -95,11 +95,11 @@ jobs:
       E2E_BASE_URL: http://localhost:3000
       E2E_ALLOW_RESET: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           package_json_file: app/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -130,7 +130,7 @@ jobs:
       - run: pnpm test:e2e
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: |
@@ -139,7 +139,8 @@ jobs:
             app/server.log
           retention-days: 7
 
-  # Decides whether a PR can affect the image; pushes to main and tags always build it.
+  # Decides whether a PR can affect the image or the backups; pushes to main and
+  # tags always run both.
   changes:
     runs-on: ubuntu-latest
     defaults:
@@ -147,8 +148,9 @@ jobs:
         working-directory: .
     outputs:
       image: ${{ steps.diff.outputs.image }}
+      backup: ${{ steps.diff.outputs.backup }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: github.event_name == 'pull_request'
         with:
           fetch-depth: 0
@@ -157,16 +159,21 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           # Anything that goes into the image or the way CI builds it.
           PATTERN: '^(app/(Dockerfile|\.dockerignore|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|next\.config\.ts|docker/|scripts/|drizzle/|src/cli/|src/server/db/|src/server/users\.ts)|backup/|\.github/workflows/)'
+          # Anything the backup/restore round trip exercises.
+          BACKUP_PATTERN: '^(backup/|scripts/|postgres/|docker-compose\.yml|\.github/workflows/)'
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            echo "image=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" HEAD | grep -qE "$PATTERN"; then
-            git diff --name-only "$BASE" HEAD | grep -E "$PATTERN"
-            echo "image=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No image-related changes; the image job is skipped."
-            echo "image=false" >> "$GITHUB_OUTPUT"
-          fi
+          check() {
+            if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            elif git diff --name-only "$BASE" HEAD | grep -E "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No $1-related changes; the $1 job is skipped."
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          check image "$PATTERN"
+          check backup "$BACKUP_PATTERN"
 
   secrets:
     runs-on: ubuntu-latest
@@ -174,7 +181,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - name: Install gitleaks
@@ -189,6 +196,18 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Scan full history
         run: gitleaks git --redact --verbose .
+
+  backup:
+    needs: [changes]
+    if: needs.changes.outputs.backup == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Backup and restore round trip
+        run: scripts/test-backup-restore.sh
 
   # Pull requests: build and smoke-test only, never push.
   # main:          publish :main and :sha-<commit>. Never :latest.
@@ -205,10 +224,10 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ghcr.io/${{ github.repository }}
           flavor: latest=false
@@ -217,27 +236,34 @@ jobs:
             type=sha
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # Not for prereleases (v1.0.0-rc.1): a server on APP_TAG=latest would pick them up.
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
       - name: Build app image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: app
           load: true
           tags: scrappy-meals:ci
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build backup image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: backup
           tags: scrappy-meals-ops:ci
       - name: Smoke test the app image
+        # As in production: postgres/init creates the roles, and migrations run
+        # as the non-superuser planner role.
         run: |
           docker network create smoke
-          docker run -d --name db --network smoke -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16-alpine
-          for i in $(seq 1 30); do docker exec db pg_isready -U postgres && break; sleep 1; done
+          docker run -d --name db --network smoke \
+            -e POSTGRES_PASSWORD=smoke -e PLANNER_DB_PASSWORD=smoke -e MEALIE_DB_PASSWORD=smoke \
+            -v "$PWD/postgres/init:/docker-entrypoint-initdb.d:ro" \
+            postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+          for i in $(seq 1 30); do docker exec db pg_isready -h 127.0.0.1 -U postgres && break; sleep 1; done
           docker run -d --name app --network smoke -p 3000:3000 \
-            -e DATABASE_URL=postgres://postgres@db:5432/postgres \
+            -e DATABASE_URL=postgres://planner:smoke@db:5432/planner \
             -e AUTH_SECRET="$(openssl rand -hex 32)" -e AUTH_URL=http://localhost:3000 \
             -e MEALIE_URL=http://mealie.invalid -e MEALIE_API_TOKEN=unused \
             scrappy-meals:ci
@@ -252,17 +278,18 @@ jobs:
         run: docker logs app || true
       - name: Log in to GHCR
         if: github.event_name == 'push'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Push the image that was just smoke-tested, not a rebuild of it.
       - name: Push app image
         if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
-        with:
-          context: app
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          for tag in $TAGS; do
+            docker tag scrappy-meals:ci "$tag"
+            docker push "$tag"
+          done

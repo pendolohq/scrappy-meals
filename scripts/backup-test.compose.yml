@@ -1,0 +1,7 @@
+# Added on top of docker-compose.yml by scripts/test-backup-restore.sh:
+# a throwaway S3 server in place of AWS.
+services:
+  s3:
+    image: adobe/s3mock:4.7.0
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: backups

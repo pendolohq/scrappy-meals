@@ -7,6 +7,8 @@
 #   ops restore-db                 replace the planner + mealie DBs from RESTORE_DIR
 #   ops restore-files              replace the Mealie data volume from RESTORE_DIR
 set -eu
+# A failing aws or pg_dump inside a pipe must fail the run, not look like "no backup".
+set -o pipefail
 
 DBS="planner mealie"
 DATA_DIR=${MEALIE_DATA_DIR:-/mealie-data}
@@ -33,6 +35,7 @@ backup() {
   : "${S3_BUCKET:?S3_BUCKET is required}"
   : "${AGE_RECIPIENT:?AGE_RECIPIENT is required}"
 
+  # TMPDIR is a disk-backed volume: dumps can outgrow RAM.
   work=$(mktemp -d)
   trap 'rm -rf "$work"; ping /fail' EXIT
 
@@ -41,26 +44,29 @@ backup() {
   # First run of each month is also kept as the monthly copy (longer lifecycle).
   [ "$(date -u +%d)" = "01" ] && prefixes="$prefixes monthly/$(date -u +%Y/%m)/$stamp"
 
+  # Everything is encrypted as it is written, so no plaintext copy touches disk.
   ping /start
   for db in $DBS; do
     log "dumping $db"
-    pg_dump -Fc -d "$db" -f "$work/$db.dump"
+    pg_dump -Fc -d "$db" | age -r "$AGE_RECIPIENT" -o "$work/$db.dump.age"
   done
-  pg_dumpall --globals-only --no-role-passwords -f "$work/globals.sql"
+  pg_dumpall --globals-only --no-role-passwords | age -r "$AGE_RECIPIENT" -o "$work/globals.sql.age"
 
   log "archiving mealie data volume"
-  tar -C "$DATA_DIR" -czf "$work/mealie-data.tar.gz" .
+  # Mealie keeps running, so files may change or vanish while tar reads them.
+  # GNU tar exits 1 for that; the archive is still usable.
+  {
+    tar -C "$DATA_DIR" --warning=no-file-changed --warning=no-file-removed -czf - . \
+      || [ $? -eq 1 ]
+  } | age -r "$AGE_RECIPIENT" -o "$work/mealie-data.tar.gz.age"
 
-  (cd "$work" && sha256sum -- * > SHA256SUMS)
-
-  for f in "$work"/*; do
-    age -r "$AGE_RECIPIENT" -o "$f.age" "$f"
-    rm "$f"
-  done
-  want=$(find "$work" -name '*.age' | wc -l)
+  (cd "$work" && sha256sum -- *.age > SHA256SUMS)
+  want=$(find "$work" -type f | wc -l)
 
   for p in $prefixes; do
-    for f in "$work"/*.age; do
+    # SHA256SUMS goes up last: fetch only picks runs that have it, so a run that
+    # died halfway is never taken for the latest one.
+    for f in "$work"/*.age "$work/SHA256SUMS"; do
       key="$p/$(basename "$f")"
       log "uploading s3://$S3_BUCKET/$key"
       aws_s3 s3api put-object --bucket "$S3_BUCKET" --key "$key" \
@@ -96,21 +102,34 @@ fetch() {
     if [ "$kind" = daily ]; then search="daily/$ymd/"; else search="monthly/${ymd%/*}/"; fi
   fi
 
-  # Keys sort by date then time, so the last run prefix is the newest.
+  # Keys sort by date then time, so the last complete run is the newest. Runs
+  # dated in the future can only have been planted (the VPS key can write).
+  now=$(date -u +%Y%m%d%H%M%S)
   run=$(aws_s3 s3api list-objects-v2 --bucket "$S3_BUCKET" --prefix "$search" \
-    --query 'Contents[].Key' --output text | tr '\t' '\n' | grep -v '^None$' \
-    | sed 's#/[^/]*$##' | sort -u | tail -n 1)
-  [ -n "$run" ] || die "no backup found under $search"
+    --query 'Contents[].Key' --output text | tr '\t' '\n' \
+    | { grep '/SHA256SUMS$' || true; } | sed 's#/[^/]*$##' | sort -u \
+    | while read -r r; do
+      d=$(echo "$r" | sed 's#^[a-z]*/##; s#[/Z]##g')
+      # monthly/YYYY/MM/HHMMSSZ has no day: compare it as the 1st.
+      if [ ${#d} -eq 12 ]; then d="${d%??????}01${d#??????}"; fi
+      if [ "$d" -le "$now" ]; then echo "$r"; fi
+    done | tail -n 1)
+  [ -n "$run" ] || die "no complete backup found under $search"
   log "fetching $run"
 
   find "$RESTORE_DIR" -mindepth 1 -delete
   aws_s3 s3 cp --recursive --only-show-errors "s3://$S3_BUCKET/$run/" "$RESTORE_DIR/"
+  (cd "$RESTORE_DIR" && sha256sum -c SHA256SUMS >/dev/null) || die "checksum mismatch"
   for f in "$RESTORE_DIR"/*.age; do
     age -d -i "$AGE_IDENTITY" -o "${f%.age}" "$f"
     rm "$f"
   done
-  (cd "$RESTORE_DIR" && sha256sum -c --quiet SHA256SUMS) || die "checksum mismatch"
-  echo "$run" > "$RESTORE_DIR/SOURCE"
+  {
+    echo "$run"
+    echo "Uploaded:"
+    aws_s3 s3api list-objects-v2 --bucket "$S3_BUCKET" --prefix "$run/" \
+      --query 'Contents[].[LastModified,Key]' --output text | sed 's/^/  /'
+  } > "$RESTORE_DIR/SOURCE"
   log "fetched and verified $run"
 }
 
@@ -123,8 +142,12 @@ restore_db() {
     dropdb --if-exists --force "$db"
     createdb -O "$db" "$db"
     psql -q -d postgres -c "REVOKE ALL ON DATABASE $db FROM PUBLIC"
-    # --role makes the app role own every restored object, so migrations keep working.
-    pg_restore --exit-on-error --no-owner --no-privileges --role="$db" -d "$db" "$RESTORE_DIR/$db.dump"
+    # Restore as the app role, not the superuser: everything restored is owned
+    # by it (so migrations keep working), and a tampered dump can't run
+    # superuser SQL.
+    pw=$(printenv "$(echo "$db" | tr a-z A-Z)_DB_PASSWORD") || die "${db}_DB_PASSWORD not set"
+    PGUSER=$db PGPASSWORD=$pw pg_restore --exit-on-error --single-transaction \
+      --no-owner --no-privileges -d "$db" "$RESTORE_DIR/$db.dump"
   done
   log "databases restored"
 }

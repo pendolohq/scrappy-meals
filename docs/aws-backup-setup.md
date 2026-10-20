@@ -8,11 +8,14 @@ export BUCKET=scrappy-meals-backups-<something-unique>
 export AWS_REGION=eu-central-1
 ```
 
+These become `S3_BUCKET` and `S3_REGION` in the VPS `.env`. `S3_REGION` must
+equal `AWS_REGION` here.
+
 ## 1. Encryption key (age)
 
 ```sh
 age-keygen -o age-identity.txt
-grep 'public key' age-identity.txt     # -> AGE_RECIPIENT in the VPS .env
+age-keygen -y age-identity.txt         # -> AGE_RECIPIENT in the VPS .env
 ```
 
 Store `age-identity.txt` in your password manager, then delete the local file.
@@ -86,7 +89,16 @@ aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" \
 
 The VPS key can upload and list, nothing else: no reads, no deletes, no
 changes to lock or lifecycle settings. If the VPS is compromised, existing
-backups stay intact and unreadable.
+backups stay unreadable (no read access, and the age identity isn't there) and
+locked: every stored version survives.
+
+What the attacker *can* do is upload new objects, including a fake run that
+looks newer, or a new version of an existing key. Restore defends against the
+obvious cases: `latest` ignores runs dated in the future, the confirmation
+shows when each object was uploaded, and `pg_restore` runs as the app roles,
+so a crafted dump can't run superuser SQL. After a break-in, restore a named
+date from before it (`scripts/restore.sh daily 2026-10-01`) and check the
+upload times it shows.
 
 ```sh
 cat > backup-writer.json <<JSON
@@ -109,15 +121,9 @@ aws iam create-access-key --user-name scrappy-meals-backup
 
 ## 5. Schedule on the VPS
 
-```sh
-echo '15 3 * * * root /opt/scrappy-meals/scripts/backup.sh >> /var/log/scrappy-meals-backup.log 2>&1' \
-  | sudo tee /etc/cron.d/scrappy-meals
-```
-
-Run one by hand first: `scripts/backup.sh`, then check the bucket.
-
-Optional: create a check on healthchecks.io (daily, 1 h grace) and put its
-ping URL in `BACKUP_PING_URL`. You get an email if a night is missed or fails.
+Set up the nightly cron job and the failure alert as in
+[deploy.md](deploy.md) §6. Run one by hand first (`scripts/backup.sh`), then
+check the bucket.
 
 ## 6. Restoring
 
@@ -130,8 +136,12 @@ AGE_IDENTITY_FILE=./age-identity.txt \
   scripts/restore.sh daily latest          # or: daily 2026-10-19, monthly 2026-09-01
 ```
 
-It downloads, decrypts and checksums the run, asks for confirmation, stops
-the app and Mealie, replaces both databases and the Mealie data volume, then
-starts them again. Delete `age-identity.txt` afterwards.
+It downloads the newest *complete* run (one whose `SHA256SUMS` was uploaded,
+which happens last), checks and decrypts it, shows what it is about to restore
+and asks for confirmation. Then it stops the app and Mealie, replaces both
+databases (each in one transaction) and the Mealie data volume, and starts
+again whatever was running before. Delete `age-identity.txt` afterwards.
 
-Practise this on a fresh VM once a quarter so you know it works.
+`scripts/test-backup-restore.sh` runs the whole round trip against a
+throwaway stack with a mock S3; CI runs it whenever the backup code changes.
+Still practise a real restore on a fresh VM once in a while.

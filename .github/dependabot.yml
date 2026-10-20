@@ -1,0 +1,19 @@
+# Bumps the pinned action SHAs and image digests. npm packages are updated by
+# hand with `pnpm update-packages` (see AGENTS.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directories: [/app, /backup]
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly

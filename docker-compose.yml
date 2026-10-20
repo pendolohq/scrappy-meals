@@ -1,9 +1,17 @@
 name: scrappy-meals
 
+# Docker never rotates container logs by default; on a small disk they grow forever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-ops: &ops
   build: ./backup
   image: scrappy-meals-ops:local
   profiles: [ops]
+  logging: *logging
   depends_on:
     postgres:
       condition: service_healthy
@@ -16,12 +24,13 @@ x-ops: &ops
     S3_ENDPOINT: ${S3_ENDPOINT:-}
     AGE_RECIPIENT: ${AGE_RECIPIENT:-}
     TZ: ${TZ:-UTC}
-  tmpfs:
-    - /tmp
+    # Disk-backed scratch space (an anonymous volume, see each service): the
+    # dumps can outgrow RAM, so not a tmpfs.
+    TMPDIR: /work
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
@@ -37,12 +46,15 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      # Over TCP: during first boot the image runs a socket-only server while
+      # postgres/init creates the roles, and that one must not count as ready.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
     mem_limit: 768m
     restart: unless-stopped
+    logging: *logging
 
   mealie:
     image: ${MEALIE_IMAGE:-ghcr.io/mealie-recipes/mealie}:v3.29.0
@@ -64,6 +76,7 @@ services:
       - mealie-data:/app/data
     mem_limit: 1g
     restart: unless-stopped
+    logging: *logging
 
   app:
     image: ${APP_IMAGE:?set APP_IMAGE, e.g. ghcr.io/<owner>/scrappy-meals}:${APP_TAG:-latest}
@@ -84,9 +97,10 @@ services:
       TZ: ${TZ:-UTC}
     mem_limit: 512m
     restart: unless-stopped
+    logging: *logging
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     ports:
       - "80:80"
       - "443:443"
@@ -100,6 +114,7 @@ services:
       - caddy-config:/config
     mem_limit: 128m
     restart: unless-stopped
+    logging: *logging
 
   # Nightly backup, run from host cron: docker compose run --rm backup
   # Write-only S3 credentials; cannot read or delete existing backups.
@@ -113,6 +128,7 @@ services:
       BACKUP_PING_URL: ${BACKUP_PING_URL:-}
     volumes:
       - mealie-data:/mealie-data:ro
+      - /work
 
   # Used only by scripts/restore.sh. Gets read credentials and the age
   # identity at run time; nothing restore-related lives in .env on the VPS.
@@ -123,10 +139,14 @@ services:
       AWS_ACCESS_KEY_ID: ${RESTORE_AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${RESTORE_AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${RESTORE_AWS_SESSION_TOKEN:-}
+      # pg_restore connects as each app role rather than the superuser.
+      PLANNER_DB_PASSWORD: ${PLANNER_DB_PASSWORD:?}
+      MEALIE_DB_PASSWORD: ${MEALIE_DB_PASSWORD:?}
     volumes:
       - mealie-data:/mealie-data
       - ${RESTORE_WORKDIR:-./restore-work}:/restore
       - ${AGE_IDENTITY_FILE:-/dev/null}:/run/age-identity:ro
+      - /work
 
 volumes:
   pgdata: {}
