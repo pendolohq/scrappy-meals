@@ -4,6 +4,7 @@ import { requireUser } from "@/server/session";
 import { findUserById } from "@/server/users";
 
 import { SettingsForm } from "./settings-form";
+import { ThemePicker } from "./theme-picker";
 
 export default async function SettingsPage() {
   const { id } = await requireUser();
@@ -29,6 +30,7 @@ export default async function SettingsPage() {
           defaultFastingDays: user.defaultFastingDays,
         }}
       />
+      <ThemePicker />
     </section>
   );
 }

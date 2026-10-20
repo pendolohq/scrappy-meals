@@ -11,7 +11,7 @@
  * keeps 3:1 against every surface; --border is for decoration only.
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --background: #f2e8cf;
   --foreground: #1f2a20;
   --muted: #5c5d4c;
@@ -33,29 +33,30 @@
   --shadow-color: 80deg 25% 15%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #131a14;
-    --foreground: #f2e8cf;
-    --muted: #b5b096;
-    --card: #1b241c;
-    --sunken: #172018;
-    --border: #2c3a2d;
-    --border-strong: #66755f;
-    /* The palette red as-is: white on it is AA, and it keeps 3:1 against the
-       dark surfaces for focus rings and borders. */
-    --accent: #bc4749;
-    --accent-ink: #e07b7c;
-    --accent-foreground: #ffffff;
-    --accent-soft: #3a2224;
-    --highlight: #a7c957;
-    --highlight-foreground: #131a14;
-    --highlight-soft: #26331d;
-    --danger: #f08a7e;
-    --danger-foreground: #131a14;
-    --danger-soft: #3b1f1f;
-    --shadow-color: 120deg 30% 3%;
-  }
+/* Only when picked in Settings (src/lib/theme.ts); light is the default even
+   on a dark system. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #131a14;
+  --foreground: #f2e8cf;
+  --muted: #b5b096;
+  --card: #1b241c;
+  --sunken: #172018;
+  --border: #2c3a2d;
+  --border-strong: #66755f;
+  /* The palette red as-is: white on it is AA, and it keeps 3:1 against the
+     dark surfaces for focus rings and borders. */
+  --accent: #bc4749;
+  --accent-ink: #e07b7c;
+  --accent-foreground: #ffffff;
+  --accent-soft: #3a2224;
+  --highlight: #a7c957;
+  --highlight-foreground: #131a14;
+  --highlight-soft: #26331d;
+  --danger: #f08a7e;
+  --danger-foreground: #131a14;
+  --danger-soft: #3b1f1f;
+  --shadow-color: 120deg 30% 3%;
 }
 
 @theme inline {
