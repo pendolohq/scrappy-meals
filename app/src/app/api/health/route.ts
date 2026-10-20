@@ -19,7 +19,7 @@ async function mealieStatus() {
     if (!v.matches && !warnedVersion) {
       warnedVersion = true;
       console.warn(
-        `Mealie ${v.server} differs from schema ${v.schema}; run pnpm mealie:types`
+        `Mealie ${v.server} differs from schema ${v.schema}; regenerate with bun run mealie:types`
       );
     }
     return { reachable: true, versionMatches: v.matches };

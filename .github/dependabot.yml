@@ -1,5 +1,5 @@
 # Bumps the pinned action SHAs and image digests. npm packages are updated by
-# hand with `pnpm update-packages` (see AGENTS.md).
+# hand with `bun run update-packages` (see AGENTS.md).
 version: 2
 updates:
   - package-ecosystem: github-actions

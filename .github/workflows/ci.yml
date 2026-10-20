@@ -38,36 +38,34 @@ jobs:
         ports: ["9000:9000"]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          package_json_file: app/package.json
+          bun-version-file: app/package.json
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - name: Format (oxfmt)
-        run: pnpm format:check
+        run: bun run format:check
       - name: Lint (oxlint)
-        run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm test:db
+        run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run test:db
         env:
           DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
       - name: Wait for Mealie
         run: |
           for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about && exit 0; sleep 3; done
           exit 1
-      - run: pnpm test:integration
+      - run: bun run test:integration
         env:
           MEALIE_TEST_URL: http://localhost:9000
           DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
       - name: Migrations match the schema
         run: |
-          DATABASE_URL=unused pnpm drizzle-kit generate --name ci-check
-          git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run pnpm drizzle-kit generate" && exit 1)
+          DATABASE_URL=unused bunx drizzle-kit generate --name ci-check
+          git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run bunx drizzle-kit generate" && exit 1)
           test -z "$(git status --porcelain -- drizzle)" || (echo "::error::uncommitted migration generated" && exit 1)
 
   e2e:
@@ -96,21 +94,19 @@ jobs:
       E2E_ALLOW_RESET: "1"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          package_json_file: app/package.json
+          bun-version-file: app/package.json
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - run: bun install --frozen-lockfile
+      - run: bun run build
       - name: Assemble the standalone server
         run: |
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: bunx playwright install --with-deps chromium
       - name: Wait for Mealie and create an API token for the app
         run: |
           for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about >/dev/null && break; sleep 3; done
@@ -127,7 +123,7 @@ jobs:
           nohup node .next/standalone/server.js > server.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && exit 0; sleep 1; done
           cat server.log; exit 1
-      - run: pnpm test:e2e
+      - run: bun run test:e2e
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

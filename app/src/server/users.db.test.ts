@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-// Runs against a real Postgres: DATABASE_TEST_URL=postgres://... pnpm test:db
+// Runs against a real Postgres: DATABASE_TEST_URL=postgres://... bun run test:db
 // The database is migrated and its users table emptied, so point it at a throwaway DB.
 import { describe, expect, it } from "vitest";
 

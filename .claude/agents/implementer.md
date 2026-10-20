@@ -35,13 +35,13 @@ For UI/component design, invoke the `frontend-design` skill.
 - Reads happen in Server Components through `src/server/*`; writes go through server actions
   built with `userAction()` / `userFormAction()`. Pages that read data call `requireUser()`.
 - Schema changes go through `src/server/db/schema.ts` plus a generated migration
-  (`pnpm drizzle-kit generate`); CI fails if they disagree.
+  (`bunx drizzle-kit generate`); CI fails if they disagree.
 - Never invent Mealie fields: check `src/server/mealie/schema.d.ts` (generated from Mealie's
   OpenAPI spec) and `docs/mealie-api.md`.
 - Match existing import style, file structure and Tailwind patterns; prefer editing existing files.
 - Keep implementations minimal: no extra features, no premature abstractions.
-- Verify with `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test` (from `app/`), plus
-  `pnpm test:db` when server/db code changed, and `pnpm build`.
+- Verify with `bun run format:check && bun run lint && bun run typecheck && bun run test` (from `app/`), plus
+  `bun run test:db` when server/db code changed, and `bun run build`.
 
 ## Output
 

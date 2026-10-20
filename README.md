@@ -94,17 +94,21 @@ see `docs/aws-backup-setup.md` §6.
 
 ```sh
 cd app
-pnpm install
-pnpm dev                 # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
-pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
-pnpm format && pnpm lint:fix                       # fix formatting and auto-fixable lint
-pnpm update-packages --dry-run                      # outdated deps; without --dry-run applies minor/patch
-DATABASE_TEST_URL=postgres://... pnpm test:db       # throwaway database
+bun install
+bun run dev                                       # needs DATABASE_URL, AUTH_SECRET, MEALIE_URL, MEALIE_API_TOKEN (+ MEALIE_PUBLIC_URL for links)
+bun run format:check && bun run lint && bun run typecheck && bun run test
+bun run format && bun run lint:fix                # fix formatting and auto-fixable lint
+bun run update-packages --dry-run                 # outdated deps; without --dry-run applies minor/patch
+DATABASE_TEST_URL=postgres://... bun run test:db  # throwaway database
 # End-to-end smoke test against a running build (empties DATABASE_URL!):
 E2E_ALLOW_RESET=1 E2E_BASE_URL=http://localhost:3000 DATABASE_URL=postgres://... \
-  MEALIE_TEST_URL=http://localhost:9000 pnpm test:e2e
-MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... pnpm test:integration
+  MEALIE_TEST_URL=http://localhost:9000 bun run test:e2e
+MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... bun run test:integration
 ```
+
+[Bun](https://bun.sh) installs the packages and runs the scripts; the app, the tests and the
+production image still run on Node 22. Always use `bun run <script>`: `bun test` and `bun build`
+are Bun's own test runner and bundler, not this project's scripts.
 
 Formatting is [oxfmt](https://oxc.rs/docs/guide/usage/formatter) (`app/.oxfmtrc.json`: 80 columns,
 sorted imports, sorted Tailwind classes) and linting is

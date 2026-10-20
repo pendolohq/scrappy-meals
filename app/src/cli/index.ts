@@ -1,5 +1,5 @@
 // Admin CLI. In the container: `docker compose exec app scrappy <command>`.
-// Locally: `pnpm cli <command>`.
+// Locally: `bun run cli <command>`.
 //
 // Accounts can only be created here, by someone with shell access to the
 // server. Passwords are read from a hidden prompt (or stdin when piped) and

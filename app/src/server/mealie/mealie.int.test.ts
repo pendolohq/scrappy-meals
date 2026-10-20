@@ -1,7 +1,7 @@
 // Runs against a real Mealie. Uses the admin login to create an API token and
 // fixtures, exercises our wrapper with that token, then removes everything.
 //
-//   MEALIE_TEST_URL=http://localhost:9000 pnpm test:integration
+//   MEALIE_TEST_URL=http://localhost:9000 bun run test:integration
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -136,7 +136,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     const v = await checkMealieVersion(client);
     expect(
       v.matches,
-      `server ${v.server}, schema ${v.schema}: run pnpm mealie:types`
+      `server ${v.server}, schema ${v.schema}: regenerate with bun run mealie:types`
     ).toBe(true);
   });
 

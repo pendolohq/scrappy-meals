@@ -13,9 +13,9 @@ projects (`app/vitest.config.mts`):
 
 | Project | Files | Needs | Run (from `app/`) |
 | --- | --- | --- | --- |
-| unit | `*.test.ts` | nothing | `pnpm test` |
-| db | `*.db.test.ts` | a throwaway Postgres: `DATABASE_TEST_URL` | `pnpm test:db` |
-| integration | `*.int.test.ts` | a running Mealie: `MEALIE_TEST_URL` | `pnpm test:integration` |
+| unit | `*.test.ts` | nothing | `bun run test` |
+| db | `*.db.test.ts` | a throwaway Postgres: `DATABASE_TEST_URL` | `bun run test:db` |
+| integration | `*.int.test.ts` | a running Mealie: `MEALIE_TEST_URL` | `bun run test:integration` |
 
 There is no component test setup (no jsdom or React Testing Library). Don't add one; UI
 behaviour belongs in the Playwright smoke test.
