@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import Link from "next/link";
 
 import {
   removeMealAction,
@@ -29,17 +30,35 @@ const Flags = ({ meal }: { meal: PlannedMeal }) => {
       flags.push("No servings count in Mealie");
     }
   }
-  if (flags.length === 0) {
+  const estimated = meal.recipe?.nutritionSource === "estimated";
+  const needsReview = meal.recipe?.reviewState === "pending";
+  if (flags.length === 0 && !estimated && !needsReview) {
     return null;
   }
   return (
-    <ul className="text-xs text-danger">
+    <ul className="text-xs">
       {flags.map((f) => (
-        <li key={f}>⚠ {f}</li>
+        <li key={f} className="text-danger">
+          ⚠ {f}
+        </li>
       ))}
+      {estimated && <li className="text-muted">≈ Estimated nutrition</li>}
+      {needsReview && (
+        <li>
+          <Link
+            href={reviewHref(meal.slug)}
+            className="text-accent underline underline-offset-2"
+          >
+            Needs review
+          </Link>
+        </li>
+      )}
     </ul>
   );
 };
+
+const reviewHref = (slug: string) =>
+  `/recipes/${encodeURIComponent(slug)}/review`;
 
 const Stepper = ({
   label,
@@ -145,7 +164,15 @@ export const MealRow = ({
           />
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{name}</p>
+          <p className="truncate text-sm font-medium">
+            {meal.recipe ? (
+              <Link href={reviewHref(meal.slug)} className="hover:underline">
+                {name}
+              </Link>
+            ) : (
+              name
+            )}
+          </p>
           <Flags meal={meal} />
         </div>
         <button

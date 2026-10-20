@@ -103,10 +103,63 @@ export default async function globalSetup() {
     ],
   });
 
+  // A recipe that already came from a web page, for the duplicate check on
+  // /recipes/new. Mealie won't fetch a page in CI, so it scrapes given HTML.
+  const imported = {
+    name: `E2E Imported Soup ${run}`,
+    url: `https://example.com/e2e/imported-soup-${run}`,
+  };
+  const importedSlug: string = await api(
+    "POST",
+    "/api/recipes/create/html-or-json",
+    {
+      url: imported.url,
+      data: `<html><head><script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name: imported.name,
+        recipeYield: "4 servings",
+        // Only calories, so the other macros are missing on the review page.
+        nutrition: { "@type": "NutritionInformation", calories: "350" },
+        recipeIngredient: [
+          "200 g red lentils",
+          "1 onion, chopped",
+          "a squeeze of lemon",
+        ],
+        recipeInstructions: [{ "@type": "HowToStep", text: "Boil." }],
+      })}</script></head><body></body></html>`,
+    }
+  );
+
+  // A recipe imported from a social post with AI-estimated nutrition that
+  // nobody has reviewed yet, as the planner shows it until someone does.
+  const reel = {
+    name: `E2E Reel Curry ${run}`,
+    url: `https://www.instagram.com/reel/e2e-${run}/`,
+  };
+  const reelSlug: string = await api("POST", "/api/recipes", {
+    name: reel.name,
+  });
+  await api("PATCH", `/api/recipes/${reelSlug}`, {
+    recipeServings: 2,
+    orgURL: reel.url,
+    nutrition: {
+      calories: "600",
+      proteinContent: "20",
+      carbohydrateContent: "70",
+      fatContent: "25",
+      fiberContent: "12",
+    },
+    recipeIngredient: [{ quantity: 0, note: "1 tin chickpeas" }],
+    extras: { scrappyReview: "pending", scrappyNutrition: "estimated" },
+  });
+
   await writeFile(
     STATE_FILE,
     JSON.stringify({
       recipe: { name, slug },
+      imported: { ...imported, slug: importedSlug },
+      reel: { ...reel, slug: reelSlug },
       food: food.name,
       extra: `coffee ${run}`,
     })

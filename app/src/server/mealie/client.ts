@@ -8,6 +8,7 @@ import type { paths } from "./schema";
 export const MEALIE_SCHEMA_VERSION = "v3.29.0";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const IMPORT_TIMEOUT_MS = 60_000;
 
 export type MealieClient = ReturnType<typeof createMealieClient>;
 
@@ -121,6 +122,12 @@ export function mealie(timeoutMs = DEFAULT_TIMEOUT_MS): MealieClient {
   }
   return client;
 }
+
+/**
+ * The same, with a longer timeout for imports: Mealie fetches and scrapes the
+ * page (or runs an AI model) before it answers.
+ */
+export const mealieImporter = (): MealieClient => mealie(IMPORT_TIMEOUT_MS);
 
 /** Compares the running Mealie version with the one our types were generated from. */
 export async function checkMealieVersion(client: MealieClient = mealie()) {

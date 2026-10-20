@@ -12,6 +12,14 @@ import {
   MealieError,
   unwrap,
 } from "./client";
+import {
+  findOrCreateFood,
+  findOrCreateUnit,
+  findRecipeBySourceUrl,
+  importRecipeFromUrl,
+  parseIngredients,
+  patchRecipe,
+} from "./import";
 import { getRecipe, searchRecipes } from "./recipes";
 import {
   addShoppingItems,
@@ -261,5 +269,166 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       { client }
     );
     expect(await getShoppingListItems(listId, { client })).toEqual([]);
+  });
+
+  describe("importing", () => {
+    const sourceUrl = `https://example.com/it-${run}/lentil-soup`;
+    let slug = "";
+
+    beforeAll(async () => {
+      // create/url needs a page Mealie can fetch, and it refuses local
+      // addresses; create/html-or-json runs the same scraper on given HTML.
+      const page = `<script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name: `IT Imported Soup ${run}`,
+        recipeYield: "4 servings",
+        recipeIngredient: ["200 g red lentils", "a squeeze of lemon"],
+        nutrition: { "@type": "NutritionInformation", calories: "320 kcal" },
+      })}</script>`;
+      slug = unwrap(
+        await admin.POST("/api/recipes/create/html-or-json", {
+          body: { data: page, url: sourceUrl },
+        })
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      );
+    });
+
+    it("returns null when Mealie won't import from a URL", async () => {
+      expect(
+        await importRecipeFromUrl("http://127.0.0.1:1/recipe", { client })
+      ).toBeNull();
+    });
+
+    it("finds a recipe by the URL it came from", async () => {
+      expect(await findRecipeBySourceUrl(sourceUrl, { client })).toEqual({
+        slug,
+        name: `IT Imported Soup ${run}`,
+      });
+      expect(
+        await findRecipeBySourceUrl(`${sourceUrl}/other`, { client })
+      ).toBeNull();
+    });
+
+    it("reads the source URL and treats a fresh import as reviewed", async () => {
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r.sourceUrl).toBe(sourceUrl);
+      expect(r.importState).toEqual({ review: "done", nutrition: null });
+      expect(r.ingredients.every((i) => i.food === null)).toBe(true);
+    });
+
+    it("parses ingredient lines", async () => {
+      const [lentils, lemon] = await parseIngredients(
+        ["200 g red lentils", "a squeeze of lemon"],
+        { client }
+      );
+      expect(lentils).toMatchObject({
+        input: "200 g red lentils",
+        quantity: 200,
+        food: { name: "red lentils" },
+      });
+      expect(lentils.unit?.name).toBeTruthy();
+      expect(lentils.confidence).toBeGreaterThan(lemon.confidence);
+      expect(lemon.quantity).toBeNull();
+      expect(await parseIngredients([], { client })).toEqual([]);
+    });
+
+    it("patches the import state without touching other fields", async () => {
+      await patchRecipe(
+        slug,
+        { extras: { scrappyReview: "pending", scrappyNutrition: "source" } },
+        { client }
+      );
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r.importState).toEqual({ review: "pending", nutrition: "source" });
+      expect(r.sourceUrl).toBe(sourceUrl);
+      expect(r.nutrition.perServing.kcal).toBe(320);
+      expect(r.ingredients).toHaveLength(2);
+    });
+  });
+
+  describe("foods and units", () => {
+    const deleteFood = (id: string) =>
+      cleanup.push(() =>
+        admin.DELETE("/api/foods/{item_id}", {
+          params: { path: { item_id: id } },
+        })
+      );
+    const deleteUnit = (id: string) =>
+      cleanup.push(() =>
+        admin.DELETE("/api/units/{item_id}", {
+          params: { path: { item_id: id } },
+        })
+      );
+
+    it("creates a food that is missing, then finds it again ignoring case and spaces", async () => {
+      const name = `it-quinoa-${run}`;
+      const created = await findOrCreateFood(name, { client });
+      deleteFood(created.id);
+      expect(created).toEqual({ id: expect.any(String), name });
+
+      const again = await findOrCreateFood(`  ${name.toUpperCase()} `, {
+        client,
+      });
+      expect(again.id).toBe(created.id);
+      expect(again.name).toBe(name);
+    });
+
+    it("finds an existing food by its plural name", async () => {
+      const name = `it-tomato-${run}`;
+      const food = unwrap(
+        await admin.POST("/api/foods", {
+          body: { name, pluralName: `${name}es` },
+        })
+      );
+      deleteFood(food.id);
+
+      const found = await findOrCreateFood(`${name}ES`, { client });
+      expect(found.id).toBe(food.id);
+    });
+
+    it("finds a food that already exists", async () => {
+      const found = await findOrCreateFood(`it-lentils-${run}`, { client });
+      expect(found.id).toBe(ids.food);
+    });
+
+    it("creates a unit that is missing, then finds it again ignoring case and spaces", async () => {
+      const name = `it-pinch-${run}`;
+      const created = await findOrCreateUnit(name, { client });
+      deleteUnit(created.id);
+      expect(created).toEqual({ id: expect.any(String), name });
+
+      const again = await findOrCreateUnit(` ${name.toUpperCase()}`, {
+        client,
+      });
+      expect(again.id).toBe(created.id);
+    });
+
+    it("finds a unit by its abbreviation", async () => {
+      const unit = unwrap(
+        await admin.POST("/api/units", {
+          body: { name: `it-bushel-${run}`, abbreviation: `itbu${run}` },
+        })
+      );
+      deleteUnit(unit.id);
+
+      const found = await findOrCreateUnit(`ITBU${run}`, { client });
+      expect(found.id).toBe(unit.id);
+    });
+
+    it("finds a unit by its plural name", async () => {
+      const name = `it-sprig-${run}`;
+      const unit = unwrap(
+        await admin.POST("/api/units", {
+          body: { name, pluralName: `${name}s` },
+        })
+      );
+      deleteUnit(unit.id);
+
+      const found = await findOrCreateUnit(`${name}S`, { client });
+      expect(found.id).toBe(unit.id);
+    });
   });
 });

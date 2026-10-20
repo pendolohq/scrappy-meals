@@ -11,7 +11,12 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 - **Fasting days**: per person, by weekday or for one day; portions default
   to 0 and targets are hidden.
 - **Honest numbers**: nutrition comes from Mealie only. Recipes with missing
-  data are flagged and totals marked incomplete, never estimated.
+  data are flagged and totals marked incomplete; the planner never estimates.
+  AI-estimated values from an import are labelled "estimated" until reviewed.
+- **Add recipes by URL**: paste a recipe page's address and Mealie imports it,
+  keeping the address as the recipe's source. A review page then shows the
+  parsed ingredients (uncertain lines highlighted), servings and nutrition to
+  check before the recipe counts as done; the plan flags it until then.
 - **Shopping list**: the week's ingredients scaled by everyone's portions,
   merged by food and unit, and sent to a Mealie shopping list.
 - **Shop from the planner**: once sent, the same page is a checklist over that

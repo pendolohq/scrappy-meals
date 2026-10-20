@@ -8,9 +8,10 @@ What the planner relies on, checked against a running instance
 - Types: `app/src/server/mealie/schema.d.ts`, generated from the committed
   `openapi.json` snapshot by `bun run mealie:types` (`MEALIE_URL=... bun run mealie:types`).
   Fields that have a server default are optional in the types.
-- Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`), `recipes.ts`,
-  `shopping.ts`, `nutrition.ts`. Everything that holds the token imports
-  `server-only`, so it can't end up in a client bundle.
+- Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`,
+  `MealieUnavailableError`; `mealieImporter()` waits 60 s), `recipes.ts`,
+  `import.ts`, `shopping.ts`, `nutrition.ts`. Everything that holds the token
+  imports `server-only`, so it can't end up in a client bundle.
 - Auth: `Authorization: Bearer <token>`. Create a long-lived token in Mealie
   under Profile → API Tokens (`POST /api/users/api-tokens`).
 - `checkMealieVersion()` compares `/api/app/about` with the schema version; the
@@ -36,6 +37,12 @@ until every place names the same version (`mealie-version.test.ts`).
 | Remove items | `DELETE /api/households/shopping/items?ids=...&ids=...` |
 | Read one item | `GET /api/households/shopping/items/{id}` |
 | Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
+| Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
+| Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
+| Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
+| Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
+| Find or create a food / unit | `GET /api/foods\|units?search=&orderBy=name`, else `POST` |
+| Group slug (for links) | `GET /api/groups/self` → `slug` |
 | Version | `GET /api/app/about` |
 
 ## Nutrition
@@ -51,6 +58,52 @@ until every place names the same version (`mealie-version.test.ts`).
   optional expected unit (`12`, `12,5`, `7 g`, `250 kcal`). Blanks, ranges
   (`10-12`) and other units count as **missing**, and the recipe is flagged
   `partial` / `missing`; we never estimate.
+
+## Importing recipes
+
+- `create/url` fetches the page from Mealie's container and reads its
+  schema.org `Recipe` data. It answers **400 with a generic message** for
+  everything that goes wrong: no recipe on the page, page unreachable, or an
+  address Mealie refuses. Mealie's HTTP client (`safehttp`) resolves the host
+  and refuses loopback and private addresses, so it can't be pointed at the
+  Compose network. The same scraper runs on given HTML with
+  `create/html-or-json` (`data`, optional `url`), which the integration tests
+  use because CI has no page Mealie may fetch.
+- The page's URL is stored as `orgURL`. Nutrition is kept per serving with
+  units stripped (`"320 kcal"` → `"320"`); `recipeYield` "4 servings" becomes
+  `recipeServings: 4`.
+- **Ingredients arrive unparsed** (`note` only, quantity 0). The NLP parser
+  returns, per line, `quantity`, `unit` and `food` **by name, with `id: null`
+  when Mealie has no such unit or food yet**, plus `confidence.average`
+  (0–1). Low confidence is typical for lines like "a squeeze of lemon".
+- **Import state** lives in the recipe's `extras` (string values):
+  `scrappyReview` (`pending` | `done`; absent = done) and `scrappyNutrition`
+  (`source` | `estimated` | `reviewed`). `PATCH` replaces `extras` as a
+  whole, so write it with `withImportState()`, which keeps other keys.
+
+## Reviewing a recipe
+
+`/recipes/<slug>/review` (`src/server/recipe-review.ts`) is where an import is
+checked, and the planner's view of any recipe.
+
+- **Loading:** lines Mealie already has parsed (a food or unit id) are shown
+  as they are. The rest go through the parser as suggestions, unless the
+  recipe was already reviewed through the planner (`scrappyReview: done`):
+  then unparsed lines are text someone chose to keep.
+- **Saving is one `PATCH`.** It replaces `recipeIngredient` as a whole, so
+  each line carries its `referenceId` and the server copies the fields the
+  form doesn't edit from Mealie's current copy: `referenceId`,
+  `originalText`, `referencedRecipe`, `substitutions`. Lines that link
+  another recipe go back unchanged. `originalText` is filled in only for
+  lines that had no parse, so their original wording survives the save.
+- **Foods and units** the parser named but Mealie lacks are created, matched
+  first by name, plural or abbreviation, trimmed and case-insensitive, over
+  every page of search results (at most 4 lookups at a time). Two spellings
+  that match nothing ("tomato", "tomatoes") still create two foods.
+- **Nutrition:** only macros whose value changed are written; a value the
+  planner can't read ("10-12") is kept as Mealie has it and shown beside the
+  empty field. Other nutrition fields (sodium etc.) are kept.
+- **Links to Mealie** use `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`.
 
 ## Servings and ingredients
 

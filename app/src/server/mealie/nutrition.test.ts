@@ -29,9 +29,21 @@ describe("parseNutritionValue", () => {
     "n/a",
     "1.2.3",
     "1,200",
+    "1.200",
     "1,200 kcal",
   ])("rejects %j instead of guessing", (raw) => {
     expect(parseNutritionValue(raw, grams)).toBeNull();
+  });
+
+  it.each([
+    ["1,200 kcal", 1200],
+    ["1.200 kcal", 1200],
+    ["1.200,5", 1200.5],
+    ["0,125 kcal", 0.125],
+  ])("reads calories %j from either locale as %d", (raw, expected) => {
+    expect(
+      parseNutritionValue(raw, ["kcal", "cal", "calories"], "thousands")
+    ).toBe(expected);
   });
 
   it("accepts calorie units only for kcal", () => {
@@ -43,6 +55,15 @@ describe("parseNutritionValue", () => {
 });
 
 describe("normaliseNutrition", () => {
+  it("reads a thousands group for calories but not for grams", () => {
+    const n = normaliseNutrition({
+      calories: "1.200",
+      proteinContent: "1,200",
+    });
+    expect(n.perServing).toEqual({ kcal: 1200 });
+    expect(n.missing).toContain("protein");
+  });
+
   it("maps Mealie fields to our macros", () => {
     const n = normaliseNutrition({
       calories: "420",

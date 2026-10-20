@@ -8,6 +8,8 @@ export type MealForMacros = {
   /** Null when the recipe is gone from Mealie. */
   nutrition: RecipeNutrition | null;
   recipeName: string;
+  /** True when the nutrition is an AI estimate nobody has checked yet. */
+  estimated?: boolean;
   /** Servings one person eats at multiplier 1. */
   baseServings: number;
   /** Portion multiplier per user id; missing = 0. */
@@ -15,12 +17,17 @@ export type MealForMacros = {
 };
 
 export type PersonDayTotals = {
-  /** Sum of every value we know. Never includes estimates. */
+  /**
+   * Sum of every value we have. AI-estimated recipes count too, so the totals
+   * stay usable; they're listed in `estimatedRecipes` for the label.
+   */
   macros: Macros;
   /** True when at least one eaten meal lacks some nutrition, so the totals are a lower bound. */
   incomplete: boolean;
   /** Names of eaten recipes that lack nutrition data, for the warning. */
   incompleteRecipes: string[];
+  /** Names of eaten recipes whose nutrition is an unchecked estimate. */
+  estimatedRecipes: string[];
   mealsEaten: number;
 };
 
@@ -35,6 +42,7 @@ export function personDayTotals(
 ): PersonDayTotals {
   const macros: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 };
   const incompleteRecipes = new Set<string>();
+  const estimatedRecipes = new Set<string>();
   let mealsEaten = 0;
 
   for (const meal of meals) {
@@ -43,6 +51,9 @@ export function personDayTotals(
       continue;
     }
     mealsEaten += 1;
+    if (meal.estimated && meal.nutrition) {
+      estimatedRecipes.add(meal.recipeName);
+    }
     if (!meal.nutrition || meal.nutrition.status !== "complete") {
       incompleteRecipes.add(meal.recipeName);
     }
@@ -64,6 +75,7 @@ export function personDayTotals(
     macros,
     incomplete: incompleteRecipes.size > 0,
     incompleteRecipes: [...incompleteRecipes],
+    estimatedRecipes: [...estimatedRecipes],
     mealsEaten,
   };
 }

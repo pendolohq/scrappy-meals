@@ -1,3 +1,9 @@
+import {
+  parseDecimal,
+  THREE_DIGIT_GROUP,
+  type ThreeDigitGroup,
+} from "../domain/decimal";
+
 import type { components } from "./schema";
 
 type MealieNutrition = components["schemas"]["Nutrition"];
@@ -21,23 +27,34 @@ export type RecipeNutrition = {
   status: "complete" | "partial" | "missing";
 };
 
-const FIELDS: Record<
-  MacroKey,
-  { key: keyof MealieNutrition; units: string[] }
-> = {
+const GRAMS = ["g", "grams"];
+
+const FIELDS = {
   kcal: { key: "calories", units: ["kcal", "cal", "calories"] },
-  protein: { key: "proteinContent", units: ["g", "grams"] },
-  carbs: { key: "carbohydrateContent", units: ["g", "grams"] },
-  fat: { key: "fatContent", units: ["g", "grams"] },
-  fibre: { key: "fiberContent", units: ["g", "grams"] },
-};
+  protein: { key: "proteinContent", units: GRAMS },
+  carbs: { key: "carbohydrateContent", units: GRAMS },
+  fat: { key: "fatContent", units: GRAMS },
+  fibre: { key: "fiberContent", units: GRAMS },
+} as const satisfies Record<
+  MacroKey,
+  { key: keyof MealieNutrition; units: readonly string[] }
+>;
 
-const NUMBER_WITH_UNIT = /^(\d+(?:[.,]\d+)?)\s*([a-z]*)$/i;
+/** The Mealie nutrition field each macro is stored in. */
+export const NUTRITION_FIELDS = Object.fromEntries(
+  MACRO_KEYS.map((m) => [m, FIELDS[m].key])
+) as { [K in MacroKey]: (typeof FIELDS)[K]["key"] };
 
-/** Parses one Mealie nutrition string ("12", "12.5", "12,5 g", "250 kcal"); null if not clean. */
+const NUMBER_WITH_UNIT = /^(\d[\d.,]*)\s*([a-z]*)$/i;
+
+/**
+ * Parses one Mealie nutrition string ("12", "12.5", "12,5 g", "1.200 kcal");
+ * null if not clean. See `parseDecimal` for "1,200".
+ */
 export function parseNutritionValue(
   raw: string | null | undefined,
-  units: string[]
+  units: readonly string[],
+  threeDigitGroup: ThreeDigitGroup = "refuse"
 ): number | null {
   const text = raw?.trim();
   if (!text) {
@@ -47,16 +64,11 @@ export function parseNutritionValue(
   if (!m) {
     return null;
   }
-  // "1,200" is a thousands separator as often as a decimal comma; don't guess.
-  if (/,\d{3}$/.test(m[1])) {
-    return null;
-  }
   const unit = m[2].toLowerCase();
   if (unit && !units.includes(unit)) {
     return null;
   }
-  const value = Number(m[1].replace(",", "."));
-  return Number.isFinite(value) ? value : null;
+  return parseDecimal(m[1], threeDigitGroup);
 }
 
 export function normaliseNutrition(
@@ -66,7 +78,11 @@ export function normaliseNutrition(
   const missing: MacroKey[] = [];
   for (const macro of MACRO_KEYS) {
     const { key, units } = FIELDS[macro];
-    const value = parseNutritionValue(nutrition?.[key], units);
+    const value = parseNutritionValue(
+      nutrition?.[key],
+      units,
+      THREE_DIGIT_GROUP[macro]
+    );
     if (value === null) {
       missing.push(macro);
     } else {

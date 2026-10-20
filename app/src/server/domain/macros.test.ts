@@ -75,6 +75,21 @@ describe("personDayTotals", () => {
     expect(t.incompleteRecipes).toEqual(["Toast", "Gone"]);
   });
 
+  it("counts estimated nutrition and names the recipes it came from", () => {
+    const t = personDayTotals(
+      [
+        meal({}),
+        meal({ estimated: true, recipeName: "Reel Curry" }),
+        meal({ estimated: true, recipeName: "Skipped", portions: { b: 1 } }),
+        meal({ estimated: true, nutrition: null, recipeName: "Gone" }),
+      ],
+      "a"
+    );
+    expect(t.macros.kcal).toBe(1000);
+    expect(t.estimatedRecipes).toEqual(["Reel Curry"]);
+    expect(personDayTotals([meal({})], "a").estimatedRecipes).toEqual([]);
+  });
+
   it("rounds to one decimal without drifting", () => {
     const n: RecipeNutrition = {
       ...full,
