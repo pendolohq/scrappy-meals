@@ -46,6 +46,15 @@ export function today(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * The week `/plan` opens on `day`: this week while nothing is planned in it
+ * yet, else the next one, which is the week still to lay out.
+ */
+export function weekToPlan(day: string, thisWeekHasMeals: boolean): string {
+  const monday = weekStartOf(day);
+  return thisWeekHasMeals ? addDays(monday, 7) : monday;
+}
+
 /** A week's Monday as it arrives from the browser, for server action input. */
 export const weekStartSchema = z
   .string()

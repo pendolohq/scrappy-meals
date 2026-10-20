@@ -64,11 +64,14 @@ export const AddMeal = ({
   slot,
   snackIndex,
   label,
+  className,
 }: {
   date: string;
   slot: SlotType;
   snackIndex: number;
   label: string;
+  /** Replaces the trigger's styling; its text stays "Add <slot>". */
+  className?: string;
 }) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -105,7 +108,10 @@ export const AddMeal = ({
       <button
         type="button"
         onClick={show}
-        className="-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
+        className={
+          className ??
+          "-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
+        }
       >
         <Plus className="size-4" aria-hidden />
         Add {what}

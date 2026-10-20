@@ -4,6 +4,7 @@ import {
   BookPlus,
   CalendarDays,
   ChartNoAxesColumn,
+  ClipboardList,
   type LucideIcon,
   Settings,
   ShoppingBasket,
@@ -20,23 +21,31 @@ type Item = {
   active: boolean;
 };
 
-const WEEK_PATH = /^\/week\/(\d{4}-\d{2}-\d{2})(\/[a-z]+)?/;
+const WEEK_PATH = /^\/(week|plan)\/(\d{4}-\d{2}-\d{2})(\/[a-z]+)?/;
 
 /**
- * Where each section lives. Shopping and adherence belong to a week: the one
- * on screen if there is one, else the current week (`currentWeek`).
+ * Where each section lives. The plan, shopping and adherence belong to a week:
+ * the one on screen if there is one, else the current week (`currentWeek`).
+ * Plan with no week on screen opens `/plan`, which picks the week to plan.
  */
 const useItems = (currentWeek: string): Item[] => {
   const pathname = usePathname();
   const match = WEEK_PATH.exec(pathname);
-  const week = match?.[1] ?? currentWeek;
-  const sub = match?.[2] ?? "";
+  const onPlan = match?.[1] === "plan" || pathname === "/plan";
+  const week = match?.[2] ?? currentWeek;
+  const sub = match?.[3] ?? "";
   return [
     {
       label: "Week",
       href: match ? `/week/${week}` : "/week",
       icon: CalendarDays,
-      active: pathname === "/week" || (Boolean(match) && sub === ""),
+      active: pathname === "/week" || (Boolean(match) && !onPlan && sub === ""),
+    },
+    {
+      label: "Plan",
+      href: match ? `/plan/${week}` : "/plan",
+      icon: ClipboardList,
+      active: onPlan,
     },
     {
       label: "Shopping",
@@ -90,10 +99,10 @@ export const SideNav = ({ currentWeek }: { currentWeek: string }) => (
   </nav>
 );
 
-/**
- * Phones: a tab bar along the bottom, above the home indicator. "Add recipe"
- * lives in the top bar instead, to keep four tabs.
- */
+/** What phones reach from the top bar instead, to keep four tabs. */
+const IN_TOP_BAR = new Set(["Add recipe", "Settings"]);
+
+/** Phones: a tab bar along the bottom, above the home indicator. */
 export const TabBar = ({ currentWeek }: { currentWeek: string }) => (
   <nav
     aria-label="Main"
@@ -101,7 +110,7 @@ export const TabBar = ({ currentWeek }: { currentWeek: string }) => (
   >
     <ul className="mx-auto grid max-w-lg grid-cols-4">
       {useItems(currentWeek)
-        .filter((i) => i.label !== "Add recipe")
+        .filter((i) => !IN_TOP_BAR.has(i.label))
         .map(({ label, href, icon: Icon, active }) => (
           <li key={label}>
             <Link

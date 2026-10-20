@@ -11,6 +11,9 @@ import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../week-route";
 
+const linkClass =
+  "inline-flex min-h-tap items-center font-medium text-accent-ink";
+
 export default async function WeekPage({
   params,
 }: {
@@ -26,13 +29,13 @@ export default async function WeekPage({
       <AutoRefresh />
       <WeekHeader weekStart={weekStart}>
         {weekStartOf(now) !== weekStart && (
-          <Link
-            href="/week"
-            className="inline-flex min-h-tap items-center font-medium text-accent-ink"
-          >
+          <Link href="/week" className={linkClass}>
             Back to this week
           </Link>
         )}
+        <Link href={`/plan/${weekStart}`} className={linkClass}>
+          Plan this week
+        </Link>
       </WeekHeader>
 
       {plan.members.length === 0 && (

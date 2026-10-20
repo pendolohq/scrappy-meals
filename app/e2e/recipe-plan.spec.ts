@@ -5,6 +5,7 @@ import { formatDay } from "../src/lib/format";
 import { addDays, today, weekStartOf } from "../src/server/domain/week";
 
 import { STATE_FILE, USERS } from "./global-setup";
+import { planMeal } from "./plan-meal";
 
 const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
@@ -33,12 +34,7 @@ test("an imported recipe is flagged in the plan until it is reviewed", async ({
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(otherDay())}"]`);
 
-  await day.getByRole("button", { name: "Add dinner" }).click();
-  await page.getByRole("dialog").getByLabel("Search recipes").fill(reel.name);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: new RegExp(reel.name) })
-    .click();
+  await planMeal(page, { date: otherDay(), slot: "Dinner", recipe: reel.name });
   const meal = day.getByTestId("meal").filter({ hasText: reel.name });
   await expect(meal.getByText("≈ Estimated nutrition")).toBeVisible();
   await expect(

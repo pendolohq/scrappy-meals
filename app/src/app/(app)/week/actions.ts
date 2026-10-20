@@ -26,11 +26,12 @@ const id = z.uuid();
  * Refreshes the week pages and the pages under them (a meal's recipe page,
  * shopping); returns the empty success result. `"layout"` only reaches nested
  * pages with the route pattern, not a literal path, so this covers every week:
- * they are all rendered per request anyway.
+ * they are all rendered per request anyway. The Plan page shows the same meals.
  */
 function refreshWeek(day: string | null) {
   if (day) {
     revalidatePath("/week/[weekStart]", "layout");
+    revalidatePath("/plan/[weekStart]", "page");
   }
   return {};
 }

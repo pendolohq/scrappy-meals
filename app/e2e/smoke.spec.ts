@@ -5,6 +5,7 @@ import { formatDay } from "../src/lib/format";
 import { today, weekStartOf } from "../src/server/domain/week";
 
 import { STATE_FILE, USERS } from "./global-setup";
+import { planMeal } from "./plan-meal";
 
 const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
@@ -61,13 +62,8 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
 
-  // Add today's lunch from Mealie.
-  await day.getByRole("button", { name: "Add lunch" }).click();
-  await page.getByRole("dialog").getByLabel("Search recipes").fill(recipe.name);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: new RegExp(recipe.name) })
-    .click();
+  // Plan today's lunch from Mealie.
+  await planMeal(page, { date: today(), slot: "Lunch", recipe: recipe.name });
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(meal).toBeVisible();
   await expect(day.getByTestId("totals-Alex").getByTestId("kcal")).toHaveText(

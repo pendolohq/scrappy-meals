@@ -1,4 +1,4 @@
-import { BookPlus } from "lucide-react";
+import { BookPlus, Settings } from "lucide-react";
 import Link from "next/link";
 
 import { SideNav, TabBar } from "@/components/app-nav";
@@ -44,6 +44,14 @@ export default async function AppLayout({
             className={iconButtonClass()}
           >
             <BookPlus className="size-5" aria-hidden />
+          </Link>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            title="Settings"
+            className={iconButtonClass()}
+          >
+            <Settings className="size-5" aria-hidden />
           </Link>
           <SignOut name={user.name} compact />
         </div>
