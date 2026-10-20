@@ -64,4 +64,10 @@ test("opens the week on today and moves between days from the strip", async ({
   const next = addDays(week, 7);
   await expect(page).toHaveURL(`/week/${next}`);
   await expectShown(next);
+
+  // A repeated hash, as Next.js can leave after a client navigation, still
+  // names the day, and goes back to one.
+  await page.goto(`/week/${week}#${other}#${other}`);
+  await expectShown(other);
+  await expect(page).toHaveURL(`/week/${week}#${other}`);
 });

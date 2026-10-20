@@ -5,7 +5,8 @@ import { weekStartOf } from "../src/server/domain/week";
 
 /**
  * Adds a recipe to a day's slot from the Plan page, then opens that day's
- * week, where the specs look at it.
+ * week, where the specs look at it. The hash opens the phone's day carousel
+ * on that day: otherwise it opens on today, with the day off to one side.
  */
 export async function planMeal(
   page: Page,
@@ -27,5 +28,5 @@ export async function planMeal(
       .filter({ hasText: recipe })
       .last()
   ).toBeVisible();
-  await page.goto(`/week/${week}`);
+  await page.goto(`/week/${week}#${date}`);
 }

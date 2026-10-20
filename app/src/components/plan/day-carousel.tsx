@@ -16,9 +16,17 @@ const noSubscribe = () => () => {};
 const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/**
+ * The day the URL's hash names. Next.js can repeat the hash when it
+ * navigates to a route it has cached from a URL with one (`#d#d`), so only
+ * the last one counts.
+ */
+const hashDay = () =>
+  decodeURIComponent(window.location.hash.split("#").pop() ?? "");
+
 /** The index in `dates` of the day the URL's hash names, if any. */
 const hashIndex = (dates: string[]) => {
-  const i = dates.indexOf(decodeURIComponent(window.location.hash.slice(1)));
+  const i = dates.indexOf(hashDay());
   return i === -1 ? null : i;
 };
 
@@ -38,7 +46,7 @@ const slideLeft = (track: HTMLElement, i: number) => {
 const positionScript = (dates: string[], initial: number) =>
   `(() => {
   const t = document.currentScript.previousElementSibling;
-  const i = ${JSON.stringify(dates)}.indexOf(decodeURIComponent(location.hash.slice(1)));
+  const i = ${JSON.stringify(dates)}.indexOf(decodeURIComponent(location.hash.split("#").pop()));
   let tries = 0;
   const place = () => {
     if (t.closest("[hidden]")) {
@@ -102,10 +110,15 @@ export const DayCarousel = ({
     if (!el) {
       return;
     }
-    const start = hashIndex(dates) ?? initialIndex;
+    const fromHash = hashIndex(dates);
+    const start = fromHash ?? initialIndex;
     el.scrollLeft = slideLeft(el, start);
     current.current = start;
     setSelected(start);
+    // Back to one hash, so a reload or Back reads the day again.
+    if (fromHash !== null && window.location.hash !== `#${dates[start]}`) {
+      window.history.replaceState(null, "", `#${dates[start]}`);
+    }
   });
   useLayoutEffect(() => open(), []);
 
