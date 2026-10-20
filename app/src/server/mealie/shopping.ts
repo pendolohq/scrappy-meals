@@ -7,8 +7,6 @@ type MealieItemCreate = components["schemas"]["ShoppingListItemCreate"];
 type MealieItemOut = components["schemas"]["ShoppingListItemOut-Output"];
 type MealieItemUpdate = components["schemas"]["ShoppingListItemUpdate"];
 
-const CLIENT_ID = "scrappyClientId";
-
 // Mealie merges and labels every line of a week's list in one request; give it
 // time rather than give up halfway with the old items already deleted.
 const BULK_TIMEOUT_MS = 30_000;
@@ -27,8 +25,6 @@ export type ShoppingItem = {
   /** Mealie's label for the item (or its food), used to group by aisle. */
   label: string | null;
   position: number;
-  /** Set on lines added from the shop page, so a replayed add finds them. */
-  clientId: string | null;
 };
 
 /** One line to add. Without foodId the line is free text (note) and Mealie won't merge it. */
@@ -39,7 +35,6 @@ export type NewShoppingItem = {
   note?: string;
   /** Recipes this line came from, so Mealie can show them on the item. */
   recipeIds?: string[];
-  clientId?: string;
 };
 
 export async function findShoppingListByName(
@@ -109,7 +104,6 @@ export async function addShoppingItems(
       recipeId,
       recipeQuantity: 1,
     })),
-    extras: item.clientId ? { [CLIENT_ID]: item.clientId } : {},
   }));
   const out = unwrap(
     await client.POST("/api/households/shopping/items/create-bulk", { body })
@@ -201,7 +195,5 @@ function toItem(i: MealieItemOut): ShoppingItem {
     checked: i.checked ?? false,
     label: i.label?.name ?? i.food?.label?.name ?? null,
     position: i.position ?? 0,
-    clientId:
-      typeof i.extras?.[CLIENT_ID] === "string" ? i.extras[CLIENT_ID] : null,
   };
 }

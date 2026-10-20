@@ -316,23 +316,8 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       ).toBe(false);
 
       // A hand-added line is a plain note, and survives sending the week again.
-      const clientId = `local-${randomUUID()}`;
-      const coffee = await addShopItem(
-        db,
-        WEEK,
-        `it-coffee-${run}`,
-        clientId,
-        opts
-      );
-      expect(coffee).toMatchObject({
-        listId: pushed.listId,
-        checked: false,
-        clientId,
-      });
-      // Sending the same add again (a lost response) doesn't duplicate it.
-      expect(
-        (await addShopItem(db, WEEK, `it-coffee-${run}`, clientId, opts)).id
-      ).toBe(coffee.id);
+      const coffee = await addShopItem(db, WEEK, `it-coffee-${run}`, opts);
+      expect(coffee).toMatchObject({ listId: pushed.listId, checked: false });
       await pushShoppingList(db, WEEK, opts);
       const after = (await weekShopList(db, WEEK, opts))!.items;
       expect(after.find((i) => i.id === coffee.id)?.note).toBe(
@@ -354,9 +339,11 @@ describe.skipIf(!baseUrl || !testDbUrl)(
           (i) => i.id === coffee.id
         )
       ).toBe(false);
-      await expect(removeShopItem(db, WEEK, coffee.id, opts)).rejects.toThrow(
-        "no longer on the list"
-      );
+      // Removing it again (a replay whose answer was lost) is harmless.
+      await removeShopItem(db, WEEK, coffee.id, opts);
+      await expect(
+        checkShopItem(db, WEEK, coffee.id, true, opts)
+      ).rejects.toThrow("no longer on the list");
     });
 
     it("has no shop list before the week is sent", async () => {

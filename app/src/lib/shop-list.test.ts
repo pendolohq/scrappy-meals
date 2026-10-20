@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   applyQueue,
   dropFailed,
-  enqueue,
+  flushQueue,
   groupItems,
   type QueuedChange,
   replaceTempId,
+  type SendResult,
   type ShopItemView,
 } from "./shop-list";
 
@@ -38,46 +39,6 @@ const remove = (itemId: string): QueuedChange => ({
   itemId,
 });
 
-describe("enqueue", () => {
-  it("keeps only the latest tick for an item", () => {
-    const b = check("b");
-    const a2 = check("a", false);
-    let q = enqueue([], check("a"));
-    q = enqueue(q, b);
-    q = enqueue(q, a2);
-    expect(q).toEqual([b, a2]);
-  });
-
-  it("drops earlier changes to an item that is removed", () => {
-    const r = remove("a");
-    expect(enqueue(enqueue([], check("a")), r)).toEqual([r]);
-  });
-
-  it("forgets an item added offline and removed before it was sent", () => {
-    let q = enqueue([], add("local-1", "coffee"));
-    q = enqueue(q, check("local-1"));
-    q = enqueue(q, remove("local-1"));
-    expect(q).toEqual([]);
-  });
-
-  it("leaves the change being sent alone", () => {
-    const sending = check("a");
-    const again = check("a", false);
-    expect(enqueue([sending], again, sending.id)).toEqual([sending, again]);
-  });
-
-  it("keeps a removal of an item whose add is already being sent", () => {
-    const sending = add("local-1");
-    const r = remove("local-1");
-    const q = enqueue([sending], r, sending.id);
-    expect(q).toEqual([sending, r]);
-    // Once Mealie answers, the removal targets the real item.
-    expect(replaceTempId(q.slice(1), "local-1", "real")).toEqual([
-      { ...r, itemId: "real" },
-    ]);
-  });
-});
-
 describe("dropFailed", () => {
   it("drops only the failed change", () => {
     const a = check("a");
@@ -90,6 +51,94 @@ describe("dropFailed", () => {
     const tick = check("local-1");
     const other = check("b");
     expect(dropFailed([failed, tick, other], failed)).toEqual([other]);
+  });
+});
+
+describe("flushQueue", () => {
+  /** A queue in memory and a server that answers from `answer`. */
+  const setup = (
+    queue: QueuedChange[],
+    answer: (c: QueuedChange) => Promise<SendResult>
+  ) => {
+    const state = { queue, sent: [] as QueuedChange[] };
+    const io = {
+      read: () => state.queue,
+      write: (q: QueuedChange[]) => {
+        state.queue = q;
+      },
+      send: (c: QueuedChange) => {
+        state.sent.push(c);
+        return answer(c);
+      },
+      onSaved: vi.fn<() => void>(),
+      onRetry: vi.fn<(message: string) => void>(),
+      onDrop: vi.fn<(message: string) => void>(),
+    };
+    return { state, io };
+  };
+
+  it("stops at a retryable error and keeps the queue", async () => {
+    const q = [check("a"), check("b")];
+    const { state, io } = setup(q, async () => ({
+      error: "Mealie didn't answer",
+      retry: true,
+    }));
+    await flushQueue(io);
+    expect(state.queue).toEqual(q);
+    expect(state.sent).toHaveLength(1);
+    expect(io.onRetry).toHaveBeenCalledWith("Mealie didn't answer");
+  });
+
+  it("stops when the request itself fails (offline)", async () => {
+    const q = [check("a")];
+    const { state, io } = setup(q, () =>
+      Promise.reject(new TypeError("offline"))
+    );
+    await flushQueue(io);
+    expect(state.queue).toEqual(q);
+  });
+
+  it("drops a change that can never succeed, with its dependants, and carries on", async () => {
+    const failed = add("local-1");
+    const tick = check("local-1");
+    const other = check("b");
+    const { state, io } = setup([failed, tick, other], async (c) =>
+      c === failed ? { error: "Mealie refused that change." } : {}
+    );
+    await flushQueue(io);
+    expect(state.queue).toEqual([]);
+    expect(state.sent).toEqual([failed, other]);
+    expect(io.onDrop).toHaveBeenCalledWith("Mealie refused that change.");
+  });
+
+  it("points later changes at the id Mealie gave a queued add", async () => {
+    const a = add("local-1", "coffee");
+    const tick = check("local-1");
+    const { state, io } = setup([a, tick], async (c) =>
+      c.kind === "add" ? { item: { id: "real" } } : {}
+    );
+    await flushQueue(io);
+    expect(state.sent[1]).toEqual({ ...tick, itemId: "real" });
+    expect(state.queue).toEqual([]);
+  });
+
+  it("keeps a change queued while another is being sent", async () => {
+    const first = check("a");
+    const later = check("b");
+    let release = () => {};
+    const { state, io } = setup([first], (c) =>
+      c === first
+        ? new Promise<SendResult>((resolve) => {
+            release = () => resolve({});
+          })
+        : Promise.resolve({})
+    );
+    const run = flushQueue(io);
+    state.queue = [...state.queue, later]; // the user ticks something meanwhile
+    release();
+    await run;
+    expect(state.sent).toEqual([first, later]);
+    expect(state.queue).toEqual([]);
   });
 });
 

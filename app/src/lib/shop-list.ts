@@ -12,9 +12,10 @@ export type ShopItemView = {
 };
 
 /**
- * A change made on this device, with its own `id`. Ticks set a value instead
- * of toggling, and adds carry their `tempId` to Mealie, so a change sent
- * twice (say, after a dropped response) ends up the same.
+ * A change made on this device, with its own `id`. Changes are only ever
+ * appended and sent in order. Ticks set a value instead of toggling and a
+ * removal of an item that is already gone succeeds, so a change sent twice
+ * (say, after a dropped response) ends up the same.
  */
 export type QueuedChange = { id: string } & (
   | { kind: "check"; itemId: string; checked: boolean }
@@ -23,38 +24,6 @@ export type QueuedChange = { id: string } & (
 );
 
 export const TEMP_PREFIX = "local-";
-
-const isTemp = (id: string) => id.startsWith(TEMP_PREFIX);
-
-/**
- * Adds a change to the queue, folding it into earlier changes to the same
- * item. The change being sent right now (`inFlightId`) is never touched: its
- * request is already out, and it leaves the queue when the request settles.
- */
-export function enqueue(
-  queue: QueuedChange[],
-  change: QueuedChange,
-  inFlightId: string | null = null
-): QueuedChange[] {
-  if (change.kind === "add") {
-    return [...queue, change];
-  }
-  const target = change.itemId;
-  const foldable = (c: QueuedChange) =>
-    c.id !== inFlightId &&
-    (c.kind === "add" ? c.tempId === target : c.itemId === target);
-  if (change.kind === "remove") {
-    // An item whose add hasn't been sent yet just disappears. If the add is
-    // already on its way, the removal waits for Mealie's id (replaceTempId).
-    const unsentAdd =
-      isTemp(target) &&
-      queue.some((c) => c.kind === "add" && c.tempId === target && foldable(c));
-    const rest = queue.filter((c) => !foldable(c));
-    return unsentAdd ? rest : [...rest, change];
-  }
-  // A later tick replaces an earlier, unsent one for the same item.
-  return [...queue.filter((c) => !(c.kind === "check" && foldable(c))), change];
-}
 
 /**
  * Takes a change that will never succeed off the queue; for an add, also the
@@ -107,6 +76,54 @@ export function replaceTempId(
   return queue.map((c) =>
     c.kind !== "add" && c.itemId === tempId ? { ...c, itemId: id } : c
   );
+}
+
+/** What the server answered for one change. */
+export type SendResult = {
+  error?: string;
+  retry?: true;
+  item?: { id: string };
+};
+
+/**
+ * Saves queued changes one at a time, oldest first. A change stays queued
+ * until its request settles, then the queue is re-read, since the user may
+ * have changed more in the meantime. A failed request or a retryable error
+ * (Mealie or the database down, signed out) stops the run and keeps the
+ * queue; any other error drops that change and is reported.
+ */
+export async function flushQueue(io: {
+  read: () => QueuedChange[];
+  write: (queue: QueuedChange[]) => void;
+  send: (change: QueuedChange) => Promise<SendResult>;
+  onSaved: () => void;
+  onRetry: (message: string) => void;
+  onDrop: (message: string) => void;
+}): Promise<void> {
+  for (let change = io.read()[0]; change; change = io.read()[0]) {
+    let result: SendResult;
+    try {
+      result = await io.send(change);
+    } catch {
+      return;
+    }
+    if (result.error && result.retry) {
+      io.onRetry(result.error);
+      return;
+    }
+    if (result.error) {
+      io.onDrop(result.error);
+      io.write(dropFailed(io.read(), change));
+      continue;
+    }
+    io.onSaved();
+    const rest = io.read().filter((c) => c.id !== change.id);
+    io.write(
+      change.kind === "add" && result.item
+        ? replaceTempId(rest, change.tempId, result.item.id)
+        : rest
+    );
+  }
 }
 
 export type ShopGroup = { label: string; items: ShopItemView[] };
