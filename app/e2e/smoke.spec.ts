@@ -2,7 +2,9 @@ import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 import { formatDay } from "../src/lib/format";
+import { createDb } from "../src/server/db/client";
 import { today, weekStartOf } from "../src/server/domain/week";
+import { setPassword } from "../src/server/users";
 
 import { STATE_FILE, USERS } from "./global-setup";
 import { planMeal } from "./plan-meal";
@@ -13,6 +15,16 @@ const state = () =>
     food: string;
     extra: string;
   };
+
+/** Signs out every device of `user`; the password stays the same. */
+async function endSessions(user: { email: string; password: string }) {
+  const { db, pool } = createDb(process.env.DATABASE_URL ?? "", { max: 1 });
+  try {
+    await setPassword(db, user.email, user.password);
+  } finally {
+    await pool.end();
+  }
+}
 
 async function signIn(page: Page, user: { email: string; password: string }) {
   await page.goto("/login");
@@ -141,8 +153,10 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await context.setOffline(false);
 
   // A session that ended elsewhere (password changed) drops the cached plan
-  // as soon as a page bounces to the login screen.
-  await context.clearCookies();
+  // as soon as a page bounces to the login screen. Ended on the server, as
+  // `scrappy user passwd` does: clearing the cookies instead races the
+  // page's prefetches, whose responses bring the session cookie back.
+  await endSessions(USERS.alex);
   await page.goto("/week");
   await expect(page).toHaveURL(/\/login/);
   await context.setOffline(true);
