@@ -1,14 +1,16 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-import { formatRange } from "@/lib/format";
-import { addDays } from "@/server/domain/week";
+import { formatRange, formatWeekLabel } from "@/lib/format";
+import { addDays, today, weekStartOf } from "@/server/domain/week";
 
-const nav = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm";
+import { iconButtonClass } from "./ui/icon-button";
 
 /**
- * Previous/next week arrows around the week's title. The arrows stay on the
- * same page (`page`, e.g. "shopping"; empty for the plan); `children` are the
- * links under the title.
+ * The week's serif title with previous/next arrows. The arrows stay on the
+ * same page (`page`, e.g. "shopping"; empty for the plan). `title` names the
+ * page ("Shopping"); without it the title is the week itself ("This week").
+ * `children` sit under the date range.
  */
 export const WeekHeader = ({
   weekStart,
@@ -19,25 +21,41 @@ export const WeekHeader = ({
   weekStart: string;
   page?: string;
   title?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) => {
   const href = (days: number) =>
     `/week/${addDays(weekStart, days)}${page && `/${page}`}`;
+  const label = formatWeekLabel(weekStart, weekStartOf(today()));
   const range = formatRange(weekStart, addDays(weekStart, 6));
   return (
-    <div className="flex items-center justify-between gap-2">
-      <Link href={href(-7)} className={nav} aria-label="Previous week">
-        ←
-      </Link>
-      <div className="text-center">
-        <h1 className="font-semibold">
-          {title ? `${title} · ${range}` : range}
+    <header className="flex items-end justify-between gap-3">
+      <div className="min-w-0 space-y-1">
+        <h1 className="font-serif text-title font-semibold sm:text-display">
+          {title ?? label}
         </h1>
-        {children}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+          <span className="tabular-nums">
+            {title ? `${label} · ${range}` : range}
+          </span>
+          {children}
+        </p>
       </div>
-      <Link href={href(7)} className={nav} aria-label="Next week">
-        →
-      </Link>
-    </div>
+      <div className="flex shrink-0 gap-2">
+        <Link
+          href={href(-7)}
+          className={iconButtonClass("outline")}
+          aria-label="Previous week"
+        >
+          <ChevronLeft className="size-5" aria-hidden />
+        </Link>
+        <Link
+          href={href(7)}
+          className={iconButtonClass("outline")}
+          aria-label="Next week"
+        >
+          <ChevronRight className="size-5" aria-hidden />
+        </Link>
+      </div>
+    </header>
   );
 };

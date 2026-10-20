@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDay, formatPortion, formatRange } from "./format";
+import {
+  formatDay,
+  formatPortion,
+  formatRange,
+  formatWeekLabel,
+} from "./format";
 
 describe("format", () => {
   it("formats days and ranges", () => {
@@ -18,5 +23,18 @@ describe("format", () => {
     [1.3, "1.3"],
   ])("portion %d -> %s", (n, s) => {
     expect(formatPortion(n)).toBe(s);
+  });
+});
+
+describe("formatWeekLabel", () => {
+  it("names the weeks around this one", () => {
+    expect(formatWeekLabel("2026-10-19", "2026-10-19")).toBe("This week");
+    expect(formatWeekLabel("2026-10-26", "2026-10-19")).toBe("Next week");
+    expect(formatWeekLabel("2026-10-12", "2026-10-19")).toBe("Last week");
+  });
+
+  it("dates the ones further away, across a clock change", () => {
+    expect(formatWeekLabel("2026-11-02", "2026-10-19")).toBe("Week of 2 Nov");
+    expect(formatWeekLabel("2026-03-23", "2026-04-06")).toBe("Week of 23 Mar");
   });
 });
