@@ -6,9 +6,9 @@ import { PlanDay } from "@/components/plan/plan-day";
 import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
-import { today } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
+import { viewerToday } from "@/server/today";
 
 import { canonicalWeek } from "../../week/week-route";
 
@@ -23,7 +23,7 @@ export default async function PlanPage({
   await requireUser();
   const weekStart = canonicalWeek((await params).weekStart, "", "/plan");
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
-  const now = today();
+  const now = await viewerToday();
 
   return (
     <div className="space-y-5 pb-8" data-wide>

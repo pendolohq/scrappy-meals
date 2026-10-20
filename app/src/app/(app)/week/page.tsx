@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 
-import { today, weekStartOf } from "@/server/domain/week";
+import { weekStartOf } from "@/server/domain/week";
+import { requireUser } from "@/server/session";
+import { viewerToday } from "@/server/today";
 
 export const dynamic = "force-dynamic";
 
-export default function CurrentWeek() {
-  redirect(`/week/${weekStartOf(today())}`);
+export default async function CurrentWeek() {
+  await requireUser();
+  redirect(`/week/${weekStartOf(await viewerToday())}`);
 }

@@ -7,9 +7,10 @@ import { DayCarousel } from "@/components/plan/day-carousel";
 import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
-import { today, weekStartOf } from "@/server/domain/week";
+import { weekStartOf } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
+import { viewerToday } from "@/server/today";
 
 import { canonicalWeek } from "../week-route";
 
@@ -24,7 +25,7 @@ export default async function WeekPage({
   const user = await requireUser();
   const weekStart = canonicalWeek((await params).weekStart);
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
-  const now = today();
+  const now = await viewerToday();
   const dates = plan.days.map((day) => day.date);
 
   return (

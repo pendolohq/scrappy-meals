@@ -7,8 +7,9 @@ import { PrecacheWeek } from "@/components/pwa";
 import { SignOut } from "@/components/sign-out";
 import { Brand, BrandMark } from "@/components/ui/brand";
 import { iconButtonClass } from "@/components/ui/icon-button";
-import { today, weekStartOf } from "@/server/domain/week";
+import { weekStartOf } from "@/server/domain/week";
 import { requireUser } from "@/server/session";
+import { viewerToday } from "@/server/today";
 
 export default async function AppLayout({
   children,
@@ -16,7 +17,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const currentWeek = weekStartOf(today());
+  const currentWeek = weekStartOf(await viewerToday());
 
   return (
     <div className="lg:flex">

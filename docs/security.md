@@ -53,6 +53,13 @@ the input: fasting, adherence and settings work this way. Plan edits (meals,
 portions, servings) and the household settings (snacks a day) are
 household-wide on purpose: anyone signed in can change them.
 
+"Today" comes from the device: the browser keeps its time zone in the `tz`
+cookie (`src/lib/time-zone.ts`), read through `viewerToday()` in
+`src/server/today.ts`. It's input like any other. `validTimeZone()` drops a
+zone the runtime doesn't know (the server's `TZ` applies instead), and a
+made-up far-east zone only lets someone log their own meals up to a day early,
+which is fine.
+
 ## Defence in depth
 
 - `src/proxy.ts` (Next.js middleware) redirects (or answers 401 under `/api/`) for everything

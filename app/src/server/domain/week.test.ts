@@ -5,6 +5,7 @@ import {
   isIsoDate,
   isoWeekday,
   today,
+  validTimeZone,
   weekDays,
   weekStartOf,
   weekToPlan,
@@ -36,8 +37,35 @@ describe("week helpers", () => {
     expect(addDays("2026-10-25", 1)).toBe("2026-10-26"); // EU DST ends 2026-10-25
   });
 
-  it("formats today in local time", () => {
+  it("formats today in local time without a zone", () => {
     expect(today(new Date(2026, 9, 19, 23, 30))).toBe("2026-10-19");
+  });
+
+  it("formats today in the device's zone, either side of midnight", () => {
+    const instant = new Date("2026-10-19T22:30:00Z");
+    expect(today(instant, "UTC")).toBe("2026-10-19");
+    expect(today(instant, "Asia/Tokyo")).toBe("2026-10-20");
+    expect(today(new Date("2026-10-20T03:00:00Z"), "America/New_York")).toBe(
+      "2026-10-19"
+    );
+    expect(today(new Date("2026-10-20T00:00:00Z"), "Europe/London")).toBe(
+      "2026-10-20"
+    );
+  });
+
+  it("falls back to local time for a zone it doesn't know", () => {
+    const instant = new Date(2026, 9, 19, 23, 30);
+    for (const zone of ["Mars/Olympus", "", "x".repeat(100), "<script>"]) {
+      expect(today(instant, zone)).toBe("2026-10-19");
+    }
+  });
+});
+
+describe("validTimeZone", () => {
+  it("keeps real zones and drops anything else", () => {
+    expect(validTimeZone("Europe/Berlin")).toBe("Europe/Berlin");
+    expect(validTimeZone(undefined)).toBeUndefined();
+    expect(validTimeZone("Not/AZone")).toBeUndefined();
   });
 });
 

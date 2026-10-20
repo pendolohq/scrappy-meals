@@ -7,7 +7,7 @@ import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
-import { isIsoDate, today } from "@/server/domain/week";
+import { isIsoDate } from "@/server/domain/week";
 import {
   addMeal,
   mealDate,
@@ -18,6 +18,7 @@ import {
   setFasting,
   setPortion,
 } from "@/server/plan";
+import { viewerToday } from "@/server/today";
 
 const date = z.string().refine(isIsoDate, "invalid date");
 const id = z.uuid();
@@ -105,7 +106,7 @@ export const setAdherenceAction = userAction(
     if (!day) {
       throw new PlanError("That meal no longer exists");
     }
-    if (day > today()) {
+    if (day > (await viewerToday())) {
       throw new PlanError("You can log this once the day comes");
     }
     await setAdherence(getDb(), data.mealId, user.id, data.status, data.note);
