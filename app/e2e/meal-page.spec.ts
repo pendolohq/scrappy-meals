@@ -61,11 +61,16 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   const qty = ingredients.getByTestId("qty");
   await expect(ingredients).toContainText(food);
   await expect(qty).toHaveText("200 g");
+  // The step linked to the lentils in Mealie lists them, in the same amount.
+  const stepIngredients = page.getByTestId("step-ingredients");
+  await expect(stepIngredients).toHaveCount(1);
+  await expect(stepIngredients).toHaveText(`200 g ${food}`);
 
-  // Cooking for more rescales the list only.
+  // Cooking for more rescales the list (and its steps) only.
   await page.getByRole("button", { name: "More (Cooking for)" }).click();
   await expect(page.getByTestId("cooking-for")).toHaveText("3");
   await expect(qty).toHaveText("300 g");
+  await expect(stepIngredients).toHaveText(`300 g ${food}`);
   await page.getByRole("button", { name: /Reset to plan/ }).click();
   await expect(qty).toHaveText("200 g");
   await page.getByRole("button", { name: "More (Cooking for)" }).click();

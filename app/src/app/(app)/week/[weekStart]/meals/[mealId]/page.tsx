@@ -15,7 +15,6 @@ import { slotLabel } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
 import { recipeLinkInMealie } from "@/server/mealie/links";
 import { MACRO_KEYS, type MacroKey } from "@/server/mealie/nutrition";
-import type { RecipeStep } from "@/server/mealie/recipes";
 import { getMeal } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
@@ -62,15 +61,6 @@ const EditInMealie = async ({ slug }: { slug: string }) => {
   );
 };
 
-/** Headings aren't steps: only steps with text get a number. */
-const numberSteps = (steps: RecipeStep[]) => {
-  let count = 0;
-  return steps.map((step) => ({
-    ...step,
-    number: step.text ? (count += 1) : null,
-  }));
-};
-
 export default async function MealPage({
   params,
 }: {
@@ -91,7 +81,6 @@ export default async function MealPage({
   }
   const { recipe } = meal;
   const name = recipe?.name ?? meal.slug;
-  const instructions = numberSteps(recipe?.instructions ?? []);
   const notes = recipe?.notes ?? [];
 
   return (
@@ -170,37 +159,10 @@ export default async function MealPage({
           recipe && {
             servings: recipe.servings,
             ingredients: recipe.ingredients,
+            instructions: recipe.instructions ?? [],
           }
         }
       />
-
-      {instructions.length > 0 && (
-        <Card as="section">
-          <SectionTitle>Method</SectionTitle>
-          <ol className="space-y-3" data-testid="instructions">
-            {instructions.map((step, i) => (
-              <li key={i}>
-                {step.title && (
-                  <h3 className="pt-2 pb-1 font-serif font-semibold">
-                    {step.title}
-                  </h3>
-                )}
-                {step.text && (
-                  <div className="flex gap-3">
-                    <span
-                      aria-hidden
-                      className="w-5 shrink-0 font-semibold text-accent-ink tabular-nums"
-                    >
-                      {step.number}
-                    </span>
-                    <p className="min-w-0 whitespace-pre-line">{step.text}</p>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
 
       {notes.length > 0 && (
         <Card as="section">

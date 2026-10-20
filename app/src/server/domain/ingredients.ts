@@ -38,6 +38,8 @@ export type IngredientLine = {
   } | null;
   /** The line as Mealie renders it; empty for a lone heading. */
   text: string;
+  /** What instruction steps link to; null when Mealie has none. */
+  referenceId: string | null;
 };
 
 /**
@@ -54,6 +56,7 @@ export function scaleIngredients(
   return ingredients.flatMap((ing): IngredientLine[] => {
     const text = ing.display.trim() || ing.note.trim();
     const title = ing.title ?? null;
+    const referenceId = ing.referenceId ?? null;
     if (ing.food && ing.quantity !== null && scale !== null) {
       return [
         {
@@ -65,10 +68,34 @@ export function scaleIngredients(
             note: ing.note.trim(),
           },
           text,
+          referenceId,
         },
       ];
     }
     // A heading can sit on an otherwise empty line.
-    return text || title ? [{ title, scaled: null, text }] : [];
+    return text || title ? [{ title, scaled: null, text, referenceId }] : [];
   });
+}
+
+/**
+ * The lines a step links to, in the ingredient list's order, from the lines
+ * `scaleIngredients` gave so they follow the same servings. A link to a line
+ * that's gone, or to a lone heading, shows nothing; headings aren't repeated
+ * under the step.
+ */
+export function stepIngredients(
+  lines: IngredientLine[],
+  refs: string[] | undefined
+): IngredientLine[] {
+  if (!refs || refs.length === 0) {
+    return [];
+  }
+  const linked = new Set(refs);
+  return lines.flatMap((line) =>
+    line.referenceId &&
+    linked.has(line.referenceId) &&
+    (line.scaled || line.text)
+      ? [{ ...line, title: null }]
+      : []
+  );
 }

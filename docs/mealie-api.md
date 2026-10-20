@@ -168,6 +168,12 @@ signed in, so cooking needs no Mealie account.
   `text` the step; `summary` is not used) and `notes` (`title`, `text`).
   `title` on an ingredient is a heading too. Empty steps and notes are
   dropped.
+- **Ingredients under each step:** a step's `ingredientReferences[].referenceId`
+  points at a `recipeIngredient[].referenceId` (Mealie's editor: a step's menu
+  → Link Ingredients). The page lists the linked ingredients under the step,
+  scaled with the Ingredients card; links to a line that's gone, or to a
+  heading, show nothing. The planner never writes links. Rows cached before
+  links were kept have no references and pick them up on the next refresh.
 - **Cached** in `recipe_cache` with the rest of the recipe, so the page opens
   while Mealie is down. Rows cached before instructions were kept have
   `instructions` null and are fetched on the page's first visit.
