@@ -107,6 +107,12 @@ Mealie 3.29 with Claude Sonnet 5.5 as the provider:
 - **`orgURL` is set to the `url` passed in**, even when the page itself had
   nothing useful (an Instagram login wall, with the caption pasted as
   `content`). Without a `url` it stays empty.
+- **A post link alone isn't enough.** For a public Facebook reel, Facebook
+  serves the whole caption without signing in (in `og:description`, cut short,
+  and in full in the page's embedded JSON), but Mealie answers 400 "No recipe
+  was found": it reads the page as visible text, which leaves the caption out.
+  The same link with the caption pasted as `content` imports completely. So
+  for social posts the caption (or a screenshot) has to come with the link.
 - **Same shape as a URL import:** ingredients arrive unparsed (`note` only),
   `recipeServings` is set when the source says so, and `extras` is empty, so
   the import state and review step work unchanged.

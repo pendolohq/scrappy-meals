@@ -147,9 +147,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   how long it takes (the app's Mealie timeout is 10 s), what it costs per import.
   Text, screenshots, `orgURL`, nutrition and timing are answered in `docs/mealie-api.md`
   (Importing with AI): it never estimates nutrition, and it sets `orgURL`. The owner doesn't
-  want audio: no `audio` provider, no video download, no `YTDLP_COOKIEFILE`. Still open:
-  whether Mealie can read a real public post's caption from its page without signing in (else
-  the caption is pasted), and cost per import (the Console showed no spend right after the
+  want audio: no `audio` provider, no video download, no `YTDLP_COOKIEFILE`. A public Facebook
+  reel's link alone gives "no recipe found"; with its caption pasted it imports fully, so the
+  caption is pasted. Still open: an Instagram post (expected to be the same), and cost per import (the Console showed no spend right after the
   spike's four calls).
 
 - [ ] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
