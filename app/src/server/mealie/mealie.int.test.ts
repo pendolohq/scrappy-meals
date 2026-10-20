@@ -192,8 +192,8 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     });
     expect(salt.display).toContain("salt to taste");
     expect(r.instructions).toEqual([
-      { title: "Soup", text: "Rinse the lentils." },
-      { title: null, text: "Simmer for 20 minutes." },
+      { title: "Soup", text: "Rinse the lentils.", ingredientRefs: [] },
+      { title: null, text: "Simmer for 20 minutes.", ingredientRefs: [] },
     ]);
     expect(r.notes).toEqual([
       { title: "Freezing", text: "Keeps for 3 months." },

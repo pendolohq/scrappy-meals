@@ -30,12 +30,22 @@ export type Ingredient = {
   display: string;
   /** Section heading shown above this line ("For the sauce"). */
   title?: string | null;
+  /**
+   * What instruction steps link to (`RecipeStep.ingredientRefs`). Absent on
+   * rows cached before links were kept.
+   */
+  referenceId?: string | null;
 };
 
 export type RecipeStep = {
   /** Section heading shown above this step ("For the sauce"). */
   title: string | null;
   text: string;
+  /**
+   * `referenceId`s of the ingredients linked to this step in Mealie. Absent
+   * on rows cached before links were kept.
+   */
+  ingredientRefs?: string[];
 };
 
 export type RecipeNote = { title: string; text: string };
@@ -145,13 +155,21 @@ function toIngredient(i: MealieIngredient): Ingredient {
     note: i.note ?? "",
     display: i.display || i.originalText || i.note || "",
     title: i.title?.trim() || null,
+    referenceId: i.referenceId ?? null,
   };
 }
 
 function toStep(s: MealieStep): RecipeStep[] {
   const title = s.title?.trim() || null;
   const text = s.text.trim();
-  return title || text ? [{ title, text }] : [];
+  const ingredientRefs = [
+    ...new Set(
+      (s.ingredientReferences ?? []).flatMap((r) =>
+        r.referenceId ? [r.referenceId] : []
+      )
+    ),
+  ];
+  return title || text ? [{ title, text, ingredientRefs }] : [];
 }
 
 function toNote(n: MealieNote): RecipeNote[] {

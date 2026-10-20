@@ -84,6 +84,7 @@ export default async function globalSetup() {
   });
   const name = `E2E Lentil Soup ${run}`;
   const slug: string = await api("POST", "/api/recipes", { name });
+  const lentilsRef = crypto.randomUUID();
   await api("PATCH", `/api/recipes/${slug}`, {
     recipeServings: 4,
     nutrition: {
@@ -99,11 +100,15 @@ export default async function globalSetup() {
         food: { id: food.id, name: food.name },
         unit: { id: unit.id, name: unit.name },
         note: "",
+        referenceId: lentilsRef,
       },
     ],
     recipeInstructions: [
       { title: "Soup", text: "Rinse the lentils." },
-      { text: "Simmer for 20 minutes." },
+      {
+        text: "Simmer for 20 minutes.",
+        ingredientReferences: [{ referenceId: lentilsRef }],
+      },
     ],
     notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
   });

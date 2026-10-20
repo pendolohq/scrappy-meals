@@ -8,11 +8,18 @@ import { Stepper } from "@/components/plan/stepper";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cx } from "@/lib/cx";
-import { formatPortion, formatQuantity } from "@/lib/format";
-import { plannedServings, scaleIngredients } from "@/server/domain/ingredients";
-import type { Ingredient } from "@/server/mealie/recipes";
+import { formatPortion } from "@/lib/format";
+import {
+  MAX_COOKING_FOR,
+  MIN_COOKING_FOR,
+  plannedServings,
+  scaleIngredients,
+  stepServings,
+} from "@/server/domain/ingredients";
+import type { Ingredient, RecipeStep } from "@/server/mealie/recipes";
 
-const MAX_SERVINGS = 100;
+import { IngredientText } from "./ingredient-text";
+import { Method } from "./method";
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">
@@ -23,7 +30,9 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
 /**
  * Everyone's portions, which are saved to the plan, and the ingredients for
  * "cooking for", which is only a view: changing it never touches the plan,
- * so batch cooking doesn't put wrong numbers into anyone's totals.
+ * so batch cooking doesn't put wrong numbers into anyone's totals. The
+ * method is here too because its steps show their ingredients in the same
+ * amounts.
  */
 export const CookingPanel = ({
   mealId,
@@ -39,7 +48,11 @@ export const CookingPanel = ({
   portions: Record<string, number>;
   baseServings: number;
   /** Null when the recipe isn't in Mealie (or Mealie is down and nothing is cached). */
-  recipe: { servings: number | null; ingredients: Ingredient[] } | null;
+  recipe: {
+    servings: number | null;
+    ingredients: Ingredient[];
+    instructions: RecipeStep[];
+  } | null;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -72,17 +85,8 @@ export const CookingPanel = ({
       }
     });
 
-  // Whole servings from wherever it stands: 1½ goes to 2 or 1.
   const stepCookingFor = (next: number) =>
-    setCookingFor(
-      Math.min(
-        MAX_SERVINGS,
-        Math.max(
-          1,
-          next > servings ? Math.floor(servings) + 1 : Math.ceil(servings) - 1
-        )
-      )
-    );
+    setCookingFor(stepServings(servings, next > servings ? 1 : -1));
 
   return (
     <>
@@ -134,8 +138,8 @@ export const CookingPanel = ({
                   label="Cooking for"
                   value={servings}
                   onChange={stepCookingFor}
-                  min={1}
-                  max={MAX_SERVINGS}
+                  min={MIN_COOKING_FOR}
+                  max={MAX_COOKING_FOR}
                   step={1}
                   suffix=""
                   testId="cooking-for"
@@ -180,27 +184,20 @@ export const CookingPanel = ({
                       {line.title}
                     </h3>
                   )}
-                  {line.scaled ? (
+                  {(line.scaled || line.text) && (
                     <p className="py-1">
-                      <span
-                        className="font-semibold text-accent-ink tabular-nums"
-                        data-testid="qty"
-                      >
-                        {formatQuantity(line.scaled.quantity, line.scaled.unit)}
-                      </span>{" "}
-                      {line.scaled.food}
-                      {line.scaled.note && (
-                        <span className="text-muted">, {line.scaled.note}</span>
-                      )}
+                      <IngredientText line={line} qtyTestId="qty" />
                     </p>
-                  ) : (
-                    line.text && <p className="py-1">{line.text}</p>
                   )}
                 </li>
               ))}
             </ul>
           )}
         </Card>
+      )}
+
+      {recipe && recipe.instructions.length > 0 && (
+        <Method steps={recipe.instructions} lines={lines} />
       )}
     </>
   );

@@ -6,6 +6,8 @@ import {
   plannedServings,
   scaleIngredients,
   servingsScale,
+  stepIngredients,
+  stepServings,
   unitLabel,
 } from "./ingredients";
 import { buildShoppingList } from "./shopping";
@@ -80,11 +82,13 @@ describe("scaleIngredients", () => {
         title: null,
         scaled: { quantity: 600, unit: "g", food: "red lentils", note: "" },
         text: "400 g red lentils",
+        referenceId: null,
       },
       {
         title: null,
         scaled: { quantity: 1.5, unit: null, food: "onion", note: "chopped" },
         text: "1 onion chopped",
+        referenceId: null,
       },
     ]);
   });
@@ -103,15 +107,30 @@ describe("scaleIngredients", () => {
 
   it("shows lines without a food or an amount as written", () => {
     expect(scaleIngredients([lemon, salt], 4, 8)).toEqual([
-      { title: null, scaled: null, text: "a squeeze of lemon" },
-      { title: null, scaled: null, text: "salt to taste" },
+      {
+        title: null,
+        scaled: null,
+        text: "a squeeze of lemon",
+        referenceId: null,
+      },
+      { title: null, scaled: null, text: "salt to taste", referenceId: null },
     ]);
   });
 
   it("shows every line as written when the recipe has no servings count", () => {
     expect(scaleIngredients([lentils, lemon], null, 8)).toEqual([
-      { title: null, scaled: null, text: "400 g red lentils" },
-      { title: null, scaled: null, text: "a squeeze of lemon" },
+      {
+        title: null,
+        scaled: null,
+        text: "400 g red lentils",
+        referenceId: null,
+      },
+      {
+        title: null,
+        scaled: null,
+        text: "a squeeze of lemon",
+        referenceId: null,
+      },
     ]);
   });
 
@@ -156,5 +175,88 @@ describe("scaleIngredients", () => {
         return [line?.quantity, line?.unit];
       })
     );
+  });
+});
+
+describe("stepIngredients", () => {
+  const linked = [
+    { ...lentils, referenceId: "ref-lentils", title: "Soup" },
+    { ...onions, referenceId: "ref-onions" },
+    ing({ title: "To serve", referenceId: "ref-heading" }),
+    { ...lemon, referenceId: "ref-lemon" },
+    salt,
+  ];
+
+  it("gives a step's linked lines in the list's order, at the same servings", () => {
+    const lines = scaleIngredients(linked, 4, 2);
+    expect(
+      stepIngredients(lines, ["ref-lemon", "ref-lentils"]).map((l) => [
+        l.scaled?.quantity ?? null,
+        l.text,
+      ])
+    ).toEqual([
+      [200, "400 g red lentils"],
+      [null, "a squeeze of lemon"],
+    ]);
+  });
+
+  it("leaves out section headings, on their own or above a linked line", () => {
+    const lines = scaleIngredients(linked, 4, 4);
+    expect(stepIngredients(lines, ["ref-lentils", "ref-heading"])).toEqual([
+      expect.objectContaining({ title: null, text: "400 g red lentils" }),
+    ]);
+  });
+
+  it("skips links to ingredients that are gone", () => {
+    const lines = scaleIngredients(linked, 4, 4);
+    expect(
+      stepIngredients(lines, ["ref-deleted", "ref-onions"]).map((l) => l.text)
+    ).toEqual(["1 onion chopped"]);
+  });
+
+  it("is empty for a step without links, or a recipe cached before links", () => {
+    const lines = scaleIngredients(linked, 4, 4);
+    expect(stepIngredients(lines, [])).toEqual([]);
+    expect(stepIngredients(lines, undefined)).toEqual([]);
+    expect(
+      stepIngredients(scaleIngredients([lentils, salt], 4, 4), ["ref-lentils"])
+    ).toEqual([]);
+  });
+});
+
+describe("stepServings", () => {
+  const walk = (from: number, direction: 1 | -1, steps: number) => {
+    const seen = [];
+    let value = from;
+    for (let i = 0; i < steps; i += 1) {
+      value = stepServings(value, direction);
+      seen.push(value);
+    }
+    return seen;
+  };
+
+  it("goes down by whole servings, then to a half and a quarter", () => {
+    expect(walk(3, -1, 5)).toEqual([2, 1, 0.5, 0.25, 0.25]);
+  });
+
+  it("goes up from a quarter to whole servings", () => {
+    expect(walk(0.25, 1, 4)).toEqual([0.5, 1, 2, 3]);
+  });
+
+  it("moves a value off the ladder to its neighbour", () => {
+    expect(stepServings(1.5, -1)).toBe(1);
+    expect(stepServings(1.5, 1)).toBe(2);
+    expect(stepServings(0.75, -1)).toBe(0.5);
+    expect(stepServings(0.75, 1)).toBe(1);
+    expect(stepServings(0.3, -1)).toBe(0.25);
+  });
+
+  it("stops at 100", () => {
+    expect(stepServings(100, 1)).toBe(100);
+  });
+
+  it("scales the ingredients down with it", () => {
+    const half = scaleIngredients([lentils], 4, stepServings(1, -1));
+    expect(half[0].scaled?.quantity).toBe(50);
   });
 });
