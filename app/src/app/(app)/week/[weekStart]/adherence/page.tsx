@@ -9,8 +9,9 @@ import {
   STATUS_LABEL,
   summariseAdherence,
 } from "@/server/domain/adherence";
+import { slotLabel } from "@/server/domain/slots";
 import { today } from "@/server/domain/week";
-import { getWeekPlan, SLOT_LABEL } from "@/server/plan";
+import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../../week-route";
@@ -119,7 +120,8 @@ export default async function AdherencePage({
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs text-muted">
-                          {formatDay(meal.date)} · {SLOT_LABEL[meal.slot]}
+                          {formatDay(meal.date)} ·{" "}
+                          {slotLabel(meal.slot, meal.snackIndex)}
                         </span>
                         <span className="font-medium">
                           {meal.recipe?.name ?? meal.slug}

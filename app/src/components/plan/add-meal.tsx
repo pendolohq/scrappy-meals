@@ -62,10 +62,12 @@ const useRecipeSearch = (query: string, enabled: boolean): SearchState => {
 export const AddMeal = ({
   date,
   slot,
+  snackIndex,
   label,
 }: {
   date: string;
   slot: SlotType;
+  snackIndex: number;
   label: string;
 }) => {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -88,7 +90,7 @@ export const AddMeal = ({
 
   const pick = (slug: string) =>
     startTransition(async () => {
-      const res = await addMealAction({ date, slot, slug });
+      const res = await addMealAction({ date, slot, snackIndex, slug });
       if (res.error) {
         setError(res.error);
       } else {

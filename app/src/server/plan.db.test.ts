@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
-import { recipeCache } from "./db/schema";
+import { mealSlots, recipeCache } from "./db/schema";
+import { setSnackSlots } from "./household";
 import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
@@ -243,6 +244,188 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
     expect(after.days[3].meals[0]).toMatchObject({
       slug: "temp",
       recipe: null,
+    });
+  });
+
+  describe("snack slots", () => {
+    it("keeps snacks in different snack slots apart, each at position 0", async () => {
+      const { a } = await twoUsers();
+      const morning = await addMeal(
+        db,
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 0,
+          slug: "nuts",
+          createdBy: a.id,
+        },
+        { fetch }
+      );
+      const afternoon = await addMeal(
+        db,
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 1,
+          slug: "apple",
+          createdBy: a.id,
+        },
+        { fetch }
+      );
+
+      const week = await getWeekPlan(db, "2026-10-19", { fetch });
+      expect(week.snackSlots).toBe(2);
+      expect(
+        week.days[1].meals.map((m) => [m.id, m.snackIndex, m.position])
+      ).toEqual(
+        expect.arrayContaining([
+          [morning, 0, 0],
+          [afternoon, 1, 0],
+        ])
+      );
+      expect(week.days[1].meals).toHaveLength(2);
+    });
+
+    it("numbers positions within one snack slot", async () => {
+      const { a } = await twoUsers();
+      for (const slug of ["x", "y"]) {
+        await addMeal(
+          db,
+          {
+            date: "2026-10-20",
+            slot: "snack",
+            snackIndex: 1,
+            slug,
+            createdBy: a.id,
+          },
+          { fetch }
+        );
+      }
+      const meals = (await getWeekPlan(db, "2026-10-19", { fetch })).days[1]
+        .meals;
+      expect(meals.map((m) => [m.snackIndex, m.position])).toEqual([
+        [1, 0],
+        [1, 1],
+      ]);
+    });
+
+    it("defaults the snack index to 0", async () => {
+      const { a } = await twoUsers();
+      await addMeal(
+        db,
+        { date: "2026-10-20", slot: "snack", slug: "nuts", createdBy: a.id },
+        { fetch }
+      );
+      const meals = (await getWeekPlan(db, "2026-10-19", { fetch })).days[1]
+        .meals;
+      expect(meals.map((m) => m.snackIndex)).toEqual([0]);
+    });
+
+    it("refuses a snack slot at or beyond the household's count", async () => {
+      const { a } = await twoUsers();
+      const add = (snackIndex: number, f: RecipeFetcher = fetch) =>
+        addMeal(
+          db,
+          {
+            date: "2026-10-20",
+            slot: "snack",
+            snackIndex,
+            slug: "nuts",
+            createdBy: a.id,
+          },
+          { fetch: f }
+        );
+
+      await expect(add(2)).rejects.toBeInstanceOf(PlanError);
+      await expect(add(2)).rejects.toThrow(
+        "That snack slot is turned off in settings"
+      );
+
+      await setSnackSlots(db, 0);
+      await expect(add(0)).rejects.toBeInstanceOf(PlanError);
+
+      // Validated before the recipe is fetched.
+      const spy = vi.fn<RecipeFetcher>(async (slug) => recipe(slug));
+      await expect(add(0, spy)).rejects.toBeInstanceOf(PlanError);
+      expect(spy).not.toHaveBeenCalled();
+
+      await setSnackSlots(db, 4);
+      await expect(add(3)).resolves.toEqual(expect.any(String));
+    });
+
+    it("refuses a snack index on a meal slot", async () => {
+      const { a } = await twoUsers();
+      const spy = vi.fn<RecipeFetcher>(async (slug) => recipe(slug));
+      await expect(
+        addMeal(
+          db,
+          {
+            date: "2026-10-20",
+            slot: "lunch",
+            snackIndex: 1,
+            slug: "soup",
+            createdBy: a.id,
+          },
+          { fetch: spy }
+        )
+      ).rejects.toBeInstanceOf(PlanError);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("keeps planned snacks when the count is lowered", async () => {
+      const { a, b } = await twoUsers();
+      const id = await addMeal(
+        db,
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 1,
+          slug: "apple",
+          createdBy: a.id,
+        },
+        { fetch }
+      );
+      await setPortion(db, id, b.id, 0.5);
+
+      await setSnackSlots(db, 0);
+
+      const week = await getWeekPlan(db, "2026-10-19", { fetch });
+      expect(week.snackSlots).toBe(0);
+      expect(week.days[1].meals).toHaveLength(1);
+      expect(week.days[1].meals[0]).toMatchObject({
+        id,
+        slot: "snack",
+        snackIndex: 1,
+        portions: { [a.id]: 1, [b.id]: 0.5 },
+      });
+    });
+
+    it("reads a row inserted without a snack index as snack 0", async () => {
+      await db.insert(mealSlots).values({
+        date: "2026-10-20",
+        slot: "snack",
+        mealieRecipeSlug: "legacy",
+      });
+      const meals = (await getWeekPlan(db, "2026-10-19", { fetch })).days[1]
+        .meals;
+      expect(meals.map((m) => [m.slug, m.snackIndex])).toEqual([["legacy", 0]]);
+    });
+
+    it("returns the snack index from getMeal", async () => {
+      const { a } = await twoUsers();
+      const id = await addMeal(
+        db,
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 1,
+          slug: "apple",
+          createdBy: a.id,
+        },
+        { fetch }
+      );
+      const meal = await getMeal(db, id, { fetch });
+      expect(meal).toMatchObject({ slot: "snack", snackIndex: 1 });
     });
   });
 

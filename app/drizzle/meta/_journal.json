@@ -29,6 +29,13 @@
       "when": 1792490751154,
       "tag": "0003_recipe-instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792500389570,
+      "tag": "0004_snack-slots",
+      "breakpoints": true
     }
   ]
 }

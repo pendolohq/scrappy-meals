@@ -11,11 +11,12 @@ import { Card } from "@/components/ui/card";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { formatAmount, formatDay, formatPortion } from "@/lib/format";
 import { getDb } from "@/server/db/client";
+import { slotLabel } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
 import { recipeLinkInMealie } from "@/server/mealie/links";
 import { MACRO_KEYS, type MacroKey } from "@/server/mealie/nutrition";
 import type { RecipeStep } from "@/server/mealie/recipes";
-import { getMeal, SLOT_LABEL } from "@/server/plan";
+import { getMeal } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../../../week-route";
@@ -112,7 +113,7 @@ export default async function MealPage({
           />
         )}
         <p className="text-xs font-semibold tracking-wider text-muted uppercase">
-          {SLOT_LABEL[meal.slot]} · {formatDay(meal.date)}
+          {slotLabel(meal.slot, meal.snackIndex)} · {formatDay(meal.date)}
         </p>
         <h1 className="font-serif text-title font-semibold sm:text-display">
           {name}

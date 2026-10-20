@@ -16,6 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { SLOT_TYPES } from "../domain/slots";
 import type { ImportState } from "../mealie/import-state";
 import type { RecipeNutrition } from "../mealie/nutrition";
 import type { Ingredient, RecipeNote, RecipeStep } from "../mealie/recipes";
@@ -30,12 +31,7 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 
-export const mealSlotType = pgEnum("meal_slot_type", [
-  "breakfast",
-  "lunch",
-  "dinner",
-  "snack",
-]);
+export const mealSlotType = pgEnum("meal_slot_type", SLOT_TYPES);
 export const adherenceStatus = pgEnum("adherence_status", [
   "stuck",
   "partial",
@@ -112,7 +108,9 @@ export const mealSlots = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     date: date("date", { mode: "string" }).notNull(),
     slot: mealSlotType("slot").notNull(),
-    /** Orders several entries of the same slot on one day (e.g. two snacks). */
+    /** Which snack of the day (0 = morning); always 0 for other slots. */
+    snackIndex: smallint("snack_index").notNull().default(0),
+    /** Orders several entries within one slot (and snack index) on one day. */
     position: smallint("position").notNull().default(0),
     mealieRecipeSlug: text("mealie_recipe_slug").notNull(),
     /** Servings one person eats at multiplier 1. */
@@ -129,8 +127,34 @@ export const mealSlots = pgTable(
     ...timestamps,
   },
   (t) => [
-    unique("meal_slots_date_slot_position").on(t.date, t.slot, t.position),
+    unique("meal_slots_date_slot_snack_position").on(
+      t.date,
+      t.slot,
+      t.snackIndex,
+      t.position
+    ),
+    check(
+      "meal_slots_snack_index_valid",
+      sql`${t.snackIndex} BETWEEN 0 AND 3 AND (${t.slot} = 'snack' OR ${t.snackIndex} = 0)`
+    ),
     check("meal_slots_base_servings_positive", sql`${t.baseServings} > 0`),
+  ]
+);
+
+/** One row at most (id = 1); no row means the defaults. */
+export const householdSettings = pgTable(
+  "household_settings",
+  {
+    id: smallint("id").primaryKey().default(1),
+    snackSlots: smallint("snack_slots").notNull().default(2),
+    updatedAt: timestamps.updatedAt,
+  },
+  (t) => [
+    check("household_settings_single_row", sql`${t.id} = 1`),
+    check(
+      "household_settings_snack_slots_valid",
+      sql`${t.snackSlots} BETWEEN 0 AND 4`
+    ),
   ]
 );
 

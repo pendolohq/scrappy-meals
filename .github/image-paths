@@ -22,5 +22,6 @@ app/bun\.lock
 app/drizzle/
 app/src/cli/
 app/src/server/db/
+app/src/server/domain/slots\.ts
 app/src/server/users\.ts
 app/src/server/errors\.ts

@@ -7,14 +7,15 @@ import {
   adherence,
   dayOverrides,
   mealSlots,
-  mealSlotType,
   slotPortions,
   users,
 } from "./db/schema";
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
+import type { SlotType } from "./domain/slots";
 import { addDays, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
+import { getSnackSlots } from "./household";
 import { isMealieUnavailable } from "./mealie/client";
 import {
   type CachedRecipe,
@@ -23,15 +24,7 @@ import {
   type RecipeFetcher,
 } from "./recipe-cache";
 
-export type SlotType = (typeof mealSlotType.enumValues)[number];
-export const SLOT_TYPES = mealSlotType.enumValues;
-
-export const SLOT_LABEL: Record<SlotType, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-};
+export { SLOT_TYPES, type SlotType } from "./domain/slots";
 
 export class PlanError extends UserFacingError {
   name = "PlanError";
@@ -54,6 +47,7 @@ export type PlannedMeal = {
   id: string;
   date: string;
   slot: SlotType;
+  snackIndex: number;
   position: number;
   slug: string;
   baseServings: number;
@@ -76,6 +70,8 @@ export type PlannedMeal = {
 export type WeekPlan = {
   weekStart: string;
   members: Member[];
+  /** How many snack slots the household uses a day. */
+  snackSlots: number;
   /** `fasting` maps member id -> whether they fast that day (default weekdays or a day override). */
   days: {
     date: string;
@@ -109,39 +105,45 @@ export async function getWeekPlan(
 ): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
   const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
-  const [members, slots, portions, overrides, logs] = await Promise.all([
-    listMembers(db),
-    db
-      .select()
-      .from(mealSlots)
-      .where(inWeek)
-      .orderBy(asc(mealSlots.date), asc(mealSlots.position)),
-    db
-      .select({
-        mealSlotId: slotPortions.mealSlotId,
-        userId: slotPortions.userId,
-        multiplier: slotPortions.multiplier,
-      })
-      .from(slotPortions)
-      .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
-      .where(inWeek),
-    db
-      .select()
-      .from(dayOverrides)
-      .where(
-        and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))
-      ),
-    db
-      .select({
-        mealSlotId: adherence.mealSlotId,
-        userId: adherence.userId,
-        status: adherence.status,
-        note: adherence.note,
-      })
-      .from(adherence)
-      .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
-      .where(inWeek),
-  ]);
+  const [members, snackSlots, slots, portions, overrides, logs] =
+    await Promise.all([
+      listMembers(db),
+      getSnackSlots(db),
+      db
+        .select()
+        .from(mealSlots)
+        .where(inWeek)
+        .orderBy(
+          asc(mealSlots.date),
+          asc(mealSlots.snackIndex),
+          asc(mealSlots.position)
+        ),
+      db
+        .select({
+          mealSlotId: slotPortions.mealSlotId,
+          userId: slotPortions.userId,
+          multiplier: slotPortions.multiplier,
+        })
+        .from(slotPortions)
+        .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
+        .where(inWeek),
+      db
+        .select()
+        .from(dayOverrides)
+        .where(
+          and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))
+        ),
+      db
+        .select({
+          mealSlotId: adherence.mealSlotId,
+          userId: adherence.userId,
+          status: adherence.status,
+          note: adherence.note,
+        })
+        .from(adherence)
+        .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
+        .where(inWeek),
+    ]);
 
   const recipes = await loadRecipes(
     db,
@@ -167,6 +169,7 @@ export async function getWeekPlan(
       id: s.id,
       date: s.date,
       slot: s.slot,
+      snackIndex: s.snackIndex,
       position: s.position,
       slug: s.mealieRecipeSlug,
       baseServings: s.baseServings,
@@ -192,6 +195,7 @@ export async function getWeekPlan(
   return {
     weekStart,
     members,
+    snackSlots,
     days: weekDays(weekStart).map((date) => ({
       date,
       meals: meals.filter((m) => m.date === date),
@@ -214,6 +218,7 @@ export type MealDetail = {
   id: string;
   date: string;
   slot: SlotType;
+  snackIndex: number;
   slug: string;
   baseServings: number;
   portions: Record<string, number>;
@@ -267,6 +272,7 @@ export async function getMeal(
     id: slot.id,
     date: slot.date,
     slot: slot.slot,
+    snackIndex: slot.snackIndex,
     slug: recipe?.slug ?? slug,
     baseServings: slot.baseServings,
     portions: Object.fromEntries(portions.map((p) => [p.userId, p.multiplier])),
@@ -333,9 +339,22 @@ export async function setFasting(
 /** Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone fasting that day. */
 export async function addMeal(
   db: Db,
-  input: { date: string; slot: SlotType; slug: string; createdBy: string },
+  input: {
+    date: string;
+    slot: SlotType;
+    snackIndex?: number;
+    slug: string;
+    createdBy: string;
+  },
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
+  const snackIndex = input.snackIndex ?? 0;
+  if (input.slot !== "snack" && snackIndex !== 0) {
+    throw new PlanError("Only snacks have more than one slot a day");
+  }
+  if (input.slot === "snack" && snackIndex >= (await getSnackSlots(db))) {
+    throw new PlanError("That snack slot is turned off in settings");
+  }
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
   const recipes = await loadRecipes(db, [input.slug], {
     ...opts,
@@ -371,13 +390,18 @@ export async function addMeal(
       })
       .from(mealSlots)
       .where(
-        and(eq(mealSlots.date, input.date), eq(mealSlots.slot, input.slot))
+        and(
+          eq(mealSlots.date, input.date),
+          eq(mealSlots.slot, input.slot),
+          eq(mealSlots.snackIndex, snackIndex)
+        )
       );
     const [slot] = await tx
       .insert(mealSlots)
       .values({
         date: input.date,
         slot: input.slot,
+        snackIndex,
         position: next,
         mealieRecipeSlug: input.slug,
         createdBy: input.createdBy,

@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { userFormAction } from "@/server/action";
+import { userAction, userFormAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
+import { MAX_SNACK_SLOTS } from "@/server/domain/slots";
+import { setSnackSlots } from "@/server/household";
 import { profileSchema, updateProfile } from "@/server/users";
 
 export type SettingsState = { ok?: boolean; error?: string };
@@ -56,5 +58,15 @@ export const saveSettings = userFormAction(
       const field = String(issue.path[0] ?? "");
       return `${LABELS[field] ?? "Input"}: ${issue.message}`;
     },
+  }
+);
+
+// Household-wide on purpose: anyone signed in may change it, like the plan itself.
+export const saveHouseholdAction = userAction(
+  z.object({ snackSlots: z.int().min(0).max(MAX_SNACK_SLOTS) }),
+  async ({ snackSlots }) => {
+    await setSnackSlots(getDb(), snackSlots);
+    revalidatePath("/", "layout");
+    return {};
   }
 );

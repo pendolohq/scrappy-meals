@@ -44,6 +44,7 @@ export default async function WeekPage({
           date={day.date}
           meals={day.meals}
           members={plan.members}
+          snackSlots={plan.snackSlots}
           fasting={day.fasting}
           currentUserId={user.id}
           isToday={day.date === now}
