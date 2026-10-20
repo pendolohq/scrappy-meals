@@ -9,6 +9,7 @@ export const MEALIE_SCHEMA_VERSION = "v3.29.0";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const IMPORT_TIMEOUT_MS = 60_000;
+const AI_IMPORT_TIMEOUT_MS = 120_000;
 
 export type MealieClient = ReturnType<typeof createMealieClient>;
 
@@ -128,6 +129,13 @@ export function mealie(timeoutMs = DEFAULT_TIMEOUT_MS): MealieClient {
  * page (or runs an AI model) before it answers.
  */
 export const mealieImporter = (): MealieClient => mealie(IMPORT_TIMEOUT_MS);
+
+/**
+ * Longer still for `create/ai`: a model reads the text or screenshots, which
+ * took up to 40 s when measured, and several images take longer.
+ */
+export const mealieAiImporter = (): MealieClient =>
+  mealie(AI_IMPORT_TIMEOUT_MS);
 
 /** Compares the running Mealie version with the one our types were generated from. */
 export async function checkMealieVersion(client: MealieClient = mealie()) {

@@ -1,5 +1,51 @@
 const MAX_LENGTH = 2048;
 
+const SOCIAL_HOSTS = ["instagram.com", "facebook.com", "fb.watch"];
+
+/**
+ * Whether the address is a post on Instagram or Facebook (or a subdomain such
+ * as m.facebook.com). Takes any text, so a form can call it on every keystroke.
+ */
+export function isSocialPostUrl(input: string): boolean {
+  let host: string;
+  try {
+    host = new URL(input.trim()).hostname;
+  } catch {
+    return false;
+  }
+  return SOCIAL_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+}
+
+// Share links add these to every post, so keeping them would import one post
+// twice. The rest of the query stays: Facebook often carries the post's
+// identity there (watch/?v=, story.php?story_fbid=&id=, photo.php?fbid=).
+const TRACKING_PARAMS = new Set([
+  "igsh",
+  "igshid",
+  "mibextid",
+  "rdid",
+  "fbclid",
+  "share_url",
+  "sfnsn",
+]);
+
+const isTracking = (name: string) =>
+  TRACKING_PARAMS.has(name) ||
+  name.startsWith("utm_") ||
+  // Facebook's click-tracking blobs: __cft__[0], __tn__.
+  name.startsWith("__cft__") ||
+  name.startsWith("__tn__");
+
+function stripTracking(url: URL) {
+  for (const name of new Set(url.searchParams.keys())) {
+    if (isTracking(name)) {
+      url.searchParams.delete(name);
+    }
+  }
+  // Sorted so the same post compares equal whatever order the link had.
+  url.searchParams.sort();
+}
+
 export type RecipeUrlResult =
   | { ok: true; url: string }
   | { ok: false; error: string };
@@ -52,6 +98,9 @@ export function normaliseRecipeUrl(input: string): RecipeUrlResult {
     };
   }
   url.hash = "";
+  if (isSocialPostUrl(url.href)) {
+    stripTracking(url);
+  }
   // Non-ASCII characters grow when percent-encoded, so check the result too.
   if (url.href.length > MAX_LENGTH) {
     return { ok: false, error: "That address is too long." };

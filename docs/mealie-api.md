@@ -39,6 +39,7 @@ until every place names the same version (`mealie-version.test.ts`).
 | Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
 | Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
 | Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
+| AI provider settings | `GET /api/groups/ai-providers/settings` → `aiEnabled`, `imageProviderEnabled` |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
@@ -83,6 +84,11 @@ until every place names the same version (`mealie-version.test.ts`).
   whole, so write it with `withImportState()`, which keeps other keys.
 
 ## Importing with AI
+
+The planner uses it for Instagram and Facebook posts: it reads the AI settings
+first (no provider, or screenshots without an `image` provider, fail with a
+clear message), then posts the caption as `content`, the screenshots as
+`images` and the post address as `url`, with a 120 s timeout.
 
 `create/ai` (Mealie ≥ 3.23) builds a recipe from any mix of pasted text
 (`content`), a `url` and screenshots (`images`, multipart). Measured on

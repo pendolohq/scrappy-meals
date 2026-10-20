@@ -152,7 +152,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   caption is pasted. Still open: an Instagram post (expected to be the same), and cost per import (the Console showed no spend right after the
   spike's four calls).
 
-- [ ] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
+- [x] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
   Depends on 7 and milestone 1. Instagram/Facebook links (`instagram.com`, `facebook.com`,
   `fb.watch`) go through `create/ai` with the URL, plus optional pasted caption and
   screenshots (size/count limits, server action body limit). If no recipe can be read from the

@@ -73,3 +73,55 @@ test("links to a recipe that was already imported from that page", async ({
   );
   await expect(page).toHaveURL(/\/recipes\/new$/);
 });
+
+// The Mealie used here has no AI provider, so the social-post path can only
+// be exercised up to the point where the planner asks Mealie for its settings.
+test("asks for a caption and screenshots only for a social post URL", async ({
+  page,
+}) => {
+  await page.goto("/recipes/new");
+  const caption = page.getByLabel("Caption", { exact: true });
+  const screenshots = page.getByLabel("Screenshots", { exact: true });
+  await expect(caption).toHaveCount(0);
+  await expect(screenshots).toHaveCount(0);
+
+  await page
+    .getByLabel("Recipe URL")
+    .fill("https://www.instagram.com/reel/e2e-caption/");
+  await expect(caption).toBeVisible();
+  await expect(screenshots).toBeVisible();
+
+  await page.getByLabel("Recipe URL").fill("https://example.com/some/recipe");
+  await expect(caption).toHaveCount(0);
+  await expect(screenshots).toHaveCount(0);
+});
+
+test("asks for the caption or a screenshot when a post has neither", async ({
+  page,
+}) => {
+  const url = "https://www.facebook.com/e2e/posts/no-caption";
+  await page.goto("/recipes/new");
+  await submit(page, url);
+  await expect(page.locator("main p[role=alert]")).toHaveText(
+    "Paste the post's caption or add a screenshot: Instagram and Facebook don't let Mealie read posts."
+  );
+  await expect(page).toHaveURL(/\/recipes\/new$/);
+  await expect(page.getByLabel("Recipe URL")).toHaveValue(url);
+});
+
+test("says so when Mealie has no AI provider, and keeps the caption", async ({
+  page,
+}) => {
+  const url = "https://www.facebook.com/e2e/posts/with-caption";
+  const text = "Lentil soup: 200 g red lentils, 1 onion. Boil for 20 minutes.";
+  await page.goto("/recipes/new");
+  await page.getByLabel("Recipe URL").fill(url);
+  await page.getByLabel("Caption", { exact: true }).fill(text);
+  await page.getByRole("button", { name: "Import recipe" }).click();
+  await expect(page.locator("main p[role=alert]")).toHaveText(
+    "Mealie has no AI provider set up. Add one in Mealie's group settings, then try again."
+  );
+  await expect(page).toHaveURL(/\/recipes\/new$/);
+  await expect(page.getByLabel("Recipe URL")).toHaveValue(url);
+  await expect(page.getByLabel("Caption", { exact: true })).toHaveValue(text);
+});
