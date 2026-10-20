@@ -34,9 +34,9 @@ as M.
    your own Edit/Write/Bash tools.
 3. Write tests yourself if the task calls for them — you already have the context; there's no
    reason to hand that to a subagent that would have to re-acquire it.
-4. Run the actual checks the task's acceptance criteria name (typecheck/lint/tests/build) via
-   Bash yourself. Never mark a task done on the strength of an assumption or a memory of what
-   should pass — run it and look at the output.
+4. Don't run format, lint, typecheck or the unit/db suites yourself: a Stop hook runs them when
+   you finish and hands failures back (AGENTS.md, Verification). Run anything else the task's
+   acceptance criteria name (a build, an e2e or integration test) and look at the output.
 5. Optional, not required: if a specific decision in the task is genuinely uncertain (not just
    "would be nice to double-check"), spawn one `code-reviewer` pass for a second opinion. This
    does not loop — read its output, apply anything real, move on.
@@ -71,9 +71,9 @@ file paths from step 2 (if any). Wait for the result; confirm the build succeeds
 ### 4. Review
 
 Invoke `code-reviewer`, passing the task description, spec context, and the files
-created/modified. After it reports, **you** re-run the checks it couldn't (typecheck/lint/
-tests/build) yourself via Bash rather than trusting either agent's self-report — a review is
-not signed off until you've seen the output yourself.
+created/modified. The hook covers format, lint, typecheck and the unit/db suites; run anything
+else the task needs (a build, e2e or integration tests) yourself rather than trusting either
+agent's self-report.
 
 ### 5. Handle review outcome
 
@@ -82,7 +82,7 @@ not signed off until you've seen the output yourself.
   `code-reviewer` again. Max 3 rounds — if still blocked, stop and report what's failing.
 - **WARNINGS only, and the fix is a small, mechanical edit** (wording, a missing class, an
   import): apply it yourself directly rather than spawning another implementer round-trip.
-  Re-run the checks yourself, then commit.
+  Then commit.
 - **WARNINGS that need real code changes:** treat like a BLOCKER — re-invoke `implementer`.
 
 ## Stopping Conditions

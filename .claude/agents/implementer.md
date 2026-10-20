@@ -40,8 +40,8 @@ For UI/component design, invoke the `frontend-design` skill.
   OpenAPI spec) and `docs/mealie-api.md`.
 - Match existing import style, file structure and Tailwind patterns; prefer editing existing files.
 - Keep implementations minimal: no extra features, no premature abstractions.
-- Verify with `bun run format:check && bun run lint && bun run typecheck && bun run test` (from `app/`), plus
-  `bun run test:db` when server/db code changed, and `bun run build`.
+- Don't run format, lint, typecheck or the test suites: a hook runs them when the session
+  finishes (AGENTS.md, Verification). Run `bun run build` when the change could break it.
 
 ## Output
 
