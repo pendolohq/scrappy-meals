@@ -48,7 +48,7 @@ export const DayCard = ({
       <h2 className="mb-3 flex items-center gap-2 font-semibold">
         {formatDay(date)}
         {isToday && (
-          <span className="rounded-full bg-accent px-2 text-xs text-white dark:text-stone-900">
+          <span className="rounded-full bg-accent px-2 text-xs text-accent-foreground">
             Today
           </span>
         )}

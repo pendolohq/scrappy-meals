@@ -146,7 +146,7 @@ export const ShopChecklist = ({
         />
         <button
           type="submit"
-          className="rounded-lg bg-accent px-4 py-2 font-medium text-white dark:text-stone-900"
+          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground"
         >
           Add
         </button>

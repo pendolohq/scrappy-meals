@@ -13,7 +13,7 @@ export default function GlobalError({ retry }: { retry: () => void }) {
           <button
             type="button"
             onClick={() => retry()}
-            className="w-full rounded-lg bg-accent px-4 py-2 font-medium text-white dark:text-stone-900"
+            className="w-full rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground"
           >
             Try again
           </button>

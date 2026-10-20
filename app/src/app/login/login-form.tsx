@@ -47,7 +47,7 @@ export const LoginForm = ({ next }: { next?: string }) => {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-60 dark:text-stone-900"
+        className="w-full rounded-lg bg-accent px-3 py-2 font-medium text-accent-foreground disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

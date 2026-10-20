@@ -1,14 +1,33 @@
 @import "tailwindcss";
 
-/* Cream paper with an olive accent; every text/background pair here is WCAG AA. */
+/*
+ * Design tokens. Cream paper with an olive accent and a terracotta highlight
+ * (for "today" and other things that should catch the eye). Every text colour
+ * here is WCAG AA on every surface it is used on: foreground, muted, accent,
+ * highlight and danger on background, card, sunken and their own -soft tint.
+ * --border-strong outlines controls (inputs, checkboxes, steppers), so it
+ * keeps 3:1 against every surface; --border is for decoration only.
+ */
 :root {
+  color-scheme: light dark;
   --background: #f6efe0;
   --foreground: #2b2620;
-  --muted: #766a5a;
+  --muted: #6f6353;
   --card: #fffaf0;
+  /* Wells inside a card: inputs, option panels, stat tiles. */
+  --sunken: #efe6d3;
   --border: #e4d9c3;
+  --border-strong: #8f7f62;
   --accent: #4f6b30;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e9eed9;
+  --highlight: #9c4a2b;
+  --highlight-foreground: #ffffff;
+  --highlight-soft: #f6e4d7;
   --danger: #b3261e;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fbe9e5;
+  --shadow-color: 60deg 30% 20%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,9 +36,19 @@
     --foreground: #f2ead9;
     --muted: #b3a790;
     --card: #28231c;
+    --sunken: #221e18;
     --border: #3d362c;
+    --border-strong: #7d705c;
     --accent: #a9c47f;
+    --accent-foreground: #1e1a15;
+    --accent-soft: #2f3424;
+    --highlight: #e8a07c;
+    --highlight-foreground: #1e1a15;
+    --highlight-soft: #3a2a20;
     --danger: #f0907f;
+    --danger-foreground: #1e1a15;
+    --danger-soft: #3a2420;
+    --shadow-color: 30deg 30% 3%;
   }
 }
 
@@ -28,15 +57,52 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-card: var(--card);
+  --color-sunken: var(--sunken);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-soft: var(--highlight-soft);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-foreground: var(--danger-foreground);
+
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Set by next/font in the root layout. */
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  /* Serif titles: page titles, recipe names, day numbers. */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 1.625rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.015em;
+  --text-heading: 1.25rem;
+  --text-heading--line-height: 1.25;
+
+  --radius-card: 1.25rem;
+  --radius-control: 0.75rem;
+  --radius-photo: 0.875rem;
+
+  --shadow-card:
+    0 1px 1px hsl(var(--shadow-color) / 0.04),
+    0 2px 6px -1px hsl(var(--shadow-color) / 0.06),
+    0 8px 24px -12px hsl(var(--shadow-color) / 0.12);
+  --shadow-raised:
+    0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 12px 32px -12px hsl(var(--shadow-color) / 0.25);
+
+  /* The smallest touch target: size-tap, min-h-tap. */
+  --spacing-tap: 2.75rem;
 }
 
-/* Tailwind v4's preflight leaves buttons on the default arrow cursor. */
 @layer base {
+  /* Tailwind v4's preflight leaves buttons on the default arrow cursor. */
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
@@ -44,8 +110,20 @@
   button:disabled {
     cursor: not-allowed;
   }
-}
 
-body {
-  font-family: var(--font-sans);
+  /* One focus ring everywhere, shown for keyboard focus only. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
 }
