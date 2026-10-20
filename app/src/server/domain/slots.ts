@@ -3,7 +3,26 @@
 export const SLOT_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export type SlotType = (typeof SLOT_TYPES)[number];
 
-export const MAX_SNACK_SLOTS = 4;
+type MealType = Exclude<SlotType, "snack">;
+
+const MEALS: { slot: MealType; label: string }[] = [
+  { slot: "breakfast", label: "Breakfast" },
+  { slot: "lunch", label: "Lunch" },
+  { slot: "dinner", label: "Dinner" },
+];
+
+// Snack n always has the same name and place, so changing the household's
+// count never renames or moves a planned meal. The schema's check constraint
+// on snack_index is built from this length: adding a snack here needs a
+// migration (`drizzle-kit generate`).
+const SNACKS: { label: string; after: MealType }[] = [
+  { label: "Morning snack", after: "breakfast" },
+  { label: "Afternoon snack", after: "lunch" },
+  { label: "Evening snack", after: "dinner" },
+  { label: "Late-night snack", after: "dinner" },
+];
+
+export const MAX_SNACK_SLOTS = SNACKS.length;
 export const DEFAULT_SNACK_SLOTS = 2;
 
 export type DaySlot = {
@@ -13,23 +32,25 @@ export type DaySlot = {
   active: boolean;
 };
 
-const SNACK_LABELS = [
-  "Morning snack",
-  "Afternoon snack",
-  "Evening snack",
-  "Late-night snack",
-];
-
-const MEAL_LABELS: Record<Exclude<SlotType, "snack">, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-};
-
 export function slotLabel(slot: SlotType, snackIndex: number): string {
   return slot === "snack"
-    ? (SNACK_LABELS[snackIndex] ?? `Snack ${snackIndex + 1}`)
-    : MEAL_LABELS[slot];
+    ? (SNACKS[snackIndex]?.label ?? "Snack")
+    : MEALS.find((m) => m.slot === slot)!.label;
+}
+
+/** Every slot a day can have, in eating order. */
+const ALL_SLOTS = MEALS.flatMap(({ slot }) => [
+  { slot: slot as SlotType, snackIndex: 0 },
+  ...SNACKS.flatMap((s, i) =>
+    s.after === slot ? [{ slot: "snack" as const, snackIndex: i }] : []
+  ),
+]);
+
+/** Where a slot falls in the day, for sorting meals into eating order. */
+export function slotRank(slot: SlotType, snackIndex: number): number {
+  return ALL_SLOTS.findIndex(
+    (s) => s.slot === slot && s.snackIndex === snackIndex
+  );
 }
 
 /**
@@ -44,30 +65,12 @@ export function daySlots(
   const used = new Set(
     meals.filter((m) => m.slot === "snack").map((m) => m.snackIndex)
   );
-  const snack = (i: number): DaySlot[] =>
-    i < snackSlots || used.has(i)
-      ? [
-          {
-            slot: "snack",
-            snackIndex: i,
-            label: slotLabel("snack", i),
-            active: i < snackSlots,
-          },
-        ]
-      : [];
-  const meal = (slot: Exclude<SlotType, "snack">): DaySlot => ({
-    slot,
-    snackIndex: 0,
-    label: slotLabel(slot, 0),
-    active: true,
-  });
-  return [
-    meal("breakfast"),
-    ...snack(0),
-    meal("lunch"),
-    ...snack(1),
-    meal("dinner"),
-    ...snack(2),
-    ...snack(3),
-  ];
+  return ALL_SLOTS.filter(
+    (s) =>
+      s.slot !== "snack" || s.snackIndex < snackSlots || used.has(s.snackIndex)
+  ).map((s) => ({
+    ...s,
+    label: slotLabel(s.slot, s.snackIndex),
+    active: s.slot !== "snack" || s.snackIndex < snackSlots,
+  }));
 }

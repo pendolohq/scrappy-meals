@@ -6,6 +6,7 @@ import {
   MAX_SNACK_SLOTS,
   SLOT_TYPES,
   slotLabel,
+  slotRank,
 } from "./slots";
 
 const keys = (slots: ReturnType<typeof daySlots>) =>
@@ -128,5 +129,22 @@ describe("slots", () => {
     ]);
     expect(keys(slots)).toEqual(keys(daySlots(2)));
     expect(slots.every((s) => s.active)).toBe(true);
+  });
+
+  it("has a snack slot in the day for every snack the setting allows", () => {
+    expect(
+      daySlots(MAX_SNACK_SLOTS).filter((s) => s.slot === "snack")
+    ).toHaveLength(MAX_SNACK_SLOTS);
+  });
+
+  it("ranks slots in eating order", () => {
+    const ranked = daySlots(MAX_SNACK_SLOTS).map((s) =>
+      slotRank(s.slot, s.snackIndex)
+    );
+    expect(ranked).toEqual(ranked.toSorted((x, y) => x - y));
+    expect(new Set(ranked).size).toBe(ranked.length);
+    expect(slotRank("snack", 0)).toBeLessThan(slotRank("lunch", 0));
+    expect(slotRank("snack", 1)).toBeGreaterThan(slotRank("lunch", 0));
+    expect(slotRank("snack", 1)).toBeLessThan(slotRank("dinner", 0));
   });
 });

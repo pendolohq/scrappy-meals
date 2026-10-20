@@ -50,7 +50,8 @@ arguments, whatever the UI allows. So every action is built with `userAction`
 
 Per-person data is keyed by `user.id` from the session, never by an id from
 the input: fasting, adherence and settings work this way. Plan edits (meals,
-portions, servings) are household-wide on purpose.
+portions, servings) and the household settings (snacks a day) are
+household-wide on purpose: anyone signed in can change them.
 
 ## Defence in depth
 

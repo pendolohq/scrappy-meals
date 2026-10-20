@@ -16,7 +16,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { SLOT_TYPES } from "../domain/slots";
+import {
+  DEFAULT_SNACK_SLOTS,
+  MAX_SNACK_SLOTS,
+  SLOT_TYPES,
+} from "../domain/slots";
 import type { ImportState } from "../mealie/import-state";
 import type { RecipeNutrition } from "../mealie/nutrition";
 import type { Ingredient, RecipeNote, RecipeStep } from "../mealie/recipes";
@@ -135,7 +139,7 @@ export const mealSlots = pgTable(
     ),
     check(
       "meal_slots_snack_index_valid",
-      sql`${t.snackIndex} BETWEEN 0 AND 3 AND (${t.slot} = 'snack' OR ${t.snackIndex} = 0)`
+      sql`${t.snackIndex} BETWEEN 0 AND ${sql.raw(String(MAX_SNACK_SLOTS - 1))} AND (${t.slot} = 'snack' OR ${t.snackIndex} = 0)`
     ),
     check("meal_slots_base_servings_positive", sql`${t.baseServings} > 0`),
   ]
@@ -146,14 +150,14 @@ export const householdSettings = pgTable(
   "household_settings",
   {
     id: smallint("id").primaryKey().default(1),
-    snackSlots: smallint("snack_slots").notNull().default(2),
+    snackSlots: smallint("snack_slots").notNull().default(DEFAULT_SNACK_SLOTS),
     updatedAt: timestamps.updatedAt,
   },
   (t) => [
     check("household_settings_single_row", sql`${t.id} = 1`),
     check(
       "household_settings_snack_slots_valid",
-      sql`${t.snackSlots} BETWEEN 0 AND 4`
+      sql`${t.snackSlots} BETWEEN 0 AND ${sql.raw(String(MAX_SNACK_SLOTS))}`
     ),
   ]
 );

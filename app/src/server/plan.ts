@@ -12,7 +12,7 @@ import {
 } from "./db/schema";
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
-import type { SlotType } from "./domain/slots";
+import { slotRank, type SlotType } from "./domain/slots";
 import { addDays, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
 import { getSnackSlots } from "./household";
@@ -23,8 +23,6 @@ import {
   loadRecipes,
   type RecipeFetcher,
 } from "./recipe-cache";
-
-export { SLOT_TYPES, type SlotType } from "./domain/slots";
 
 export class PlanError extends UserFacingError {
   name = "PlanError";
@@ -109,15 +107,7 @@ export async function getWeekPlan(
     await Promise.all([
       listMembers(db),
       getSnackSlots(db),
-      db
-        .select()
-        .from(mealSlots)
-        .where(inWeek)
-        .orderBy(
-          asc(mealSlots.date),
-          asc(mealSlots.snackIndex),
-          asc(mealSlots.position)
-        ),
+      db.select().from(mealSlots).where(inWeek),
       db
         .select({
           mealSlotId: slotPortions.mealSlotId,
@@ -163,7 +153,14 @@ export async function getWeekPlan(
     logsBySlot.set(l.mealSlotId, entry);
   }
 
-  const meals: PlannedMeal[] = slots.map((s) => {
+  // Eating order (breakfast, morning snack, lunch, ...) isn't a column to sort by.
+  const inEatingOrder = slots.toSorted(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      slotRank(a.slot, a.snackIndex) - slotRank(b.slot, b.snackIndex) ||
+      a.position - b.position
+  );
+  const meals: PlannedMeal[] = inEatingOrder.map((s) => {
     const r = recipes.get(s.mealieRecipeSlug);
     return {
       id: s.id,

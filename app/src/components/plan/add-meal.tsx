@@ -10,8 +10,8 @@ import { Pill } from "@/components/ui/pill";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import { formatDay } from "@/lib/format";
+import type { SlotType } from "@/server/domain/slots";
 import type { RecipeListItem } from "@/server/mealie/recipes";
-import type { SlotType } from "@/server/plan";
 
 type SearchState = {
   status: "idle" | "loading" | "done" | "error";

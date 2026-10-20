@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { testDbUrl, useTestDb } from "../../test/db";
 
 import { mealSlots, recipeCache } from "./db/schema";
+import type { SlotType } from "./domain/slots";
 import { setSnackSlots } from "./household";
 import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
@@ -284,6 +285,39 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
         ])
       );
       expect(week.days[1].meals).toHaveLength(2);
+    });
+
+    it("lists a day's meals in eating order, whatever order they were added in", async () => {
+      const { a } = await twoUsers();
+      const added: [SlotType, number][] = [
+        ["dinner", 0],
+        ["snack", 1],
+        ["lunch", 0],
+        ["snack", 0],
+        ["breakfast", 0],
+      ];
+      for (const [slot, snackIndex] of added) {
+        await addMeal(
+          db,
+          {
+            date: "2026-10-20",
+            slot,
+            snackIndex,
+            slug: `${slot}-${snackIndex}`,
+            createdBy: a.id,
+          },
+          { fetch }
+        );
+      }
+      const meals = (await getWeekPlan(db, "2026-10-19", { fetch })).days[1]
+        .meals;
+      expect(meals.map((m) => m.slug)).toEqual([
+        "breakfast-0",
+        "snack-0",
+        "lunch-0",
+        "snack-1",
+        "dinner-0",
+      ]);
     });
 
     it("numbers positions within one snack slot", async () => {

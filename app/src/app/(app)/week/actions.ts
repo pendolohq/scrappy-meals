@@ -6,7 +6,7 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
-import { MAX_SNACK_SLOTS } from "@/server/domain/slots";
+import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { isIsoDate, today } from "@/server/domain/week";
 import {
   addMeal,
@@ -17,7 +17,6 @@ import {
   setBaseServings,
   setFasting,
   setPortion,
-  SLOT_TYPES,
 } from "@/server/plan";
 
 const date = z.string().refine(isIsoDate, "invalid date");

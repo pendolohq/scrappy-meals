@@ -54,9 +54,8 @@ test("plans the same recipe in two snack slots of one day", async ({
     .getByTestId("meal")
     .filter({ hasText: recipe.name });
   await expect(morning).toHaveCount(1);
-  await expect(alexKcal).not.toHaveText("0");
-  const one = Number(await alexKcal.textContent());
-  expect(one).toBeGreaterThan(0);
+  // The test recipe is 400 kcal a serving (global-setup).
+  await expect(alexKcal).toHaveText("400");
 
   await add("Afternoon snack");
   const afternoon = slotOf("Afternoon snack")
@@ -66,7 +65,7 @@ test("plans the same recipe in two snack slots of one day", async ({
 
   // Each meal sits under its own snack section, not both under one.
   await expect(morning).toHaveCount(1);
-  await expect(alexKcal).toHaveText(String(one * 2));
+  await expect(alexKcal).toHaveText("800");
 
   // The smoke test pushes this week's shopping list and expects only its own
   // meal on it.
