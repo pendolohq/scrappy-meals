@@ -1,6 +1,6 @@
 "use client";
 
-import { clearCachedPages } from "./pwa";
+import { clearDeviceData } from "./pwa";
 
 export const SignOut = ({
   action,
@@ -10,7 +10,7 @@ export const SignOut = ({
   name: string;
 }) => {
   return (
-    <form action={action} onSubmit={clearCachedPages}>
+    <form action={action} onSubmit={clearDeviceData}>
       <button type="submit" className="text-sm text-muted">
         Sign out {name}
       </button>

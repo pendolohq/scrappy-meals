@@ -289,19 +289,21 @@ They become one page.
 
 ## M6 — PWA and offline
 
-- [ ] **Task 21: Opening the installed app offline shows this week**
+- [x] **Task 21: Opening the installed app offline shows this week**
   **Complexity:** S
   **Do:** `sw.js`: when a navigation to `/week` (or `/`) fails, serve the cached
   `/week/<this Monday>` (computed in local time), falling back to `/offline`. Fix the offline
   page's link so it doesn't loop. After M5, also cache `/week/<monday>/shopping`.
   **Done when:** e2e step: go offline, `goto("/week")`, see the cached week.
 
-- [ ] **Task 22: Cached pages don't outlive the session**
+- [x] **Task 22: Cached pages don't outlive the session**
   **Complexity:** S
   **Do:**
-  - `sw.js`: when a `/week` navigation comes back redirected to `/login`, delete the `PAGES`
-    cache.
-  - Send `Clear-Site-Data: "cache", "storage"` from the sign-out response.
+  - `sw.js`: when a page bounces to `/login?next=…` (no session), delete the `PAGES` cache.
+    (A navigation's redirect is opaque to the service worker, so the bounce is what it sees.)
+  - ~~Send `Clear-Site-Data` from the sign-out response.~~ Skipped: a server action can't set
+    it, and sending it from `/login` would wipe unsaved offline ticks whenever a session
+    expires. The login-bounce cleanup covers the same risk.
   - Cap the `STATIC` cache, for example by evicting the oldest entries past 200.
   - Rename `clearCachedPages` to `clearDeviceData`.
   **Done when:** e2e: sign out → offline → the week is not served.

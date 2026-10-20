@@ -39,7 +39,7 @@ export const Pwa = () => {
  * On sign-out: asks the service worker to drop cached pages and clears queued
  * shop-list changes, so neither the plan nor the list stays on the device.
  */
-export const clearCachedPages = () => {
+export const clearDeviceData = () => {
   navigator.serviceWorker?.controller?.postMessage("clear-pages");
   clearAllQueues();
 };
