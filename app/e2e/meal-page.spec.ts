@@ -105,9 +105,16 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   await expect(page.getByText("Nobody eats this in the plan")).toBeVisible();
   await expect(page.getByTestId("cooking-for")).toHaveText("1");
   await expect(qty).toHaveText("100 g");
-  await expect(
-    page.getByRole("button", { name: "Less (Cooking for)" })
-  ).toBeDisabled();
+
+  // Below one serving: half the recipe for one, then a quarter.
+  const less = page.getByRole("button", { name: "Less (Cooking for)" });
+  await less.click();
+  await expect(page.getByTestId("cooking-for")).toHaveText("½");
+  await expect(qty).toHaveText("50 g");
+  await less.click();
+  await expect(page.getByTestId("cooking-for")).toHaveText("¼");
+  await expect(qty).toHaveText("25 g");
+  await expect(less).toBeDisabled();
   await page.getByRole("link", { name: "Back to the plan" }).click();
 
   // The smoke test pushes this week's shopping list and expects only its own

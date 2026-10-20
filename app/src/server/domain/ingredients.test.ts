@@ -7,6 +7,7 @@ import {
   scaleIngredients,
   servingsScale,
   stepIngredients,
+  stepServings,
   unitLabel,
 } from "./ingredients";
 import { buildShoppingList } from "./shopping";
@@ -220,5 +221,42 @@ describe("stepIngredients", () => {
     expect(
       stepIngredients(scaleIngredients([lentils, salt], 4, 4), ["ref-lentils"])
     ).toEqual([]);
+  });
+});
+
+describe("stepServings", () => {
+  const walk = (from: number, direction: 1 | -1, steps: number) => {
+    const seen = [];
+    let value = from;
+    for (let i = 0; i < steps; i += 1) {
+      value = stepServings(value, direction);
+      seen.push(value);
+    }
+    return seen;
+  };
+
+  it("goes down by whole servings, then to a half and a quarter", () => {
+    expect(walk(3, -1, 5)).toEqual([2, 1, 0.5, 0.25, 0.25]);
+  });
+
+  it("goes up from a quarter to whole servings", () => {
+    expect(walk(0.25, 1, 4)).toEqual([0.5, 1, 2, 3]);
+  });
+
+  it("moves a value off the ladder to its neighbour", () => {
+    expect(stepServings(1.5, -1)).toBe(1);
+    expect(stepServings(1.5, 1)).toBe(2);
+    expect(stepServings(0.75, -1)).toBe(0.5);
+    expect(stepServings(0.75, 1)).toBe(1);
+    expect(stepServings(0.3, -1)).toBe(0.25);
+  });
+
+  it("stops at 100", () => {
+    expect(stepServings(100, 1)).toBe(100);
+  });
+
+  it("scales the ingredients down with it", () => {
+    const half = scaleIngredients([lentils], 4, stepServings(1, -1));
+    expect(half[0].scaled?.quantity).toBe(50);
   });
 });

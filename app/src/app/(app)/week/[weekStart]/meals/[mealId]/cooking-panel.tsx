@@ -9,13 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
-import { plannedServings, scaleIngredients } from "@/server/domain/ingredients";
+import {
+  MAX_COOKING_FOR,
+  MIN_COOKING_FOR,
+  plannedServings,
+  scaleIngredients,
+  stepServings,
+} from "@/server/domain/ingredients";
 import type { Ingredient, RecipeStep } from "@/server/mealie/recipes";
 
 import { IngredientText } from "./ingredient-text";
 import { Method } from "./method";
-
-const MAX_SERVINGS = 100;
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">
@@ -81,17 +85,8 @@ export const CookingPanel = ({
       }
     });
 
-  // Whole servings from wherever it stands: 1½ goes to 2 or 1.
   const stepCookingFor = (next: number) =>
-    setCookingFor(
-      Math.min(
-        MAX_SERVINGS,
-        Math.max(
-          1,
-          next > servings ? Math.floor(servings) + 1 : Math.ceil(servings) - 1
-        )
-      )
-    );
+    setCookingFor(stepServings(servings, next > servings ? 1 : -1));
 
   return (
     <>
@@ -143,8 +138,8 @@ export const CookingPanel = ({
                   label="Cooking for"
                   value={servings}
                   onChange={stepCookingFor}
-                  min={1}
-                  max={MAX_SERVINGS}
+                  min={MIN_COOKING_FOR}
+                  max={MAX_COOKING_FOR}
                   step={1}
                   suffix=""
                   testId="cooking-for"
