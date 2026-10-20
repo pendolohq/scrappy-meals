@@ -68,9 +68,10 @@ export const AdherenceButtons = ({
   };
 
   return (
-    <div className="space-y-1">
+    // Four 44px buttons need 11rem; a narrower column gets two rows.
+    <div className="@container space-y-1">
       <fieldset
-        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-4 rounded-full border border-border bg-card p-0.5"
+        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-2 rounded-[1.5rem] border border-border bg-card p-0.5 @[11rem]:grid-cols-4 @[11rem]:rounded-full"
         aria-label={`How did ${mealName} go?`}
       >
         {ADHERENCE_STATUSES.map((s) => {

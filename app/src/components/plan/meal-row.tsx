@@ -51,7 +51,7 @@ const Flags = ({ meal }: { meal: PlannedMeal }) => {
       ))}
       {estimated && <li className={pillClass()}>≈ Estimated nutrition</li>}
       {needsReview && (
-        <li>
+        <li className="-my-2 flex min-h-tap items-center">
           <Link
             href={reviewHref(meal.slug)}
             className={cx(
