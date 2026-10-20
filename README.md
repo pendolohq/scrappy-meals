@@ -107,7 +107,7 @@ MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... bun run t
 ```
 
 [Bun](https://bun.sh) installs the packages and runs the scripts; the app, the tests and the
-production image still run on Node 22. Always use `bun run <script>`: `bun test` and `bun build`
+production image still run on Node 26. Always use `bun run <script>`: `bun test` and `bun build`
 are Bun's own test runner and bundler, not this project's scripts.
 
 Formatting is [oxfmt](https://oxc.rs/docs/guide/usage/formatter) (`app/.oxfmtrc.json`: 80 columns,

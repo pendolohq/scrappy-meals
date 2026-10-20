@@ -13,7 +13,7 @@ export const options = {
   outExtension: { ".js": ".cjs" },
   bundle: true,
   platform: "node",
-  target: "node22",
+  target: "node26",
   format: "cjs",
   // The CLI runs only on the server, so server-only modules resolve to their no-op build.
   conditions: ["react-server"],
