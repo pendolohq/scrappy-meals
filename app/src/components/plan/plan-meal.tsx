@@ -22,11 +22,10 @@ import { RecipeFlags } from "./recipe-flags";
 import { Stepper } from "./stepper";
 
 /**
- * A meal on the Plan page: everyone's portion, one person per row so it fits a
- * day column; servings and Remove sit behind the options button, as on the
- * Week page. `compact` is the desktop grid's cell: just the name, linking to
- * the meal, with everyone's portions as text and their steppers moved behind
- * the options button too.
+ * A meal on the Plan page, with everyone's portions as a line of text; the
+ * steppers, servings and Remove sit behind the options button, as on the
+ * Week page. `compact` is the desktop grid's cell: no photo, the name links
+ * to the meal, and the options float over the grid.
  */
 export const PlanMeal = ({
   meal,
@@ -60,6 +59,16 @@ export const PlanMeal = ({
 
   const name = meal.recipe?.name ?? meal.slug;
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
+
+  // Portions are nearly always 1× each, so they read as a line of text and
+  // the steppers wait behind the options button.
+  const eating = members.filter((m) => (portions[m.id] ?? 0) > 0);
+  const summary =
+    eating.length === 0
+      ? "Nobody eats this"
+      : eating
+          .map((m) => `${m.name} ${formatPortion(portions[m.id])}×`)
+          .join(" · ");
 
   const steppers = (
     <div className="space-y-1">
@@ -96,7 +105,7 @@ export const PlanMeal = ({
           "absolute top-full right-0 z-10 mt-1 w-64 border border-border shadow-card"
       )}
     >
-      {compact && steppers}
+      {steppers}
       <div className="flex items-center justify-between gap-2">
         <label htmlFor={servingsId} className="text-muted">
           Servings per 1×
@@ -136,7 +145,6 @@ export const PlanMeal = ({
   );
 
   if (compact) {
-    const eating = members.filter((m) => (portions[m.id] ?? 0) > 0);
     return (
       <li
         className={cx(
@@ -161,13 +169,7 @@ export const PlanMeal = ({
             <Ellipsis className="size-4" aria-hidden />
           </IconButton>
         </div>
-        <p className="truncate text-xs text-muted tabular-nums">
-          {eating.length === 0
-            ? "Nobody eats this"
-            : eating
-                .map((m) => `${m.name} ${formatPortion(portions[m.id])}×`)
-                .join(" · ")}
-        </p>
+        <p className="truncate text-xs text-muted tabular-nums">{summary}</p>
         {options}
         {errorText}
       </li>
@@ -200,7 +202,7 @@ export const PlanMeal = ({
         </IconButton>
       </div>
 
-      {steppers}
+      <p className="text-xs text-muted tabular-nums">{summary}</p>
       {options}
       {errorText}
     </li>

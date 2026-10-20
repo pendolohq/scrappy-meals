@@ -47,8 +47,8 @@ test("plans a recipe from the Plan page and shows it on the week", async ({
     .click();
   const planned = lunch.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(planned).toHaveCount(1);
-  // Both people start at a full portion, set right here.
-  await expect(planned.getByTestId("portion")).toHaveText(["1×", "1×"]);
+  // Both people start at a full portion.
+  await expect(planned).toContainText("Alex 1× · Sam 1×");
 
   await page.getByRole("link", { name: "See the week" }).click();
   await expect(page).toHaveURL(`/week/${week}`);

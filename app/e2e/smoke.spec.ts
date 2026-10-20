@@ -70,7 +70,11 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     "400"
   );
 
-  // Sam has a half portion: 1 + 0.5 = 1.5 of 4 servings.
+  // Sam has a half portion: 1 + 0.5 = 1.5 of 4 servings. Portions are
+  // changed from the meal's options.
+  await meal
+    .getByRole("button", { name: `Options for ${recipe.name}` })
+    .click();
   await meal
     .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
     .click();
@@ -78,6 +82,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
     .click();
   await expect(meal.getByTestId("portion").nth(1)).toHaveText("½×");
+  await expect(meal.getByTestId("portion-text").nth(1)).toHaveText("½×");
   await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText(
     "200"
   );

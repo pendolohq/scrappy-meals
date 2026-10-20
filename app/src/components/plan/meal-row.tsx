@@ -14,6 +14,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
+import { formatPortion } from "@/lib/format";
 import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AdherenceBadge, AdherenceButtons } from "./adherence-cell";
@@ -99,28 +100,13 @@ export const MealRow = ({
       >
         {members.map((m) => (
           <div key={m.id} className="min-w-0 space-y-2">
-            {members.length > 1 && (
-              <p
-                aria-hidden
-                className="text-center text-[0.6875rem] font-medium tracking-wider text-muted uppercase"
-              >
-                {m.name}
-              </p>
-            )}
-            <Stepper
-              label={`${m.name}'s portion of ${name}`}
-              value={portions[m.id] ?? 0}
-              onChange={(multiplier) =>
-                act(async () => {
-                  setOptimisticPortion({ userId: m.id, multiplier });
-                  return setPortionAction({
-                    mealId: meal.id,
-                    userId: m.id,
-                    multiplier,
-                  });
-                })
-              }
-            />
+            {/* Portions are nearly always 1×: shown as text, changed from the options. */}
+            <p className="text-center text-[0.6875rem] font-medium tracking-wider text-muted uppercase tabular-nums">
+              {members.length > 1 && `${m.name} · `}
+              <span data-testid="portion-text">
+                {formatPortion(portions[m.id] ?? 0)}×
+              </span>
+            </p>
             {m.id === currentUserId ? (
               canLog && (
                 <AdherenceButtons
@@ -137,37 +123,65 @@ export const MealRow = ({
       </div>
 
       {open && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-sunken p-3 text-sm">
-          <div className="flex items-center gap-2">
-            <label htmlFor={servingsId} className="text-muted">
-              Servings per 1×
-            </label>
-            <Input
-              id={servingsId}
-              type="number"
-              min="0.25"
-              max="100"
-              step="0.25"
-              defaultValue={meal.baseServings}
-              className="w-24 tabular-nums"
-              onBlur={(e) => {
-                const baseServings = Number(e.currentTarget.value);
-                if (baseServings > 0 && baseServings !== meal.baseServings) {
-                  act(() =>
-                    setServingsAction({ mealId: meal.id, baseServings })
-                  );
-                }
-              }}
-            />
+        <div className="space-y-3 rounded-control bg-sunken p-3 text-sm">
+          <div className="space-y-1">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-2"
+              >
+                <span aria-hidden className="min-w-0 truncate text-muted">
+                  {m.name}
+                </span>
+                <Stepper
+                  label={`${m.name}'s portion of ${name}`}
+                  value={portions[m.id] ?? 0}
+                  onChange={(multiplier) =>
+                    act(async () => {
+                      setOptimisticPortion({ userId: m.id, multiplier });
+                      return setPortionAction({
+                        mealId: meal.id,
+                        userId: m.id,
+                        multiplier,
+                      });
+                    })
+                  }
+                />
+              </div>
+            ))}
           </div>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
-          >
-            <Trash2 className="size-4" aria-hidden />
-            Remove
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor={servingsId} className="text-muted">
+                Servings per 1×
+              </label>
+              <Input
+                id={servingsId}
+                type="number"
+                min="0.25"
+                max="100"
+                step="0.25"
+                defaultValue={meal.baseServings}
+                className="w-24 tabular-nums"
+                onBlur={(e) => {
+                  const baseServings = Number(e.currentTarget.value);
+                  if (baseServings > 0 && baseServings !== meal.baseServings) {
+                    act(() =>
+                      setServingsAction({ mealId: meal.id, baseServings })
+                    );
+                  }
+                }}
+              />
+            </div>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              Remove
+            </Button>
+          </div>
         </div>
       )}
       {error && (
