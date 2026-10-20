@@ -43,8 +43,21 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(alexKcal).toHaveText("400");
 
-  await meal.getByRole("link", { name: recipe.name }).click();
-  await expect(page).toHaveURL(/\/meals\/[0-9a-f-]{36}$/);
+  // On a phone the week shows one day at a time: each way, wait for the page
+  // (and back on the week, for the day's card) before using it.
+  const openMeal = async () => {
+    await meal.getByRole("link", { name: recipe.name }).click();
+    await expect(page).toHaveURL(/\/meals\/[0-9a-f-]{36}$/);
+  };
+  const backToWeek = async () => {
+    await page.getByRole("link", { name: "Back to the plan" }).click();
+    await expect(page).toHaveURL(
+      `/week/${weekStartOf(otherDay())}#${otherDay()}`
+    );
+    await expect(day).toBeInViewport();
+  };
+
+  await openMeal();
   await expect(
     page.getByRole("heading", { level: 1, name: recipe.name })
   ).toBeVisible();
@@ -76,21 +89,21 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   await page.getByRole("button", { name: "More (Cooking for)" }).click();
   await expect(qty).toHaveText("300 g");
 
-  await page.getByRole("link", { name: "Back to the plan" }).click();
+  await backToWeek();
   await expect(alexKcal).toHaveText("400");
 
   // A portion changed on the recipe page is saved to the plan.
-  await meal.getByRole("link", { name: recipe.name }).click();
+  await openMeal();
   await page
     .getByRole("button", { name: `More (Alex's portion of ${recipe.name})` })
     .click();
   // The list follows the plan again: 2.25 of 4 servings.
   await expect(qty).toHaveText("225 g");
-  await page.getByRole("link", { name: "Back to the plan" }).click();
+  await backToWeek();
   await expect(alexKcal).toHaveText("500");
 
   // With everyone at 0, the recipe is shown for one, and never for fewer.
-  await meal.getByRole("link", { name: recipe.name }).click();
+  await openMeal();
   for (const name of ["Alex", "Sam"]) {
     const portion = page.getByRole("group", {
       name: `${name}'s portion of ${recipe.name}`,
@@ -115,7 +128,7 @@ test("cooks a planned meal from its recipe page", async ({ page }) => {
   await expect(page.getByTestId("cooking-for")).toHaveText("¼");
   await expect(qty).toHaveText("25 g");
   await expect(less).toBeDisabled();
-  await page.getByRole("link", { name: "Back to the plan" }).click();
+  await backToWeek();
 
   // The smoke test pushes this week's shopping list and expects only its own
   // meal on it.
