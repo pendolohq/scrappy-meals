@@ -1,8 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 
 import { Pwa } from "@/components/pwa";
 
 import "./globals.css";
+
+// Fraunces from the npm package rather than next/font/google, so the build
+// doesn't need to reach Google either. One variable file covers every weight
+// and the optical size axis, which keeps large titles crisp.
+const fraunces = localFont({
+  src: "../../node_modules/@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2",
+  weight: "100 900",
+  variable: "--font-fraunces",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Scrappy Meals",
@@ -26,7 +37,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={fraunces.variable}>
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <Pwa />
         {children}

@@ -47,7 +47,7 @@ export const FastingToggle = ({
         aria-pressed={fasting}
         className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-60 ${
           fasting
-            ? "border-accent bg-accent text-white dark:text-stone-900"
+            ? "border-accent bg-accent text-accent-foreground"
             : "border-border text-muted"
         }`}
       >
