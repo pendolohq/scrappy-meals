@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normaliseRecipeUrl } from "./recipe-url";
+import { isSocialPostUrl, normaliseRecipeUrl } from "./recipe-url";
 
 function rejected(input: string) {
   const result = normaliseRecipeUrl(input);
@@ -116,5 +116,109 @@ describe("normaliseRecipeUrl", () => {
 
   it("rejects host names with characters a host can't have", () => {
     expect(rejected('https://a"b.com/')).not.toBe("");
+  });
+});
+
+describe("normaliseRecipeUrl for social posts", () => {
+  it.each([
+    [
+      "https://www.instagram.com/p/DAbc123/?igsh=MXx4&utm_source=ig_web_copy_link",
+      "https://www.instagram.com/p/DAbc123/",
+    ],
+    [
+      "https://www.facebook.com/share/p/1AbCd/?mibextid=wwXIfr&rdid=xyz",
+      "https://www.facebook.com/share/p/1AbCd/",
+    ],
+    [
+      "https://m.facebook.com/story.php?fbclid=abc",
+      "https://m.facebook.com/story.php",
+    ],
+    [
+      "https://m.facebook.com/story.php?story_fbid=1&id=2&mibextid=x",
+      "https://m.facebook.com/story.php?id=2&story_fbid=1",
+    ],
+    ["https://fb.watch/abc123/?mibextid=x#t=3", "https://fb.watch/abc123/"],
+  ])("drops the query string of %s", (input, expected) => {
+    expect(normaliseRecipeUrl(input)).toEqual({ ok: true, url: expected });
+  });
+
+  it("keeps the params that identify the post", () => {
+    const a = normaliseRecipeUrl("https://www.facebook.com/watch/?v=1");
+    const b = normaliseRecipeUrl("https://www.facebook.com/watch/?v=2");
+    expect(a).not.toEqual(b);
+    expect(a).toEqual({ ok: true, url: "https://www.facebook.com/watch/?v=1" });
+  });
+
+  it("compares equal whatever the order of the params", () => {
+    const a = normaliseRecipeUrl(
+      "https://m.facebook.com/story.php?id=2&story_fbid=1"
+    );
+    const b = normaliseRecipeUrl(
+      "https://m.facebook.com/story.php?story_fbid=1&id=2"
+    );
+    expect(a).toEqual(b);
+  });
+
+  it("keeps the query of a lookalike host", () => {
+    expect(normaliseRecipeUrl("https://notfacebook.com/soup?id=7")).toEqual({
+      ok: true,
+      url: "https://notfacebook.com/soup?id=7",
+    });
+  });
+
+  it("makes the same post with different tracking parameters equal", () => {
+    const a = normaliseRecipeUrl("https://www.instagram.com/p/X/?igsh=1");
+    const b = normaliseRecipeUrl("https://www.instagram.com/p/X/?igsh=2");
+    expect(a).toEqual(b);
+  });
+
+  it("still applies the usual checks to social URLs", () => {
+    expect(rejected("https://user:pw@www.instagram.com/p/X/")).not.toBe("");
+    expect(rejected("ftp://www.facebook.com/x")).not.toBe("");
+  });
+});
+
+describe("isSocialPostUrl", () => {
+  it.each([
+    "https://instagram.com/p/abc/",
+    "https://www.instagram.com/reel/abc/",
+    "https://facebook.com/share/p/abc",
+    "https://www.facebook.com/share/p/abc",
+    "https://m.facebook.com/story.php?id=1",
+    "https://web.facebook.com/x/posts/1",
+    "https://fb.watch/abc/",
+    "https://www.fb.watch/abc/",
+    "HTTPS://WWW.INSTAGRAM.COM/p/abc/",
+    "http://www.instagram.com/p/abc/",
+  ])("is true for %s", (url) => {
+    expect(isSocialPostUrl(url)).toBe(true);
+  });
+
+  it.each([
+    "https://notfacebook.com/x",
+    "https://facebook.com.evil.example/x",
+    "https://instagram.co/p/abc",
+    "https://fakeinstagram.com/p/abc",
+    "https://example.com/?u=https://www.facebook.com/x",
+    "https://example.com/instagram.com",
+    "https://user@evil.example/facebook.com",
+  ])("is false for the lookalike %s", (url) => {
+    expect(isSocialPostUrl(url)).toBe(false);
+  });
+
+  it.each([
+    "",
+    "   ",
+    "instagram",
+    "www.instagram.com/p/abc",
+    "https://",
+    "not a url",
+    "javascript:alert(1)",
+  ])("is false for unusable input %j", (input) => {
+    expect(isSocialPostUrl(input)).toBe(false);
+  });
+
+  it("is false for a normal recipe site", () => {
+    expect(isSocialPostUrl("https://example.com/soup")).toBe(false);
   });
 });

@@ -99,6 +99,25 @@ ssh -L 9000:<that address>:9000 deploy@<server>
    recipes and writes shopping lists, so if the token leaks it can't manage
    users or Mealie's settings.
 3. Add or import a few recipes.
+4. Optional, for importing Instagram and Facebook posts: as the admin, add an
+   AI provider (Group Settings → AI Providers), test it, then pick it as the
+   group's **default** and **image** provider. Leave **audio** empty: the
+   planner sends the post's caption and screenshots, never the video. For
+   Claude, which Mealie reaches through Anthropic's OpenAI-compatible API:
+
+   | Field | Value |
+   |---|---|
+   | Base URL | `https://api.anthropic.com/v1/` |
+   | API key | a Claude API key (console.anthropic.com → API keys) |
+   | Model | `claude-sonnet-5-5` |
+
+   Add the header `anthropic-workspace-id` if the key can reach several
+   workspaces. The key lives in Mealie's database, so it's in the (encrypted)
+   backups too; it never goes into `.env`. The planner's token stays a plain
+   member's: it reads whether AI is set up from the group, not from the
+   manage-only settings. Without a provider, everything else works and post
+   imports say that AI isn't set up. What Mealie does with the provider is in
+   [mealie-api.md](mealie-api.md#importing-with-ai).
 
 Then publish it: `docker compose up -d caddy`.
 

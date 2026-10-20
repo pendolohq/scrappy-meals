@@ -16,6 +16,7 @@ import {
   findOrCreateFood,
   findOrCreateUnit,
   findRecipeBySourceUrl,
+  getAiSettings,
   importRecipeFromUrl,
   parseIngredients,
   patchRecipe,
@@ -346,6 +347,56 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(r.sourceUrl).toBe(sourceUrl);
       expect(r.nutrition.perServing.kcal).toBe(320);
       expect(r.ingredients).toHaveLength(2);
+    });
+  });
+
+  describe("AI settings", () => {
+    // In production the planner's token belongs to a plain member, not an
+    // admin; the group's AI provider settings endpoint is manage-only.
+    let member: MealieClient;
+    let memberId = "";
+
+    beforeAll(async () => {
+      const group = unwrap(await admin.GET("/api/groups/self"));
+      const household = unwrap(await admin.GET("/api/households/self"));
+      const email = `it-member-${run}@example.com`;
+      const password = `it-member-${run}-Pw`;
+      const user = unwrap(
+        await admin.POST("/api/admin/users", {
+          body: {
+            username: `it-member-${run}`,
+            fullName: "IT Member",
+            email,
+            password,
+            group: group.name,
+            household: household.name,
+            admin: false,
+            canManage: false,
+            canInvite: false,
+            canOrganize: false,
+          },
+        })
+      );
+      memberId = user.id;
+      cleanup.push(() =>
+        admin.DELETE("/api/admin/users/{item_id}", {
+          params: { path: { item_id: memberId } },
+        })
+      );
+      const login = await fetch(`${baseUrl}/api/auth/token`, {
+        method: "POST",
+        body: new URLSearchParams({ username: email, password }),
+      });
+      const { access_token } = (await login.json()) as {
+        access_token: string;
+      };
+      member = createMealieClient({ baseUrl: baseUrl!, token: access_token });
+    });
+
+    it("reads them with a member's token", async () => {
+      const settings = await getAiSettings({ client: member });
+      expect(typeof settings.aiEnabled).toBe("boolean");
+      expect(typeof settings.imageProviderEnabled).toBe("boolean");
     });
   });
 

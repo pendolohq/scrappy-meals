@@ -11,7 +11,7 @@ export default async function NewRecipePage() {
     <section className="max-w-xl space-y-6 pb-8">
       <PageHeader
         title="Add a recipe"
-        description="Paste the address of a recipe page. Mealie reads it, then you check the servings, nutrition and ingredients."
+        description="Paste the address of a recipe page, or of an Instagram or Facebook post. Mealie reads it, then you check the servings, nutrition and ingredients."
       />
       <Card className="p-5 sm:p-6">
         <ImportForm />

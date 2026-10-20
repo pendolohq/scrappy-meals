@@ -1,6 +1,12 @@
 import "server-only";
 
-import { type MealieClient, mealie, mealieImporter, unwrap } from "./client";
+import {
+  type MealieClient,
+  mealie,
+  mealieAiImporter,
+  mealieImporter,
+  unwrap,
+} from "./client";
 import type { components } from "./schema";
 
 type RecipePatch = components["schemas"]["RecipeIn"];
@@ -22,6 +28,59 @@ export async function importRecipeFromUrl(
     return null;
   }
   return unwrap(result);
+}
+
+/**
+ * Asks Mealie's AI to build a recipe from a pasted caption and/or screenshots,
+ * with the post's address as its source. Returns the new recipe's slug, or
+ * null when Mealie answered 400 (no recipe in the text, or no provider).
+ */
+export async function importRecipeWithAi(
+  input: { url: string; caption: string | null; images: File[] },
+  opts: { client?: MealieClient } = {}
+): Promise<string | null> {
+  const client = opts.client ?? mealieAiImporter();
+  const result = await client.POST("/api/recipes/create/ai", {
+    // The generated type can't describe files; the serializer builds the form.
+    body: {
+      url: input.url,
+      ...(input.caption === null ? {} : { content: input.caption }),
+      images: [],
+    },
+    bodySerializer: (body) => {
+      const form = new FormData();
+      if (body?.url) {
+        form.set("url", body.url);
+      }
+      if (body?.content) {
+        form.set("content", body.content);
+      }
+      for (const image of input.images) {
+        form.append("images", image, image.name || "screenshot");
+      }
+      return form;
+    },
+  });
+  if (result.response.status === 400) {
+    return null;
+  }
+  return unwrap(result);
+}
+
+/** The group's AI provider settings: whether AI, and image input, work. */
+export async function getAiSettings(
+  opts: { client?: MealieClient } = {}
+): Promise<{ aiEnabled: boolean; imageProviderEnabled: boolean }> {
+  const client = opts.client ?? mealie();
+  // Read from the group, not /api/groups/ai-providers/settings: that one needs
+  // group-manage permission, which the planner's token deliberately lacks.
+  const settings = unwrap(
+    await client.GET("/api/groups/self")
+  ).aiProviderSettings;
+  return {
+    aiEnabled: settings?.aiEnabled ?? false,
+    imageProviderEnabled: settings?.imageProviderEnabled ?? false,
+  };
 }
 
 /** A recipe already imported from this URL (Mealie's orgURL), if any. */

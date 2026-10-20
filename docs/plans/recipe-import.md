@@ -145,21 +145,26 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   transcribe it from the server without signing in to Instagram/Facebook (else Mealie's
   `YTDLP_COOKIEFILE`), does it set `orgURL`, does it fill nutrition when the source has none,
   how long it takes (the app's Mealie timeout is 10 s), what it costs per import.
+  Text, screenshots, `orgURL`, nutrition and timing are answered in `docs/mealie-api.md`
+  (Importing with AI): it never estimates nutrition, and it sets `orgURL`. The owner doesn't
+  want audio: no `audio` provider, no video download, no `YTDLP_COOKIEFILE`. A public Facebook
+  reel's link alone gives "no recipe found"; with its caption pasted it imports fully, so the
+  caption is pasted. Still open: an Instagram post (expected to be the same), and cost per import (the Console showed no spend right after the
+  spike's four calls).
 
-- [ ] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
+- [x] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
   Depends on 7 and milestone 1. Instagram/Facebook links (`instagram.com`, `facebook.com`,
   `fb.watch`) go through `create/ai` with the URL, plus optional pasted caption and
-  screenshots (size/count limits, server action body limit). If the video can't be fetched,
-  say so and ask for the caption or screenshots. Always set `orgURL` to the post URL. Nutrition
-  from an AI import is `estimated`. Same review step as milestone 1.
+  screenshots (size/count limits, server action body limit). If no recipe can be read from the
+  post, say so and ask for the caption or screenshots. Always set `orgURL` to the post URL.
+  Mealie copies nutrition only when the post states it, so it's `source` like a web page's.
+  Same review step as milestone 1.
 
-- [ ] **9. Estimate missing nutrition.** **Complexity:** M
-  Depends on 7. If the spike shows `create/ai` estimates nutrition, offer "Estimate with AI" on
-  the review page for web-page imports that have none, marked `estimated`. If it doesn't,
-  decide with the owner before building anything (the alternative is the app calling a model
-  itself, which needs its own key and env var).
+- [ ] ~~**9. Estimate missing nutrition.**~~ **Dropped for now.** `create/ai` never estimates
+  (see 7), and the owner chose not to have the app call a model itself. Missing nutrition stays
+  missing and is filled in on the review page. The `estimated` state stays supported for
+  recipes marked that way by hand.
 
-- [ ] **10. Deploy docs.** **Complexity:** S
-  `docs/deploy.md`: set up AI providers in Mealie (which features need which provider, picking
-  cheap models), and `YTDLP_COOKIEFILE` if the spike shows it's needed (then `.env.example`
-  and `docker-compose.yml` too).
+- [x] **10. Deploy docs.** **Complexity:** S
+  `docs/deploy.md`: set up an AI provider in Mealie (`default` and `image`; no `audio`),
+  including Claude through Anthropic's OpenAI-compatible endpoint.

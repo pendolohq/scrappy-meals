@@ -4,8 +4,10 @@ import { RetryableError, UserFacingError } from "./errors";
 import { isMealieUnavailable } from "./mealie/client";
 import {
   findRecipeBySourceUrl,
+  getAiSettings,
   getRawRecipe,
   importRecipeFromUrl,
+  importRecipeWithAi,
   patchRecipe,
 } from "./mealie/import";
 import { IMPORT_EXTRAS, withImportState } from "./mealie/import-state";
@@ -27,9 +29,20 @@ type Deps = {
   getRecipe: (slug: string) => Promise<FetchedRecipe | null>;
   patch: (
     slug: string,
-    fields: { extras: Record<string, string> }
+    fields: { extras: Record<string, string>; orgURL?: string }
   ) => Promise<void>;
   limiter: { hit: (key: string) => boolean };
+  aiSettings: () => Promise<{
+    aiEnabled: boolean;
+    imageProviderEnabled: boolean;
+  }>;
+  importFromAi: (input: SocialInput) => Promise<string | null>;
+};
+
+export type SocialInput = {
+  url: string;
+  caption: string | null;
+  images: File[];
 };
 
 // Each import makes Mealie fetch a third-party page (and later may spend AI
@@ -42,6 +55,8 @@ const defaults: Deps = {
   getRecipe: getRawRecipe,
   patch: (slug, fields) => patchRecipe(slug, fields),
   limiter,
+  aiSettings: () => getAiSettings(),
+  importFromAi: (input) => importRecipeWithAi(input),
 };
 
 // One import per page at a time: a second submission while the first is
@@ -59,6 +74,63 @@ export async function importRecipe(
   deps: Partial<Deps> = {}
 ): Promise<ImportResult> {
   const d = { ...defaults, ...deps };
+  return guarded(url, userId, d, async () => {
+    const existing = await findExisting(url, d);
+    if (existing) {
+      return existing;
+    }
+    const slug = await d.importFromUrl(url);
+    if (!slug) {
+      throw new UserFacingError("Couldn't find a recipe on that page.");
+    }
+    return markImported(slug, d);
+  });
+}
+
+/**
+ * Imports a recipe from an Instagram or Facebook post through Mealie's AI,
+ * from the pasted caption and/or screenshots (Mealie can't read the post
+ * itself). The caller makes sure there is at least one of them.
+ */
+export async function importSocialRecipe(
+  input: SocialInput,
+  userId: string,
+  deps: Partial<Deps> = {}
+): Promise<ImportResult> {
+  const d = { ...defaults, ...deps };
+  return guarded(input.url, userId, d, async () => {
+    const existing = await findExisting(input.url, d);
+    if (existing) {
+      return existing;
+    }
+    const settings = await d.aiSettings();
+    if (!settings.aiEnabled) {
+      throw new UserFacingError(
+        "Mealie has no AI provider set up. Add one in Mealie's group settings, then try again."
+      );
+    }
+    if (input.images.length > 0 && !settings.imageProviderEnabled) {
+      throw new UserFacingError(
+        "Mealie has no AI provider for images. Paste the caption instead, or pick an image provider in Mealie's group settings."
+      );
+    }
+    const slug = await d.importFromAi(input);
+    if (!slug) {
+      throw new UserFacingError(
+        "Couldn't find a recipe in that caption or those screenshots."
+      );
+    }
+    // Set explicitly so the source survives Mealie not copying the url.
+    return markImported(slug, d, input.url);
+  });
+}
+
+async function guarded(
+  url: string,
+  userId: string,
+  d: Deps,
+  run: () => Promise<ImportResult>
+): Promise<ImportResult> {
   if (!d.limiter.hit(userId)) {
     throw new UserFacingError("Too many imports. Try again in a while.");
   }
@@ -66,33 +138,44 @@ export async function importRecipe(
   if (running) {
     return running;
   }
-  const work = runImport(url, d).finally(() => inFlight.delete(url));
+  const work = withRetry(run).finally(() => inFlight.delete(url));
   inFlight.set(url, work);
   return work;
 }
 
-async function runImport(url: string, d: Deps): Promise<ImportResult> {
+async function findExisting(
+  url: string,
+  d: Deps
+): Promise<ImportResult | null> {
+  const existing = await d.find(url);
+  if (!existing) {
+    return null;
+  }
+  // An earlier import can create the recipe and still fail before
+  // marking it (a timeout, a failed PATCH); this retry finishes the job.
+  const recipe = await d.getRecipe(existing.slug);
+  if (recipe && !(IMPORT_EXTRAS.review in (recipe.extras ?? {}))) {
+    await markPending(existing.slug, recipe, d);
+  }
+  return { status: "exists", ...existing };
+}
+
+async function markImported(
+  slug: string,
+  d: Deps,
+  orgURL?: string
+): Promise<ImportResult> {
+  const recipe = await d.getRecipe(slug);
+  // Null: the recipe was deleted since the import, nothing left to mark.
+  if (recipe) {
+    await markPending(slug, recipe, d, orgURL);
+  }
+  return { status: "imported", slug };
+}
+
+async function withRetry(run: () => Promise<ImportResult>) {
   try {
-    const existing = await d.find(url);
-    if (existing) {
-      // An earlier import can create the recipe and still fail before
-      // marking it (a timeout, a failed PATCH); this retry finishes the job.
-      const recipe = await d.getRecipe(existing.slug);
-      if (recipe && !(IMPORT_EXTRAS.review in (recipe.extras ?? {}))) {
-        await markPending(existing.slug, recipe, d);
-      }
-      return { status: "exists", ...existing };
-    }
-    const slug = await d.importFromUrl(url);
-    if (!slug) {
-      throw new UserFacingError("Couldn't find a recipe on that page.");
-    }
-    const recipe = await d.getRecipe(slug);
-    // Null: the recipe was deleted since the import, nothing left to mark.
-    if (recipe) {
-      await markPending(slug, recipe, d);
-    }
-    return { status: "imported", slug };
+    return await run();
   } catch (err) {
     if (isMealieUnavailable(err)) {
       console.error("recipe import failed", err);
@@ -104,7 +187,12 @@ async function runImport(url: string, d: Deps): Promise<ImportResult> {
   }
 }
 
-async function markPending(slug: string, recipe: FetchedRecipe, d: Deps) {
+async function markPending(
+  slug: string,
+  recipe: FetchedRecipe,
+  d: Deps,
+  orgURL?: string
+) {
   // Only the macros count: a page giving just sodium has no usable nutrition.
   const hasNutrition = MACRO_KEYS.some((m) => {
     const v = recipe.nutrition?.[NUTRITION_FIELDS[m]];
@@ -115,5 +203,6 @@ async function markPending(slug: string, recipe: FetchedRecipe, d: Deps) {
       review: "pending",
       nutrition: hasNutrition ? "source" : null,
     }),
+    ...(orgURL ? { orgURL } : {}),
   });
 }
