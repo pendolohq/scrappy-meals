@@ -3,6 +3,7 @@ import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { DayCard } from "@/components/plan/day-card";
+import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
 import { today, weekStartOf } from "@/server/domain/week";
@@ -10,6 +11,9 @@ import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../week-route";
+
+const linkClass =
+  "inline-flex min-h-tap items-center font-medium text-accent-ink";
 
 export default async function WeekPage({
   params,
@@ -22,35 +26,44 @@ export default async function WeekPage({
   const now = today();
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-5 pb-8" data-wide>
       <AutoRefresh />
       <WeekHeader weekStart={weekStart}>
         {weekStartOf(now) !== weekStart && (
-          <Link
-            href="/week"
-            className="inline-flex min-h-tap items-center font-medium text-accent-ink"
-          >
+          <Link href="/week" className={linkClass}>
             Back to this week
           </Link>
         )}
+        <Link href={`/plan/${weekStart}`} className={linkClass}>
+          Plan this week
+        </Link>
       </WeekHeader>
 
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>
       )}
-      {plan.days.map((day) => (
-        <DayCard
-          key={day.date}
-          date={day.date}
-          meals={day.meals}
-          members={plan.members}
-          snackSlots={plan.snackSlots}
-          fasting={day.fasting}
-          currentUserId={user.id}
-          isToday={day.date === now}
-          isPastOrToday={day.date <= now}
-        />
-      ))}
+      <div className="space-y-5 xl:hidden">
+        {plan.days.map((day) => (
+          <DayCard
+            key={day.date}
+            date={day.date}
+            meals={day.meals}
+            members={plan.members}
+            snackSlots={plan.snackSlots}
+            fasting={day.fasting}
+            currentUserId={user.id}
+            isToday={day.date === now}
+            isPastOrToday={day.date <= now}
+          />
+        ))}
+      </div>
+      <WeekGrid
+        plan={plan}
+        today={now}
+        mode="week"
+        currentUserId={user.id}
+        className="hidden xl:table"
+      />
     </div>
   );
 }

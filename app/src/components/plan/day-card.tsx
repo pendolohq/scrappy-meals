@@ -1,4 +1,5 @@
-import { Apple, Moon, Sun, Sunrise, type LucideIcon } from "lucide-react";
+import { Apple, Moon, Plus, Sun, Sunrise, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
@@ -8,11 +9,10 @@ import { daySlots, type SlotType } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal } from "@/server/plan";
 
-import { AddMeal } from "./add-meal";
 import { MealRow } from "./meal-row";
 import { PersonTotals } from "./person-totals";
 
-const SLOT_ICON: Record<SlotType, LucideIcon> = {
+export const SLOT_ICON: Record<SlotType, LucideIcon> = {
   breakfast: Sunrise,
   lunch: Sun,
   dinner: Moon,
@@ -20,7 +20,13 @@ const SLOT_ICON: Record<SlotType, LucideIcon> = {
 };
 
 /** A big day number beside the weekday and month, like a desk calendar. */
-const DayTitle = ({ date, isToday }: { date: string; isToday: boolean }) => {
+export const DayTitle = ({
+  date,
+  isToday,
+}: {
+  date: string;
+  isToday: boolean;
+}) => {
   const { day, weekday, month } = dayParts(date);
   return (
     <h2 className="flex items-center gap-3">
@@ -131,17 +137,22 @@ export const DayCard = ({
                     <Icon className="size-4" strokeWidth={1.75} aria-hidden />
                     {label}
                   </h3>
-                  {active ? (
-                    <AddMeal
-                      date={date}
-                      slot={slot}
-                      snackIndex={snackIndex}
-                      label={label}
-                    />
-                  ) : (
+                  {/* Meals are added on the Plan page; an empty slot links there, at this day. */}
+                  {!active ? (
                     <span className="text-xs text-muted">
                       Turned off in settings
                     </span>
+                  ) : (
+                    inSlot.length === 0 && (
+                      <Link
+                        href={`/plan/${weekStartOf(date)}#${date}`}
+                        aria-label={`Plan ${label.toLowerCase()}`}
+                        className="-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
+                      >
+                        <Plus className="size-4" aria-hidden />
+                        Plan
+                      </Link>
+                    )
                   )}
                 </div>
                 {inSlot.length > 0 && (

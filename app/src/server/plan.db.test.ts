@@ -12,6 +12,7 @@ import {
   addMeal,
   getMeal,
   getWeekPlan,
+  hasMeals,
   PlanError,
   removeMeal,
   setBaseServings,
@@ -110,6 +111,23 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
     ); // Monday after
     const week = await getWeekPlan(db, "2026-10-19", { fetch });
     expect(week.days.flatMap((d) => d.meals)).toEqual([]);
+  });
+
+  it("tells whether a week has anything planned, Monday to Sunday", async () => {
+    const { a } = await twoUsers();
+    expect(await hasMeals(db, "2026-10-19")).toBe(false);
+    await addMeal(
+      db,
+      { date: "2026-10-18", slot: "dinner", slug: "x", createdBy: a.id },
+      { fetch }
+    ); // Sunday before
+    expect(await hasMeals(db, "2026-10-19")).toBe(false);
+    await addMeal(
+      db,
+      { date: "2026-10-25", slot: "dinner", slug: "y", createdBy: a.id },
+      { fetch }
+    ); // Sunday
+    expect(await hasMeals(db, "2026-10-19")).toBe(true);
   });
 
   it("updates portions and servings, validates ranges, and removes meals", async () => {

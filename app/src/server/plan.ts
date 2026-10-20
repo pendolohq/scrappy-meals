@@ -211,6 +211,21 @@ export async function getWeekPlan(
   };
 }
 
+/** Whether anything is planned in the week starting `weekStart`. */
+export async function hasMeals(db: Db, weekStart: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: mealSlots.id })
+    .from(mealSlots)
+    .where(
+      and(
+        gte(mealSlots.date, weekStart),
+        lte(mealSlots.date, addDays(weekStart, 6))
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export type MealDetail = {
   id: string;
   date: string;

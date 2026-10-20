@@ -7,6 +7,7 @@ import {
   today,
   weekDays,
   weekStartOf,
+  weekToPlan,
 } from "./week";
 
 describe("week helpers", () => {
@@ -37,5 +38,17 @@ describe("week helpers", () => {
 
   it("formats today in local time", () => {
     expect(today(new Date(2026, 9, 19, 23, 30))).toBe("2026-10-19");
+  });
+});
+
+describe("weekToPlan", () => {
+  it("opens this week while nothing is planned in it", () => {
+    expect(weekToPlan("2026-10-22", false)).toBe("2026-10-19"); // Thursday
+    expect(weekToPlan("2026-10-25", false)).toBe("2026-10-19"); // Sunday
+  });
+
+  it("opens next week once this week has meals", () => {
+    expect(weekToPlan("2026-10-19", true)).toBe("2026-10-26"); // Monday
+    expect(weekToPlan("2026-12-31", true)).toBe("2027-01-04"); // across the year
   });
 });

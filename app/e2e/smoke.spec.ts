@@ -5,6 +5,7 @@ import { formatDay } from "../src/lib/format";
 import { today, weekStartOf } from "../src/server/domain/week";
 
 import { STATE_FILE, USERS } from "./global-setup";
+import { planMeal } from "./plan-meal";
 
 const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
@@ -61,20 +62,19 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
 
-  // Add today's lunch from Mealie.
-  await day.getByRole("button", { name: "Add lunch" }).click();
-  await page.getByRole("dialog").getByLabel("Search recipes").fill(recipe.name);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: new RegExp(recipe.name) })
-    .click();
+  // Plan today's lunch from Mealie.
+  await planMeal(page, { date: today(), slot: "Lunch", recipe: recipe.name });
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(meal).toBeVisible();
   await expect(day.getByTestId("totals-Alex").getByTestId("kcal")).toHaveText(
     "400"
   );
 
-  // Sam has a half portion: 1 + 0.5 = 1.5 of 4 servings.
+  // Sam has a half portion: 1 + 0.5 = 1.5 of 4 servings. Portions are
+  // changed from the meal's options.
+  await meal
+    .getByRole("button", { name: `Options for ${recipe.name}` })
+    .click();
   await meal
     .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
     .click();
@@ -82,6 +82,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
     .click();
   await expect(meal.getByTestId("portion").nth(1)).toHaveText("½×");
+  await expect(meal.getByTestId("portion-text").nth(1)).toHaveText("½×");
   await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText(
     "200"
   );

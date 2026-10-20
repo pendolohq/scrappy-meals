@@ -5,6 +5,7 @@ import { formatDay } from "../src/lib/format";
 import { addDays, today, weekStartOf } from "../src/server/domain/week";
 
 import { STATE_FILE, USERS } from "./global-setup";
+import { planMeal } from "./plan-meal";
 
 const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
@@ -35,19 +36,8 @@ test("plans the same recipe in two snack slots of one day", async ({
   const alexKcal = day.getByTestId("totals-Alex").getByTestId("kcal");
   const slotOf = (label: string) => day.getByRole("group", { name: label });
 
-  const add = async (slotLabel: string) => {
-    await day
-      .getByRole("button", { name: `Add ${slotLabel.toLowerCase()}` })
-      .click();
-    await page
-      .getByRole("dialog")
-      .getByLabel("Search recipes")
-      .fill(recipe.name);
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: new RegExp(recipe.name) })
-      .click();
-  };
+  const add = (slot: string) =>
+    planMeal(page, { date: otherDay(), slot, recipe: recipe.name });
 
   await add("Morning snack");
   const morning = slotOf("Morning snack")
