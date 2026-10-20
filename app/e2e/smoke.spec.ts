@@ -62,7 +62,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
 
   // Add today's lunch from Mealie.
-  await day.getByRole("button", { name: "+ Add lunch" }).click();
+  await day.getByRole("button", { name: "Add lunch" }).click();
   await page.getByRole("dialog").getByLabel("Search recipes").fill(recipe.name);
   await page
     .getByRole("dialog")

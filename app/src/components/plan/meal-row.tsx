@@ -1,6 +1,7 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useId, useOptimistic, useState, useTransition } from "react";
+import { Ellipsis, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -8,6 +9,12 @@ import {
   setPortionAction,
   setServingsAction,
 } from "@/app/(app)/week/actions";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Input } from "@/components/ui/input";
+import { pillClass } from "@/components/ui/pill";
+import { RecipeImage } from "@/components/ui/recipe-image";
+import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
 import type { Member, PlannedMeal } from "@/server/plan";
 
@@ -36,18 +43,21 @@ const Flags = ({ meal }: { meal: PlannedMeal }) => {
     return null;
   }
   return (
-    <ul className="text-xs">
+    <ul className="mt-1.5 flex flex-wrap gap-1.5">
       {flags.map((f) => (
-        <li key={f} className="text-danger">
+        <li key={f} className={pillClass("danger")}>
           ⚠ {f}
         </li>
       ))}
-      {estimated && <li className="text-muted">≈ Estimated nutrition</li>}
+      {estimated && <li className={pillClass()}>≈ Estimated nutrition</li>}
       {needsReview && (
         <li>
           <Link
             href={reviewHref(meal.slug)}
-            className="text-accent underline underline-offset-2"
+            className={cx(
+              pillClass("highlight"),
+              "underline-offset-2 hover:underline"
+            )}
           >
             Needs review
           </Link>
@@ -72,10 +82,10 @@ const Stepper = ({
   min?: number;
 }) => {
   const btn =
-    "size-10 rounded-full border border-border text-lg leading-none disabled:opacity-40";
+    "flex size-tap items-center justify-center rounded-full border border-border-strong bg-card text-foreground transition hover:bg-sunken disabled:opacity-40";
   return (
     <fieldset
-      className="flex min-w-0 items-center justify-center gap-1.5"
+      className="flex min-w-0 items-center justify-center gap-1"
       aria-label={label}
     >
       <button
@@ -85,10 +95,13 @@ const Stepper = ({
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - STEP))}
       >
-        −
+        <Minus className="size-4" aria-hidden />
       </button>
       <span
-        className={`w-9 text-center text-sm tabular-nums ${value === 0 ? "text-muted" : ""}`}
+        className={cx(
+          "w-9 text-center text-[0.9375rem] font-semibold tabular-nums",
+          value === 0 && "font-normal text-muted"
+        )}
         data-testid="portion"
       >
         {formatPortion(value)}×
@@ -100,7 +113,7 @@ const Stepper = ({
         disabled={value >= 20}
         onClick={() => onChange(Math.min(20, value + STEP))}
       >
-        +
+        <Plus className="size-4" aria-hidden />
       </button>
     </fieldset>
   );
@@ -121,6 +134,7 @@ export const MealRow = ({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [open, setOpen] = useState(false);
+  const servingsId = useId();
   const [portions, setOptimisticPortion] = useOptimistic(
     meal.portions,
     (
@@ -139,34 +153,22 @@ export const MealRow = ({
     });
 
   const name = meal.recipe?.name ?? meal.slug;
-  const thumb = meal.recipe?.imagePath
-    ? `/api/recipe-images/${meal.recipe.mealieId}`
-    : null;
+  const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
 
   return (
     <li
-      className={`space-y-2 py-2 ${pending ? "opacity-70" : ""}`}
+      className={cx("space-y-3 py-3", pending && "opacity-70")}
       data-testid="meal"
     >
       <div className="flex items-start gap-3">
-        {thumb ? (
-          // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails, already small
-          <img
-            src={thumb}
-            alt=""
-            className="h-10 w-10 shrink-0 rounded-md object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="h-10 w-10 shrink-0 rounded-md bg-border"
-            aria-hidden
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
+        <RecipeImage mealieId={photo} className="size-16 sm:size-20" />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="line-clamp-2 font-serif text-[1.0625rem] leading-snug font-semibold">
             {meal.recipe ? (
-              <Link href={reviewHref(meal.slug)} className="hover:underline">
+              <Link
+                href={reviewHref(meal.slug)}
+                className="underline-offset-2 hover:underline"
+              >
                 {name}
               </Link>
             ) : (
@@ -175,25 +177,32 @@ export const MealRow = ({
           </p>
           <Flags meal={meal} />
         </div>
-        <button
-          type="button"
-          className="-mr-2 size-10 shrink-0 rounded-full text-muted"
+        <IconButton
+          label={`Options for ${name}`}
           aria-expanded={open}
-          aria-label={`Options for ${name}`}
+          className="-mt-1 -mr-2"
           onClick={() => setOpen((o) => !o)}
         >
-          ⋯
-        </button>
+          <Ellipsis className="size-5" aria-hidden />
+        </IconButton>
       </div>
 
       <div
-        className="grid gap-2"
+        className="grid gap-3"
         style={{
           gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))`,
         }}
       >
         {members.map((m) => (
-          <div key={m.id} className="space-y-1.5">
+          <div key={m.id} className="min-w-0 space-y-2">
+            {members.length > 1 && (
+              <p
+                aria-hidden
+                className="text-center text-[0.6875rem] font-medium tracking-wider text-muted uppercase"
+              >
+                {m.name}
+              </p>
+            )}
             <Stepper
               label={`${m.name}'s portion of ${name}`}
               value={portions[m.id] ?? 0}
@@ -224,16 +233,19 @@ export const MealRow = ({
       </div>
 
       {open && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-background p-2 text-sm">
-          <label className="flex items-center gap-2">
-            <span className="text-muted">Servings per 1×</span>
-            <input
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-sunken p-3 text-sm">
+          <div className="flex items-center gap-2">
+            <label htmlFor={servingsId} className="text-muted">
+              Servings per 1×
+            </label>
+            <Input
+              id={servingsId}
               type="number"
               min="0.25"
               max="100"
               step="0.25"
               defaultValue={meal.baseServings}
-              className="w-20 rounded border border-border bg-card px-2 py-1"
+              className="w-24 tabular-nums"
               onBlur={(e) => {
                 const baseServings = Number(e.currentTarget.value);
                 if (baseServings > 0 && baseServings !== meal.baseServings) {
@@ -243,14 +255,15 @@ export const MealRow = ({
                 }
               }}
             />
-          </label>
-          <button
-            type="button"
-            className="text-danger"
+          </div>
+          <Button
+            variant="danger"
+            size="sm"
             onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
           >
+            <Trash2 className="size-4" aria-hidden />
             Remove
-          </button>
+          </Button>
         </div>
       )}
       {error && (

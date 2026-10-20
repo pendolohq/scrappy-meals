@@ -1,3 +1,5 @@
+import { Pill } from "@/components/ui/pill";
+import { cx } from "@/lib/cx";
 import { formatAmount } from "@/lib/format";
 import type { PersonDayTotals } from "@/server/domain/macros";
 import type { Member } from "@/server/plan";
@@ -19,18 +21,29 @@ const tone = (total: number, target: number) => {
   if (ratio >= 0.9) {
     return "bg-accent";
   }
-  return "bg-muted";
+  return "bg-muted/60";
 };
 
-const Bar = ({ total, target }: { total: number; target: number }) => {
+const Bar = ({
+  total,
+  target,
+  thick = false,
+}: {
+  total: number;
+  target: number;
+  thick?: boolean;
+}) => {
   const pct = Math.min(100, (total / target) * 100);
   return (
     <div
-      className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+      className={cx(
+        "w-full overflow-hidden rounded-full bg-border",
+        thick ? "h-2" : "h-1"
+      )}
       aria-hidden
     >
       <div
-        className={`h-full ${tone(total, target)}`}
+        className={cx("h-full rounded-full", tone(total, target))}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -66,12 +79,12 @@ export const PersonTotals = ({
   const kcal = totals.macros.kcal;
   return (
     <div
-      className="min-w-0 space-y-1.5"
+      className="@container min-w-0 space-y-2"
       data-testid={`totals-${member.name}`}
       data-fasting={fasting}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="truncate text-sm font-medium">{member.name}</span>
+        <span className="truncate text-sm font-semibold">{member.name}</span>
         {isSelf ? (
           <FastingToggle
             date={date}
@@ -79,11 +92,7 @@ export const PersonTotals = ({
             plannedPortions={plannedPortions}
           />
         ) : (
-          fasting && (
-            <span className="rounded-full border border-accent px-2 py-0.5 text-xs text-accent">
-              Fasting
-            </span>
-          )
+          fasting && <Pill tone="accent">Fasting</Pill>
         )}
         {totals.incomplete && (
           <span
@@ -109,7 +118,7 @@ export const PersonTotals = ({
       ) : (
         <>
           <div className="text-sm tabular-nums">
-            <span className="font-semibold" data-testid="kcal">
+            <span className="text-lg font-semibold" data-testid="kcal">
               {formatAmount(kcal)}
             </span>
             {targets.kcal ? (
@@ -118,21 +127,23 @@ export const PersonTotals = ({
               <span className="text-muted"> kcal</span>
             )}
           </div>
-          {targets.kcal ? <Bar total={kcal} target={targets.kcal} /> : null}
-          <dl className="grid grid-cols-4 gap-1 text-xs tabular-nums">
+          {targets.kcal ? (
+            <Bar total={kcal} target={targets.kcal} thick />
+          ) : null}
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs tabular-nums @[15rem]:grid-cols-4">
             {MACROS.map(({ key, label }) => {
               const target = targets[key];
               return (
                 <div key={key} className="min-w-0">
                   <dt className="text-muted">{label}</dt>
-                  <dd className="truncate">
+                  <dd className="truncate font-medium">
                     {formatAmount(totals.macros[key])}
+                    {target ? (
+                      <span className="text-[10px] font-normal text-muted">
+                        /{formatAmount(target)}
+                      </span>
+                    ) : null}
                   </dd>
-                  {target ? (
-                    <dd className="truncate text-[10px] text-muted">
-                      of {formatAmount(target)}
-                    </dd>
-                  ) : null}
                   {target ? (
                     <Bar total={totals.macros[key]} target={target} />
                   ) : null}

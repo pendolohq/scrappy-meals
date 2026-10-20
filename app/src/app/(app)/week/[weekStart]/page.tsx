@@ -22,7 +22,7 @@ export default async function WeekPage({
   const now = today();
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-5 pb-8">
       <AutoRefresh />
       <WeekHeader weekStart={weekStart}>
         {weekStartOf(now) !== weekStart && (

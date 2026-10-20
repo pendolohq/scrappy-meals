@@ -33,7 +33,7 @@ test("an imported recipe is flagged in the plan until it is reviewed", async ({
   await signIn(page, USERS.alex);
   const day = page.locator(`section[aria-label="${formatDay(otherDay())}"]`);
 
-  await day.getByRole("button", { name: "+ Add dinner" }).click();
+  await day.getByRole("button", { name: "Add dinner" }).click();
   await page.getByRole("dialog").getByLabel("Search recipes").fill(reel.name);
   await page
     .getByRole("dialog")

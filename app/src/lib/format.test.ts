@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dayParts,
   formatDay,
   formatPortion,
   formatRange,
@@ -36,5 +37,15 @@ describe("formatWeekLabel", () => {
   it("dates the ones further away, across a clock change", () => {
     expect(formatWeekLabel("2026-11-02", "2026-10-19")).toBe("Week of 2 Nov");
     expect(formatWeekLabel("2026-03-23", "2026-04-06")).toBe("Week of 23 Mar");
+  });
+});
+
+describe("dayParts", () => {
+  it("spells out the weekday and month", () => {
+    expect(dayParts("2026-10-20")).toEqual({
+      day: 20,
+      weekday: "Tuesday",
+      month: "October",
+    });
   });
 });

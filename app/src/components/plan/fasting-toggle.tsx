@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 
 import { setFastingAction } from "@/app/(app)/week/actions";
+import { pillClass } from "@/components/ui/pill";
+import { cx } from "@/lib/cx";
 import { formatDay } from "@/lib/format";
 
 export const FastingToggle = ({
@@ -40,18 +42,25 @@ export const FastingToggle = ({
 
   return (
     <>
+      {/* The pill is small; the button around it keeps a 44px tall target. */}
       <button
         type="button"
         onClick={toggle}
         disabled={pending}
         aria-pressed={fasting}
-        className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-60 ${
-          fasting
-            ? "border-accent bg-accent text-accent-foreground"
-            : "border-border text-muted"
-        }`}
+        className="group -my-2.5 inline-flex min-h-tap items-center disabled:opacity-60"
       >
-        {fasting ? "Fasting ✓" : "Fast"}
+        <span
+          className={cx(
+            pillClass(fasting ? "solid" : "neutral"),
+            "border transition",
+            fasting
+              ? "border-transparent"
+              : "border-border-strong bg-card group-hover:bg-sunken"
+          )}
+        >
+          {fasting ? "Fasting ✓" : "Fast"}
+        </span>
       </button>
       {error && (
         <span role="alert" className="block text-xs text-danger">
