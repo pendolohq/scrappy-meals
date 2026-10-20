@@ -27,6 +27,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // --background in globals.css; metadata can't read CSS variables.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f6efe0" },
     { media: "(prefers-color-scheme: dark)", color: "#1e1a15" },

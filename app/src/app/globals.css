@@ -5,8 +5,11 @@
  * (for "today" and other things that should catch the eye). Every text colour
  * here is WCAG AA on every surface it is used on: foreground, muted, accent,
  * highlight and danger on background, card, sunken and their own -soft tint.
+ * --border-strong outlines controls (inputs, checkboxes, steppers), so it
+ * keeps 3:1 against every surface; --border is for decoration only.
  */
 :root {
+  color-scheme: light dark;
   --background: #f6efe0;
   --foreground: #2b2620;
   --muted: #6f6353;
@@ -14,7 +17,7 @@
   /* Wells inside a card: inputs, option panels, stat tiles. */
   --sunken: #efe6d3;
   --border: #e4d9c3;
-  --border-strong: #cdbd9f;
+  --border-strong: #8f7f62;
   --accent: #4f6b30;
   --accent-foreground: #ffffff;
   --accent-soft: #e9eed9;
@@ -35,7 +38,7 @@
     --card: #28231c;
     --sunken: #221e18;
     --border: #3d362c;
-    --border-strong: #574d3f;
+    --border-strong: #7d705c;
     --accent: #a9c47f;
     --accent-foreground: #1e1a15;
     --accent-soft: #2f3424;
