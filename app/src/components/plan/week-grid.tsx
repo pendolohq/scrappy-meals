@@ -83,7 +83,7 @@ export const WeekGrid = ({
     >
       <thead>
         <tr>
-          <th className="w-34">
+          <th className="w-38">
             <span className="sr-only">Day</span>
           </th>
           {columns.map(({ slot, snackIndex, label }) => {
@@ -111,7 +111,7 @@ export const WeekGrid = ({
         {plan.days.map(({ date, meals }) => {
           const isToday = date === today;
           const { day, weekday } = dayParts(date);
-          const kcal =
+          const macros =
             mode === "week"
               ? personDayTotals(
                   meals.map((m) => ({
@@ -122,7 +122,7 @@ export const WeekGrid = ({
                     portions: m.portions,
                   })),
                   currentUserId
-                ).macros.kcal
+                ).macros
               : null;
           return (
             <tr key={date} data-testid="grid-day">
@@ -157,9 +157,19 @@ export const WeekGrid = ({
                     Today
                   </span>
                 )}
-                {kcal !== null && kcal > 0 && (
-                  <span className="block text-xs text-muted tabular-nums">
-                    {formatAmount(kcal)} kcal
+                {macros && macros.kcal > 0 && (
+                  <span className="mt-0.5 block text-xs text-muted tabular-nums">
+                    <span className="block">
+                      {formatAmount(macros.kcal)} kcal
+                    </span>
+                    <span aria-hidden className="block whitespace-nowrap">
+                      P {formatAmount(macros.protein)} · C{" "}
+                      {formatAmount(macros.carbs)} · F{" "}
+                      {formatAmount(macros.fat)}
+                    </span>
+                    <span className="sr-only">
+                      {`Protein ${formatAmount(macros.protein)} g, carbs ${formatAmount(macros.carbs)} g, fat ${formatAmount(macros.fat)} g`}
+                    </span>
                   </span>
                 )}
               </th>
