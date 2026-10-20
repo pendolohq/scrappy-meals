@@ -47,6 +47,10 @@ export function parseNutritionValue(
   if (!m) {
     return null;
   }
+  // "1,200" is a thousands separator as often as a decimal comma; don't guess.
+  if (/,\d{3}$/.test(m[1])) {
+    return null;
+  }
   const unit = m[2].toLowerCase();
   if (unit && !units.includes(unit)) {
     return null;

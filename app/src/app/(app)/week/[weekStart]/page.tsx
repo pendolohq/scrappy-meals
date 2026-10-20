@@ -11,8 +11,6 @@ import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../week-route";
 
-export const dynamic = "force-dynamic";
-
 export default async function WeekPage({
   params,
 }: {

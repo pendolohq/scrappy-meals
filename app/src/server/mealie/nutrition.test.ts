@@ -28,6 +28,8 @@ describe("parseNutritionValue", () => {
     "-3",
     "n/a",
     "1.2.3",
+    "1,200",
+    "1,200 kcal",
   ])("rejects %j instead of guessing", (raw) => {
     expect(parseNutritionValue(raw, grams)).toBeNull();
   });

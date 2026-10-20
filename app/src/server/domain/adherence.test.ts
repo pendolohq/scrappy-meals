@@ -17,7 +17,7 @@ describe("summariseAdherence", () => {
     );
     expect(s.counts).toEqual({ stuck: 1, partial: 1, swapped: 1, skipped: 1 });
     expect(s.score).toBe(0.5);
-    expect(s).toMatchObject({ due: 4, unlogged: 0 });
+    expect(s).toMatchObject({ unlogged: 0 });
   });
 
   it("counts unlogged meals only up to today, and ignores meals not planned for this person", () => {
@@ -32,7 +32,6 @@ describe("summariseAdherence", () => {
     );
     expect(s).toEqual({
       counts: { stuck: 0, partial: 0, skipped: 0, swapped: 0 },
-      due: 2,
       unlogged: 2,
       score: null,
     });
@@ -43,6 +42,6 @@ describe("summariseAdherence", () => {
       [{ date: "2026-10-20", portion: 0, status: "stuck" }],
       TODAY
     );
-    expect(s).toMatchObject({ due: 0, score: 1, counts: { stuck: 1 } });
+    expect(s).toMatchObject({ score: 1, counts: { stuck: 1 } });
   });
 });

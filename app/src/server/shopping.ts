@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
 
+import { formatDate } from "@/lib/format";
+
 import "server-only";
 
 import type { Db } from "./db/client";
@@ -20,25 +22,9 @@ import type { RecipeFetcher } from "./recipe-cache";
 
 type Opts = { client?: MealieClient; fetch?: RecipeFetcher };
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
 /** "Scrappy Meals · week of 19 Oct 2026" */
 export function shoppingListName(weekStart: string): string {
-  const [y, m, d] = weekStart.split("-").map(Number);
-  return `Scrappy Meals · week of ${d} ${MONTHS[m - 1]} ${y}`;
+  return `Scrappy Meals · week of ${formatDate(weekStart)}`;
 }
 
 function fetcher(opts: Opts): RecipeFetcher | undefined {
@@ -105,10 +91,7 @@ export async function pushShoppingList(
   const name = shoppingListName(weekStart);
   const mealie = { client: opts.client };
 
-  const [previous] = await db
-    .select()
-    .from(shoppingPushes)
-    .where(eq(shoppingPushes.weekStart, weekStart));
+  const previous = await lastPush(db, weekStart);
   let listId: string | null = null;
   let replaced = 0;
 

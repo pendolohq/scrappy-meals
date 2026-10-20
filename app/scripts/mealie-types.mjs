@@ -3,7 +3,8 @@
 //   MEALIE_URL=http://localhost:9000 pnpm mealie:types
 //
 // Run after bumping the Mealie image tag in docker-compose.yml, then commit
-// both files. The client warns at runtime if the server version differs.
+// both files and update MEALIE_SCHEMA_VERSION (mealie-version.test.ts checks
+// they all agree). /api/health reports a running Mealie that differs.
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import openapiTS, { astToString } from "openapi-typescript";

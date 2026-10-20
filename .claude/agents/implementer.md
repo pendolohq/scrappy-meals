@@ -24,8 +24,8 @@ and pushes shopping lists to it. Your job is production-ready code that fits the
 
 ## Standards to Follow
 
-**Always use the `/simplify` skill** after completing an implementation to review for
-unnecessary complexity.
+After completing an implementation, review it for unnecessary complexity (in Claude Code, the
+built-in `/simplify` skill does this).
 
 For React component work, invoke the `vercel-react-best-practices` skill before writing.
 For UI/component design, invoke the `frontend-design` skill.

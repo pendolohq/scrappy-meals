@@ -15,8 +15,6 @@ import { canonicalWeek } from "../../week-route";
 import { PushButton } from "./push-button";
 import { ShopChecklist } from "./shop-checklist";
 
-export const dynamic = "force-dynamic";
-
 const formatQty = (n: number) => String(Math.round(n * 100) / 100);
 
 /** What the plan needs, as it will be sent to Mealie. */

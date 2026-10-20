@@ -21,7 +21,6 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
   name: `Recipe ${slug}`,
   imagePath: null,
   servings: 4,
-  updatedAt: null,
   ingredients: [],
   nutrition: {
     perServing: { kcal, protein: 20, carbs: 40, fat: 15, fibre: 6 },
@@ -180,6 +179,27 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
     await Promise.all(deferred.map((work) => work()));
     const refreshed = await loadRecipes(db, ["soup"], { fetch: f, now: later });
     expect(refreshed.get("soup")?.nutrition.perServing.kcal).toBe(500);
+  });
+
+  it("follows a recipe renamed in Mealie (new slug, same id)", async () => {
+    const { a } = await twoUsers();
+    await addMeal(
+      db,
+      { date: "2026-10-22", slot: "lunch", slug: "soup", createdBy: a.id },
+      { fetch }
+    );
+    const id = recipe("soup").id;
+    const renamed = async (slug: string) =>
+      slug === id
+        ? { ...recipe("soup"), slug: "soup-2", name: "Soup 2" }
+        : null;
+
+    await loadRecipes(db, ["soup"], { fetch: renamed, force: true });
+    const week = await getWeekPlan(db, "2026-10-19", { fetch: renamed });
+    expect(week.days[3].meals[0]).toMatchObject({
+      slug: "soup-2",
+      recipe: { name: "Soup 2" },
+    });
   });
 
   it("says Mealie is down rather than that the recipe doesn't exist", async () => {

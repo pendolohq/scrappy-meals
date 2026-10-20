@@ -26,6 +26,13 @@ import {
 export type SlotType = (typeof mealSlotType.enumValues)[number];
 export const SLOT_TYPES = mealSlotType.enumValues;
 
+export const SLOT_LABEL: Record<SlotType, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+};
+
 export class PlanError extends UserFacingError {
   name = "PlanError";
 }
@@ -195,26 +202,6 @@ export async function getWeekPlan(
   };
 }
 
-/** Whether `userId` fasts on `date`. */
-export async function isUserFasting(
-  db: Db,
-  userId: string,
-  date: string
-): Promise<boolean> {
-  const [user] = await db
-    .select({ days: users.defaultFastingDays })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (!user) {
-    throw new PlanError("Unknown user");
-  }
-  const [o] = await db
-    .select({ isFasting: dayOverrides.isFasting })
-    .from(dayOverrides)
-    .where(and(eq(dayOverrides.userId, userId), eq(dayOverrides.date, date)));
-  return isFasting(user.days, date, o?.isFasting);
-}
-
 /**
  * Sets whether a person fasts on a day. Starting a fast sets their portions
  * for that day to 0; ending one leaves portions as they are, to adjust by hand.
@@ -302,50 +289,38 @@ export async function addMeal(
     .where(eq(dayOverrides.date, input.date));
   const override = new Map(overrides.map((o) => [o.userId, o.isFasting]));
 
-  // Two people adding to the same slot at once can collide on position; retry.
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await db.transaction(async (tx) => {
-        const [{ next }] = await tx
-          .select({
-            next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
-          })
-          .from(mealSlots)
-          .where(
-            and(eq(mealSlots.date, input.date), eq(mealSlots.slot, input.slot))
-          );
-        const [slot] = await tx
-          .insert(mealSlots)
-          .values({
-            date: input.date,
-            slot: input.slot,
-            position: next,
-            mealieRecipeSlug: input.slug,
-            createdBy: input.createdBy,
-          })
-          .returning({ id: mealSlots.id });
-        if (members.length > 0) {
-          await tx.insert(slotPortions).values(
-            members.map((m) => ({
-              mealSlotId: slot.id,
-              userId: m.id,
-              multiplier: isFasting(m.days, input.date, override.get(m.id))
-                ? 0
-                : 1,
-            }))
-          );
-        }
-        return slot.id;
-      });
-    } catch (err) {
-      const unique =
-        (err as { cause?: { code?: string }; code?: string }).cause?.code ??
-        (err as { code?: string }).code;
-      if (unique !== "23505" || attempt >= 3) {
-        throw err;
-      }
+  // Two people adding to the same slot at the same moment can collide on
+  // position; the second then gets "Something went wrong" and adds it again.
+  return db.transaction(async (tx) => {
+    const [{ next }] = await tx
+      .select({
+        next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
+      })
+      .from(mealSlots)
+      .where(
+        and(eq(mealSlots.date, input.date), eq(mealSlots.slot, input.slot))
+      );
+    const [slot] = await tx
+      .insert(mealSlots)
+      .values({
+        date: input.date,
+        slot: input.slot,
+        position: next,
+        mealieRecipeSlug: input.slug,
+        createdBy: input.createdBy,
+      })
+      .returning({ id: mealSlots.id });
+    if (members.length > 0) {
+      await tx.insert(slotPortions).values(
+        members.map((m) => ({
+          mealSlotId: slot.id,
+          userId: m.id,
+          multiplier: isFasting(m.days, input.date, override.get(m.id)) ? 0 : 1,
+        }))
+      );
     }
-  }
+    return slot.id;
+  });
 }
 
 export async function setPortion(

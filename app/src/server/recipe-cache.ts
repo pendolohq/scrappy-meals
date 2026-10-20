@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import "server-only";
 
 import type { Db } from "./db/client";
-import { recipeCache } from "./db/schema";
+import { mealSlots, recipeCache } from "./db/schema";
 import { getRecipe, type Recipe } from "./mealie/recipes";
 
 export type CachedRecipe = typeof recipeCache.$inferSelect;
@@ -51,7 +51,20 @@ export async function loadRecipes(
 
   const refresh = async (slug: string) => {
     try {
-      const recipe = await fetchRecipe(slug);
+      let recipe = await fetchRecipe(slug);
+      const known = cached.get(slug);
+      if (!recipe && known) {
+        // Renaming a recipe in Mealie gives it a new slug but keeps its id:
+        // find it by id and move the planned meals over.
+        recipe = await fetchRecipe(known.mealieId);
+        if (recipe) {
+          await db
+            .update(mealSlots)
+            .set({ mealieRecipeSlug: recipe.slug })
+            .where(eq(mealSlots.mealieRecipeSlug, slug));
+          await db.delete(recipeCache).where(eq(recipeCache.slug, slug));
+        }
+      }
       if (!recipe) {
         await db.delete(recipeCache).where(eq(recipeCache.slug, slug));
         cached.delete(slug);
@@ -59,14 +72,13 @@ export async function loadRecipes(
         return;
       }
       const values = {
-        slug,
+        slug: recipe.slug,
         mealieId: recipe.id,
         name: recipe.name,
         imagePath: recipe.imagePath,
         servings: recipe.servings,
         nutrition: recipe.nutrition,
         ingredients: recipe.ingredients,
-        mealieUpdatedAt: recipe.updatedAt ? new Date(recipe.updatedAt) : null,
         fetchedAt: now,
       };
       const [row] = await db

@@ -25,6 +25,12 @@ export const formatDay = (date: string) => {
   return `${WEEKDAYS[d.getUTCDay()]} ${dayMonth(d)}`;
 };
 
+/** "19 Oct 2026" for 2026-10-19. */
+export const formatDate = (date: string) => {
+  const d = utc(date);
+  return `${dayMonth(d)} ${d.getUTCFullYear()}`;
+};
+
 /** "19 Oct – 25 Oct". */
 export const formatRange = (start: string, end: string) =>
   `${dayMonth(utc(start))} – ${dayMonth(utc(end))}`;

@@ -74,6 +74,9 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       unscaled.add(recipe.name);
     }
     const source = { id: recipe.id, name: recipe.name };
+    // ×N counts meals: a line written twice in one recipe (say "salt" in two
+    // sections) is still one recipe's worth.
+    const seenText = new Set<string>();
 
     for (const ing of recipe.ingredients) {
       if (!ing.food || scale === null) {
@@ -83,11 +86,16 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
         }
         const line =
           scale === null && ing.food ? `${text} (whole recipe)` : text;
-        const existing = freeText.get(`${recipe.id}|${line}`);
+        const key = `${recipe.id}|${line}`;
+        if (seenText.has(key)) {
+          continue;
+        }
+        seenText.add(key);
+        const existing = freeText.get(key);
         if (existing) {
           existing.times += 1;
         } else {
-          freeText.set(`${recipe.id}|${line}`, {
+          freeText.set(key, {
             text: line,
             recipeId: recipe.id,
             recipeName: recipe.name,

@@ -12,7 +12,6 @@ const fetch = async (slug: string): Promise<Recipe> => ({
   name: slug,
   imagePath: null,
   servings: 2,
-  updatedAt: null,
   ingredients: [],
   nutrition: {
     perServing: {},

@@ -11,13 +11,11 @@ const onion = { id: "f-onion", name: "onion" };
 const salt = { id: "f-salt", name: "salt" };
 
 const ing = (over: Partial<Ingredient>): Ingredient => ({
-  referenceId: "r",
   quantity: null,
   food: null,
   unit: null,
   note: "",
   display: "",
-  title: null,
   ...over,
 });
 
@@ -115,6 +113,20 @@ describe("buildShoppingList", () => {
         recipeName: "Toast",
       },
     ]);
+  });
+
+  it("counts a free-text line once per meal, even if the recipe repeats it", () => {
+    const stew = {
+      id: "stew",
+      name: "Stew",
+      servings: 2,
+      ingredients: [ing({ display: "salt" }), ing({ display: "salt" })],
+    };
+    const list = buildShoppingList([
+      meal(stew, { a: 1 }),
+      meal(stew, { a: 1 }),
+    ]);
+    expect(list.freeText).toMatchObject([{ text: "salt", times: 2 }]);
   });
 
   it("reports recipes that are gone from Mealie", () => {

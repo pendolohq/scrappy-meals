@@ -3,7 +3,6 @@ import {
   boolean,
   check,
   date,
-  index,
   integer,
   jsonb,
   numeric,
@@ -51,7 +50,7 @@ export const users = pgTable(
     /** Stored lowercased; see normaliseEmail(). */
     email: text("email").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
-    /** Bumped on password change or removal; sessions carrying an older value are rejected. */
+    /** Bumped on password change; sessions carrying an older value are rejected (and a removed user's row is gone). */
     sessionVersion: integer("session_version").notNull().default(0),
     targetKcal: integer("target_kcal"),
     targetProteinG: numeric("target_protein_g", {
@@ -129,7 +128,6 @@ export const mealSlots = pgTable(
     ...timestamps,
   },
   (t) => [
-    index("meal_slots_date_idx").on(t.date),
     unique("meal_slots_date_slot_position").on(t.date, t.slot, t.position),
     check("meal_slots_base_servings_positive", sql`${t.baseServings} > 0`),
   ]
@@ -187,7 +185,6 @@ export const recipeCache = pgTable("recipe_cache", {
   servings: numeric("servings", { precision: 6, scale: 2, mode: "number" }),
   nutrition: jsonb("nutrition").$type<RecipeNutrition>().notNull(),
   ingredients: jsonb("ingredients").$type<Ingredient[]>().notNull(),
-  mealieUpdatedAt: timestamp("mealie_updated_at", { withTimezone: true }),
   fetchedAt: timestamp("fetched_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

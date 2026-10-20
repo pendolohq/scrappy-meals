@@ -360,7 +360,7 @@ They become one page.
 
 ## M9 — Cleanup
 
-- [ ] **Task 28: Remove dead code and duplicates**
+- [x] **Task 28: Remove dead code and duplicates**
   **Complexity:** S
   **Do:**
   - Delete code only tests use: `isUserFasting` (test through `getWeekPlan`) and
@@ -379,19 +379,25 @@ They become one page.
     - test DB setup in `users.db.test.ts` and the TRUNCATE list in e2e global setup.
   - Drop redundant `export const dynamic = "force-dynamic"`, the `inArray` with one element and
     the `auth.ts:88` cast (add `sv` to the `User` augmentation).
+  **Kept on purpose:** `createMealieClient`'s `timeoutMs`/`fetch` (now used by `mealie()` and
+  the client test); the client's `SendResult` (the queue lives in `lib/`, which can't import
+  `server/action.ts`); the TRUNCATE list in `e2e/global-setup.ts` (Playwright can't import the
+  vitest helper); `force-dynamic` on `/week` and `/login` (they'd otherwise risk being
+  prerendered with a build-time date or a build-time database).
   **Done when:** all checks green; Grep shows no remaining references.
 
-- [ ] **Task 29: Drop the `addMeal` retry loop and the redundant index**
+- [x] **Task 29: Drop the `addMeal` retry loop and the redundant index**
   **Complexity:** S
   **Do:** remove the `23505` retry loop in `plan.ts:291-334`; a collision falls through to
   "Something went wrong". In one migration:
   - drop `meal_slots_date_idx`;
   - drop `recipe_cache.mealie_updated_at` and `Recipe.updatedAt`;
-  - replace `image_path` with `has_image`.
+  - ~~replace `image_path` with `has_image`.~~ Skipped: drizzle-kit treats it as an
+    interactive rename, and the column works as it is.
   Generate it with drizzle-kit.
   **Done when:** db tests pass; CI's migration-drift check passes.
 
-- [ ] **Task 30: Rare correctness quirks**
+- [x] **Task 30: Rare correctness quirks**
   **Complexity:** S
   **Do:**
   - `nutrition.ts`: a comma followed by exactly three digits ("1,200") is treated as missing,
@@ -408,7 +414,7 @@ They become one page.
   - Free-text "(×N)" counts recipes, not repeated lines within one recipe.
   **Done when:** unit tests for the nutrition and free-text changes.
 
-- [ ] **Task 31: Docs, agent files and dependencies**
+- [x] **Task 31: Docs, agent files and dependencies**
   **Complexity:** S
   **Do:**
   - AGENTS.md "Workflow" matches `execute-tasks.md` (direct by default, full round for
@@ -419,8 +425,9 @@ They become one page.
   - Merge the two "Ticking" bullets in `docs/mealie-api.md` if Task 16 hasn't already.
   - Remove the valtiberina references (`README.md:111`, `update-packages.ts:4`).
   - Fix the stale comments in `schema.ts:54` and `scripts/mealie-types.mjs:6`.
-  - `MEALIE_SCHEMA_VERSION` is read from `openapi.json`'s `info.version`, so the Mealie version
-    lives in compose, CI and openapi only.
+  - ~~`MEALIE_SCHEMA_VERSION` read from `openapi.json`.~~ Instead `mealie-version.test.ts`
+    fails unless compose, CI, openapi.json, the constant and the doc all agree; importing the
+    840 KB spec into the server bundle for one string wasn't worth it.
   - `@types/node` → `^22`.
   - Either pin the `^` deps exactly or relax the AGENTS.md rule, whichever is less churn.
   - DB and integration vitest projects fail loudly when their env var is missing instead of

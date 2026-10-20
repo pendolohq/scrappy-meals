@@ -24,7 +24,7 @@ export type PersonDayTotals = {
   mealsEaten: number;
 };
 
-export const servingsEaten = (
+const servingsEaten = (
   meal: Pick<MealForMacros, "baseServings" | "portions">,
   userId: string
 ) => meal.baseServings * (meal.portions[userId] ?? 0);

@@ -3,11 +3,13 @@
 import { useOptimistic, useState, useTransition } from "react";
 
 import { setAdherenceAction } from "@/app/(app)/week/actions";
-import { type AdherenceStatus, STATUS_LABEL } from "@/server/domain/adherence";
+import {
+  ADHERENCE_STATUSES,
+  type AdherenceStatus,
+  STATUS_LABEL,
+} from "@/server/domain/adherence";
 
 type Log = { status: AdherenceStatus; note: string | null } | undefined;
-
-const BUTTONS: AdherenceStatus[] = ["stuck", "partial", "skipped", "swapped"];
 
 /** Your own one-tap log for a meal (tap the active one again to clear). */
 export const AdherenceButtons = ({
@@ -62,7 +64,7 @@ export const AdherenceButtons = ({
         className="flex min-w-0 justify-center gap-1"
         aria-label={`How did ${mealName} go?`}
       >
-        {BUTTONS.map((s) => {
+        {ADHERENCE_STATUSES.map((s) => {
           const active = current?.status === s;
           return (
             <button

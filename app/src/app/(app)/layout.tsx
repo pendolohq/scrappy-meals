@@ -3,8 +3,6 @@ import Link from "next/link";
 import { SignOut } from "@/components/sign-out";
 import { requireUser } from "@/server/session";
 
-export const dynamic = "force-dynamic";
-
 export default async function AppLayout({
   children,
 }: {

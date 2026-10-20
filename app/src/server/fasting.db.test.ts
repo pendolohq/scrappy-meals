@@ -5,13 +5,7 @@ import { testDbUrl, useTestDb } from "../../test/db";
 
 import { dayOverrides } from "./db/schema";
 import type { Recipe } from "./mealie/recipes";
-import {
-  addMeal,
-  getWeekPlan,
-  isUserFasting,
-  setFasting,
-  setPortion,
-} from "./plan";
+import { addMeal, getWeekPlan, setFasting, setPortion } from "./plan";
 import { createUser, updateProfile } from "./users";
 
 const fetch = async (slug: string): Promise<Recipe> => ({
@@ -20,7 +14,6 @@ const fetch = async (slug: string): Promise<Recipe> => ({
   name: slug,
   imagePath: null,
   servings: 2,
-  updatedAt: null,
   ingredients: [],
   nutrition: {
     perServing: { kcal: 500 },
@@ -99,9 +92,8 @@ describe.skipIf(!testDbUrl)("fasting (Postgres)", () => {
     await setPortion(db, thuLunch, a.id, 0); // already 0: not counted
 
     expect(await setFasting(db, a.id, THU, true)).toBe(1);
-    expect(await isUserFasting(db, a.id, THU)).toBe(true);
-
     const week = await getWeekPlan(db, "2026-10-19", { fetch });
+    expect(week.days[3].fasting[a.id]).toBe(true);
     expect(week.days[3].meals.map((m) => m.portions[a.id])).toEqual([0, 0]);
     expect(week.days[3].meals.map((m) => m.portions[b.id])).toEqual([1, 1]);
     expect(week.days[4].meals.find((m) => m.id === fri)?.portions[a.id]).toBe(
@@ -117,7 +109,9 @@ describe.skipIf(!testDbUrl)("fasting (Postgres)", () => {
       { fetch }
     );
     expect(await setFasting(db, a.id, WED, false)).toBe(0);
-    expect(await isUserFasting(db, a.id, WED)).toBe(false);
+    expect(
+      (await getWeekPlan(db, "2026-10-19", { fetch })).days[2].fasting[a.id]
+    ).toBe(false);
 
     await addMeal(
       db,
