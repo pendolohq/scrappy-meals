@@ -32,6 +32,10 @@ export const proxy = auth((req) => {
 });
 
 // Proxy always runs on Node.js, which the session check needs (it reads the database).
+// Icons and the install screenshots (sample data) are fetched by the browser's
+// install dialog, signed in or not.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icons/|screenshots/).*)",
+  ],
 };

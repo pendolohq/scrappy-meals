@@ -1,3 +1,4 @@
+import { InstallCard } from "@/components/install-hint";
 import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/server/db/client";
 import { getSnackSlots } from "@/server/household";
@@ -37,6 +38,7 @@ export default async function SettingsPage() {
       />
       <HouseholdForm snackSlots={snackSlots} />
       <ThemePicker />
+      <InstallCard />
     </section>
   );
 }
