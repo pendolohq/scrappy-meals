@@ -113,7 +113,7 @@ export const AddMeal = ({
         ref={dialog}
         onClose={() => setOpen(false)}
         className={cx(
-          "mx-auto mt-auto mb-0 w-full max-w-none rounded-t-card border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-black/40 backdrop:backdrop-blur-[2px]",
+          "mx-auto mt-auto mb-0 w-full max-w-none rounded-t-card border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-scrim/40 backdrop:backdrop-blur-[2px]",
           "sm:m-auto sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-card"
         )}
         aria-label={`Add ${what}`}

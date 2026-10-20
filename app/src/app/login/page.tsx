@@ -61,10 +61,10 @@ export default async function LoginPage({
             sizes="(min-width: 1024px) 55vw, 100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-linear-to-b from-black/45 via-transparent to-transparent lg:hidden" />
-          <Brand className="absolute top-4 left-4 text-white lg:hidden" />
-          <div className="absolute inset-x-0 bottom-0 hidden bg-linear-to-t from-black/60 via-black/25 to-transparent px-10 pt-32 pb-10 lg:block">
-            <p className="max-w-md font-serif text-title font-medium text-balance text-white">
+          <div className="absolute inset-0 bg-linear-to-b from-scrim/45 via-transparent to-transparent lg:hidden" />
+          <Brand className="absolute top-4 left-4 text-on-photo lg:hidden" />
+          <div className="absolute inset-x-0 bottom-0 hidden bg-linear-to-t from-scrim/60 via-scrim/25 to-transparent px-10 pt-32 pb-10 lg:block">
+            <p className="max-w-md font-serif text-title font-medium text-balance text-on-photo">
               Plan it together, cook it once, shop for it in one go.
             </p>
           </div>

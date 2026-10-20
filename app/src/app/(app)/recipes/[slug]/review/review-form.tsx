@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ArrowLeft, Check, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
+import { Button, buttonClass } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { inputClass } from "@/components/ui/input";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { cx } from "@/lib/cx";
 import {
   parseDecimal,
   THREE_DIGIT_GROUP,
@@ -28,8 +34,16 @@ const SOURCE_LABELS = {
 
 const LOW_CONFIDENCE = 0.8;
 
-const inputClass =
-  "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
+const field = cx(inputClass, "mt-1.5");
+const fieldLabel = "text-sm font-medium text-muted";
+
+const NUTRITION_TONE: Record<string, PillTone> = {
+  Missing: "danger",
+  Edited: "highlight",
+  Estimated: "neutral",
+  Reviewed: "accent",
+  "From the page": "neutral",
+};
 
 /**
  * Empty is "not set" (null); anything unreadable becomes NaN and is refused.
@@ -136,25 +150,34 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
   };
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-6">
-      <label className="block">
-        <span className="text-sm text-muted">Servings</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={servings}
-          onChange={(e) => setServings(e.target.value)}
-          className={inputClass}
-        />
-      </label>
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <Card>
+        <label className="block max-w-40">
+          <span className={fieldLabel}>Servings</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={servings}
+            onChange={(e) => setServings(e.target.value)}
+            className={field}
+          />
+        </label>
+      </Card>
 
-      <fieldset>
-        <legend className="mb-2 font-medium">Nutrition per serving</legend>
-        <p className="mb-3 text-sm text-muted">{nutritionLabel}</p>
+      <Card as="fieldset" className="min-w-0">
+        <legend className="sr-only">Nutrition per serving</legend>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 aria-hidden className="font-serif text-heading font-semibold">
+            Nutrition per serving
+          </h2>
+          <Pill tone={NUTRITION_TONE[nutritionLabel] ?? "neutral"}>
+            {nutritionLabel}
+          </Pill>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {MACROS.map((m) => (
             <label key={m.key} className="block">
-              <span className="text-sm text-muted">{m.label}</span>
+              <span className={fieldLabel}>{m.label}</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -162,20 +185,20 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                 onChange={(e) =>
                   setNutrition((n) => ({ ...n, [m.key]: e.target.value }))
                 }
-                className={inputClass}
+                className={field}
               />
               {draft.unreadableNutrition[m.key] && (
-                <span className="text-xs text-muted">
+                <span className="mt-1 block text-xs text-muted">
                   Mealie has: {draft.unreadableNutrition[m.key]}
                 </span>
               )}
             </label>
           ))}
         </div>
-      </fieldset>
+      </Card>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Ingredients</h2>
+      <Card as="section" className="space-y-4">
+        <h2 className="font-serif text-heading font-semibold">Ingredients</h2>
         {draft.lines.map((line, i) => {
           const state = lines[i];
           const low =
@@ -184,28 +207,37 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
           return (
             <div key={line.key}>
               {line.title && (
-                <p className="mb-1 text-sm font-medium">{line.title}</p>
+                <p className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">
+                  {line.title}
+                </p>
               )}
               <fieldset
-                className={`rounded-lg border bg-card p-3 ${
-                  low ? "border-danger" : "border-border"
-                }`}
+                className={cx(
+                  "min-w-0 rounded-control border p-3 pt-1 sm:p-4 sm:pt-1.5",
+                  low
+                    ? "border-danger/60 bg-danger-soft/40"
+                    : "border-border bg-sunken/40"
+                )}
               >
-                <legend className="px-1 text-sm">{line.original}</legend>
+                <legend className="px-1.5 font-medium">{line.original}</legend>
                 {line.linked && (
                   <p className="text-sm text-muted">
                     Linked recipe: edit it in Mealie
                   </p>
                 )}
                 {low && (
-                  <p id={hint} className="mb-2 text-sm text-danger">
+                  <p
+                    id={hint}
+                    className="mb-2 flex items-center gap-1.5 text-sm font-medium text-danger"
+                  >
+                    <TriangleAlert className="size-4" aria-hidden />
                     Check this line
                   </p>
                 )}
                 {!line.linked && !state.asText && (
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <label className="block">
-                      <span className="text-sm text-muted">Amount</span>
+                      <span className={fieldLabel}>Amount</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -214,25 +246,25 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                         onChange={(e) =>
                           setLine(i, { quantity: e.target.value })
                         }
-                        className={inputClass}
+                        className={field}
                       />
                     </label>
                     <label className="block">
-                      <span className="text-sm text-muted">Unit</span>
+                      <span className={fieldLabel}>Unit</span>
                       <input
                         aria-describedby={hint}
                         value={state.unit}
                         onChange={(e) => setLine(i, { unit: e.target.value })}
-                        className={inputClass}
+                        className={field}
                       />
                     </label>
                     <label className="col-span-2 block sm:col-span-1">
-                      <span className="text-sm text-muted">Food</span>
+                      <span className={fieldLabel}>Food</span>
                       <input
                         aria-describedby={hint}
                         value={state.food}
                         onChange={(e) => setLine(i, { food: e.target.value })}
-                        className={inputClass}
+                        className={field}
                       />
                     </label>
                   </div>
@@ -240,19 +272,20 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
                 {!line.linked && (
                   <>
                     <label className="mt-2 block">
-                      <span className="text-sm text-muted">Note</span>
+                      <span className={fieldLabel}>Note</span>
                       <input
                         aria-describedby={hint}
                         value={state.note}
                         onChange={(e) =>
                           setLine(i, { note: e.target.value, noteEdited: true })
                         }
-                        className={inputClass}
+                        className={field}
                       />
                     </label>
-                    <label className="mt-2 flex items-center gap-1.5">
+                    <label className="mt-1 flex min-h-tap w-fit cursor-pointer items-center gap-2">
                       <input
                         type="checkbox"
+                        className="size-4 accent-accent"
                         checked={state.asText}
                         onChange={(e) => toggleText(i, e.target.checked)}
                       />
@@ -264,25 +297,37 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
             </div>
           );
         })}
-      </section>
+      </Card>
 
       {error && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          role="alert"
+          className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+        >
           {error}
         </p>
       )}
       {/* Always in the page so screen readers announce "Saved" when it appears. */}
-      <output className="block text-sm">{saved ? "Saved" : ""}</output>
-      <div className="flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground disabled:opacity-60"
-        >
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" size="lg" disabled={pending}>
           {pending ? "Saving…" : "Save recipe"}
-        </button>
+        </Button>
+        <output className="flex items-center gap-1.5 text-sm font-medium text-accent">
+          {saved ? (
+            <>
+              <Check className="size-4" aria-hidden />
+              Saved
+            </>
+          ) : (
+            ""
+          )}
+        </output>
         {saved && (
-          <Link href="/week" className="text-sm underline">
+          <Link
+            href="/week"
+            className={cx(buttonClass({ variant: "ghost" }), "ml-auto")}
+          >
+            <ArrowLeft className="size-4" aria-hidden />
             Back to the plan
           </Link>
         )}

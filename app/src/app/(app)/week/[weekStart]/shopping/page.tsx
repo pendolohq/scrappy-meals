@@ -1,4 +1,7 @@
+import { ExternalLink, TriangleAlert } from "lucide-react";
+
 import { AutoRefresh } from "@/components/auto-refresh";
+import { Card, cardClass } from "@/components/ui/card";
 import { WeekHeader } from "@/components/week-header";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
@@ -15,34 +18,48 @@ import { ShopChecklist } from "./shop-checklist";
 
 const formatQty = (n: number) => String(Math.round(n * 100) / 100);
 
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  <h2 className="mb-1 text-xs font-semibold tracking-wider text-muted uppercase">
+    {children}
+  </h2>
+);
+
 /** What the plan needs, as it will be sent to Mealie. */
 const Preview = ({ list }: { list: WeekIngredients }) => {
   if (list.lines.length === 0 && list.freeText.length === 0) {
     return (
-      <p className="text-sm text-muted">
-        Nothing planned to eat this week yet.
-      </p>
+      <Card className="py-10 text-center">
+        <p className="font-serif text-heading font-semibold">
+          Nothing to buy yet
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Nothing planned to eat this week yet.
+        </p>
+      </Card>
     );
   }
   return (
     <>
-      <section className="rounded-xl border border-border bg-card p-3">
-        <h2 className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">
+      <Card as="section">
+        <SectionTitle>
           {list.lines.length} item{list.lines.length === 1 ? "" : "s"}
-        </h2>
-        <ul className="divide-y divide-border" data-testid="lines">
+        </SectionTitle>
+        <ul className="divide-y divide-border/70" data-testid="lines">
           {list.lines.map((l) => (
             <li
               key={l.key}
-              className="flex items-baseline justify-between gap-3 py-1.5 text-sm"
+              className="flex items-baseline justify-between gap-4 py-3"
             >
               <span className="min-w-0">
                 <span className="font-medium">{l.foodName}</span>
-                <span className="block truncate text-xs text-muted">
+                <span className="mt-0.5 block truncate text-xs text-muted">
                   {l.recipes.map((r) => r.name).join(", ")}
                 </span>
               </span>
-              <span className="shrink-0 tabular-nums" data-testid="qty">
+              <span
+                className="shrink-0 font-semibold text-accent tabular-nums"
+                data-testid="qty"
+              >
                 {l.quantity === null
                   ? "–"
                   : `${formatQty(l.quantity)}${l.unit ? ` ${l.unit}` : ""}`}
@@ -50,27 +67,25 @@ const Preview = ({ list }: { list: WeekIngredients }) => {
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
       {list.freeText.length > 0 && (
-        <section className="rounded-xl border border-border bg-card p-3">
-          <h2 className="text-xs font-medium tracking-wide text-muted uppercase">
-            Check these
-          </h2>
+        <Card as="section">
+          <SectionTitle>Check these</SectionTitle>
           <p className="mb-2 text-xs text-muted">
             Mealie hasn&apos;t parsed these lines, so they&apos;re added as
             written.
           </p>
-          <ul className="space-y-1 text-sm" data-testid="free-text">
+          <ul className="divide-y divide-border/70" data-testid="free-text">
             {list.freeText.map((f, i) => (
-              <li key={`${f.recipeId}-${i}`}>
+              <li key={`${f.recipeId}-${i}`} className="py-2.5">
                 {f.text}
                 {f.times > 1 ? ` (×${f.times})` : ""}{" "}
                 <span className="text-xs text-muted">· {f.recipeName}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
     </>
   );
@@ -117,12 +132,15 @@ export default async function ShoppingPage({
   const base = process.env.MEALIE_PUBLIC_URL?.replace(/\/$/, "");
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-5 pb-8">
       {sent && <AutoRefresh seconds={15} />}
       <WeekHeader weekStart={weekStart} page="shopping" title="Shopping" />
 
       {mealieDown && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          role="alert"
+          className="rounded-control bg-danger-soft px-4 py-3 text-sm font-medium text-danger"
+        >
           Mealie isn&apos;t reachable right now, so the list can&apos;t load.
           Try again in a moment.
         </p>
@@ -130,19 +148,25 @@ export default async function ShoppingPage({
 
       {(plan.missing.length > 0 || plan.unscaled.length > 0) && (
         <div
-          className="space-y-1 rounded-xl border border-danger p-3 text-sm"
+          className="flex gap-3 rounded-control bg-highlight-soft px-4 py-3 text-sm"
           role="note"
         >
-          {plan.missing.length > 0 && (
-            <p>⚠ No longer in Mealie, left out: {plan.missing.join(", ")}.</p>
-          )}
-          {plan.unscaled.length > 0 && (
-            <p>
-              ⚠ No servings count in Mealie, so amounts are for the whole
-              recipe: {plan.unscaled.join(", ")}. Set servings in Mealie to
-              scale them.
-            </p>
-          )}
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0 text-highlight"
+            aria-hidden
+          />
+          <div className="space-y-1">
+            {plan.missing.length > 0 && (
+              <p>No longer in Mealie, left out: {plan.missing.join(", ")}.</p>
+            )}
+            {plan.unscaled.length > 0 && (
+              <p>
+                No servings count in Mealie, so amounts are for the whole
+                recipe: {plan.unscaled.join(", ")}. Set servings in Mealie to
+                scale them.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -159,8 +183,8 @@ export default async function ShoppingPage({
       <PushButton weekStart={weekStart} disabled={empty} pushedBefore={sent} />
 
       {sent && (
-        <details className="rounded-xl border border-border p-3">
-          <summary className="cursor-pointer text-sm font-medium">
+        <details className={cardClass()}>
+          <summary className="flex min-h-tap cursor-pointer items-center text-sm font-medium">
             What the plan needs ({needed} item{needed === 1 ? "" : "s"})
           </summary>
           <div className="mt-3 space-y-4">
@@ -170,14 +194,15 @@ export default async function ShoppingPage({
       )}
 
       {shop && base && (
-        <p className="text-center text-xs text-muted">
+        <p className="text-center text-sm">
           <a
             href={`${base}/shopping-lists/${shop.listId}`}
             target="_blank"
             rel="noreferrer"
-            className="underline"
+            className="inline-flex min-h-tap items-center gap-1.5 font-medium text-accent underline-offset-2 hover:underline"
           >
             Open “{shop.listName}” in Mealie
+            <ExternalLink className="size-3.5" aria-hidden />
           </a>
         </p>
       )}

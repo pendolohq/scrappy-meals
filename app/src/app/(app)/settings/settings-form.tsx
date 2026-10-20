@@ -1,7 +1,12 @@
 "use client";
 
 import { type FormEvent, startTransition, useActionState } from "react";
+import { Check } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Field, inputClass } from "@/components/ui/input";
+import { cx } from "@/lib/cx";
 import type { ProfileInput } from "@/server/users";
 
 import { saveSettings, type SettingsState } from "./actions";
@@ -29,8 +34,6 @@ const TARGETS = [
   { name: "targetFibreG", label: "Fibre", unit: "g", step: "0.1", max: 500 },
 ] as const;
 
-const input = "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
-
 export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
   const [state, action, pending] = useActionState<SettingsState, FormData>(
     saveSettings,
@@ -46,29 +49,30 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-6">
-      <label className="block">
-        <span className="text-sm text-muted">Name</span>
-        <input
-          name="name"
-          defaultValue={profile.name}
-          required
-          maxLength={80}
-          className={input}
-        />
-      </label>
+    <form onSubmit={submit} className="space-y-4">
+      <Card>
+        <Field label="Name">
+          <input
+            name="name"
+            defaultValue={profile.name}
+            required
+            maxLength={80}
+            className={inputClass}
+          />
+        </Field>
+      </Card>
 
-      <fieldset>
-        <legend className="mb-2 font-medium">Daily targets</legend>
-        <p className="mb-3 text-sm text-muted">
+      <Card as="fieldset">
+        <legend className="sr-only">Daily targets</legend>
+        <h2 aria-hidden className="font-serif text-heading font-semibold">
+          Daily targets
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-muted">
           Leave a field empty to not track it.
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {TARGETS.map((t) => (
-            <label key={t.name} className="block">
-              <span className="text-sm text-muted">
-                {t.label} ({t.unit})
-              </span>
+            <Field key={t.name} label={`${t.label} (${t.unit})`}>
               <input
                 name={t.name}
                 type="number"
@@ -77,16 +81,19 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
                 max={t.max}
                 step={t.step}
                 defaultValue={profile[t.name] ?? ""}
-                className={input}
+                className={cx(inputClass, "tabular-nums")}
               />
-            </label>
+            </Field>
           ))}
         </div>
-      </fieldset>
+      </Card>
 
-      <fieldset>
-        <legend className="mb-2 font-medium">Fasting days</legend>
-        <p className="mb-3 text-sm text-muted">
+      <Card as="fieldset">
+        <legend className="sr-only">Fasting days</legend>
+        <h2 aria-hidden className="font-serif text-heading font-semibold">
+          Fasting days
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-muted">
           Meals added on these weekdays start with your portion at 0, and your
           targets are hidden. Changing them also applies to past weeks, and
           doesn&apos;t change meals already planned. Single days can still be
@@ -96,33 +103,41 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
           {WEEKDAYS.map((day, i) => (
             <label
               key={day}
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2"
+              className="relative flex min-h-tap cursor-pointer items-center gap-1.5 rounded-full border border-border-strong bg-card px-4 text-sm font-medium transition hover:bg-sunken has-checked:border-accent has-checked:bg-accent has-checked:text-accent-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent"
             >
               <input
                 type="checkbox"
                 name="fastingDays"
                 value={i + 1}
                 defaultChecked={profile.defaultFastingDays.includes(i + 1)}
+                className="peer sr-only"
               />
-              <span className="text-sm">{day}</span>
+              <Check className="hidden size-4 peer-checked:block" aria-hidden />
+              {day}
             </label>
           ))}
         </div>
-      </fieldset>
+      </Card>
 
       {state.error && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          role="alert"
+          className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+        >
           {state.error}
         </p>
       )}
-      {state.ok && <p className="text-sm text-accent">Saved.</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground disabled:opacity-60"
-      >
-        {pending ? "Saving…" : "Save"}
-      </button>
+      <div className="flex items-center gap-4">
+        <Button type="submit" size="lg" disabled={pending}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+        {state.ok && (
+          <p className="flex items-center gap-1.5 text-sm font-medium text-accent">
+            <Check className="size-4" aria-hidden />
+            Saved.
+          </p>
+        )}
+      </div>
     </form>
   );
 };

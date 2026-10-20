@@ -44,7 +44,10 @@ type RawIngredient = {
 };
 
 type RawRecipe = {
+  id?: string | null;
   name: string;
+  // Mealie sets this to a file key once a photo is uploaded.
+  image?: unknown;
   recipeServings?: number | null;
   orgURL?: string | null;
   nutrition?: Record<string, string | null> | null;
@@ -88,6 +91,8 @@ export type ReviewDraft = {
   servings: number | null;
   sourceUrl: string | null;
   mealieUrl: string | null;
+  /** Mealie's recipe id when it has a photo, for /api/recipe-images/[id]. */
+  photoId: string | null;
   importState: ImportState;
   nutrition: Record<MacroKey, number | null>;
   /** Text Mealie has for a macro that can't be read as a number ("10-12"). */
@@ -231,6 +236,7 @@ export async function loadReview(
       servings: recipe.recipeServings || null,
       sourceUrl: recipe.orgURL || null,
       mealieUrl: mealieBase ? `${mealieBase}/g/${group}/r/${slug}` : null,
+      photoId: recipe.id && recipe.image ? recipe.id : null,
       importState: readImportState(recipe.extras),
       nutrition: {
         kcal: perServing.kcal ?? null,

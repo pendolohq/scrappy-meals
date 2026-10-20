@@ -1,5 +1,8 @@
+import { ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { buttonClass } from "@/components/ui/button";
+import { RecipeImage } from "@/components/ui/recipe-image";
 import { loadReview } from "@/server/recipe-review";
 import { requireUser } from "@/server/session";
 
@@ -18,18 +21,31 @@ export default async function ReviewPage({
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold">{draft.name}</h1>
-        <p className="mt-1 flex gap-4 text-sm">
+    <section className="space-y-6 pb-8">
+      <div className="space-y-3">
+        {draft.photoId && (
+          <RecipeImage
+            mealieId={draft.photoId}
+            className="aspect-[16/9] w-full sm:aspect-[21/9]"
+            rounded="rounded-card"
+          />
+        )}
+        <p className="pt-1 text-xs font-semibold tracking-wider text-muted uppercase">
+          Review recipe
+        </p>
+        <h1 className="font-serif text-title font-semibold sm:text-display">
+          {draft.name}
+        </h1>
+        <p className="flex flex-wrap gap-2">
           {draft.sourceUrl && (
             <a
               href={draft.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline"
+              className={buttonClass({ variant: "secondary", size: "sm" })}
             >
               Source
+              <ExternalLink className="size-3.5" aria-hidden />
             </a>
           )}
           {draft.mealieUrl && (
@@ -37,9 +53,10 @@ export default async function ReviewPage({
               href={draft.mealieUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline"
+              className={buttonClass({ variant: "secondary", size: "sm" })}
             >
               Open in Mealie
+              <ExternalLink className="size-3.5" aria-hidden />
             </a>
           )}
         </p>

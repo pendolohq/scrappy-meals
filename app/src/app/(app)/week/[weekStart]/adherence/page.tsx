@@ -1,5 +1,6 @@
 import { after } from "next/server";
 
+import { Card } from "@/components/ui/card";
 import { WeekHeader } from "@/components/week-header";
 import { formatDay } from "@/lib/format";
 import { getDb } from "@/server/db/client";
@@ -27,10 +28,10 @@ export default async function AdherencePage({
   const meals = plan.days.flatMap((d) => d.meals);
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-5 pb-8">
       <WeekHeader weekStart={weekStart} page="adherence" title="Adherence" />
 
-      <p className="text-sm text-muted">
+      <p className="max-w-prose text-sm text-muted">
         Score: stuck to it counts 1, partly or swapped ½, skipped 0, averaged
         over the meals you logged.
       </p>
@@ -54,15 +55,34 @@ export default async function AdherencePage({
         );
 
         return (
-          <section
+          <Card
+            as="section"
             key={m.id}
-            className="rounded-xl border border-border bg-card p-4"
+            className="space-y-4"
             data-testid={`summary-${m.name}`}
           >
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-semibold">{m.name}</h2>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden
+                  className="flex size-11 items-center justify-center rounded-full bg-highlight-soft font-serif text-lg font-semibold text-highlight"
+                >
+                  {m.name.slice(0, 1).toUpperCase()}
+                </span>
+                <div>
+                  <h2 className="font-serif text-heading font-semibold">
+                    {m.name}
+                  </h2>
+                  <p className="text-sm text-muted" data-testid="logged">
+                    {logged} logged
+                    {summary.unlogged > 0
+                      ? `, ${summary.unlogged} still to log`
+                      : ""}
+                  </p>
+                </div>
+              </div>
               <span
-                className="text-2xl font-semibold tabular-nums"
+                className="font-serif text-display font-semibold text-accent tabular-nums"
                 data-testid="score"
               >
                 {summary.score === null
@@ -70,18 +90,14 @@ export default async function AdherencePage({
                   : `${Math.round(summary.score * 100)}%`}
               </span>
             </div>
-            <p className="text-sm text-muted" data-testid="logged">
-              {logged} logged
-              {summary.unlogged > 0 ? `, ${summary.unlogged} still to log` : ""}
-            </p>
-            <dl className="mt-3 grid grid-cols-4 gap-2 text-center">
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {ADHERENCE_STATUSES.map((s) => (
-                <div key={s} className="rounded-lg bg-background p-2">
+                <div key={s} className="rounded-control bg-sunken px-3 py-2.5">
                   <dt className="text-xs text-muted">
                     {STATUS_LABEL[s].icon} {STATUS_LABEL[s].label}
                   </dt>
                   <dd
-                    className="text-lg font-semibold tabular-nums"
+                    className="text-xl font-semibold tabular-nums"
                     data-testid={`count-${s}`}
                   >
                     {summary.counts[s]}
@@ -90,17 +106,24 @@ export default async function AdherencePage({
               ))}
             </dl>
             {notable.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm">
+              <ul className="divide-y divide-border/70 text-sm">
                 {notable.map((meal) => {
                   const log = meal.adherence[m.id]!;
                   return (
-                    <li key={meal.id} className="flex gap-2">
-                      <span aria-hidden>{STATUS_LABEL[log.status].icon}</span>
+                    <li key={meal.id} className="flex gap-3 py-2.5">
+                      <span
+                        aria-hidden
+                        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sunken text-xs"
+                      >
+                        {STATUS_LABEL[log.status].icon}
+                      </span>
                       <span className="min-w-0">
-                        <span className="text-muted">
-                          {formatDay(meal.date)} · {SLOT_LABEL[meal.slot]}:
-                        </span>{" "}
-                        {meal.recipe?.name ?? meal.slug}
+                        <span className="block text-xs text-muted">
+                          {formatDay(meal.date)} · {SLOT_LABEL[meal.slot]}
+                        </span>
+                        <span className="font-medium">
+                          {meal.recipe?.name ?? meal.slug}
+                        </span>
                         {log.note ? (
                           <span className="text-muted"> ({log.note})</span>
                         ) : null}
@@ -110,7 +133,7 @@ export default async function AdherencePage({
                 })}
               </ul>
             )}
-          </section>
+          </Card>
         );
       })}
     </div>
