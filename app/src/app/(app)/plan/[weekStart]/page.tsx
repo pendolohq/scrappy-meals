@@ -3,6 +3,7 @@ import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PlanDay } from "@/components/plan/plan-day";
+import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
 import { today } from "@/server/domain/week";
@@ -25,7 +26,7 @@ export default async function PlanPage({
   const now = today();
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-5 pb-8" data-wide>
       <AutoRefresh />
       <WeekHeader weekStart={weekStart} base="/plan" title="Plan">
         <Link href={`/week/${weekStart}`} className={linkClass}>
@@ -39,7 +40,7 @@ export default async function PlanPage({
       {/* Days side by side; on phones each snaps into place with the next one
           peeking in. `relative` keeps the columns' absolutely placed screen-reader
           text clipped here too, or it widens the whole page. */}
-      <div className="relative -mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6">
+      <div className="relative -mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:hidden">
         {plan.days.map((day) => (
           <PlanDay
             key={day.date}
@@ -51,6 +52,12 @@ export default async function PlanPage({
           />
         ))}
       </div>
+      <WeekGrid
+        plan={plan}
+        today={now}
+        mode="plan"
+        className="hidden xl:grid"
+      />
     </div>
   );
 }

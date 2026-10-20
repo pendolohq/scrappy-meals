@@ -2,6 +2,7 @@
 
 import { useId, useOptimistic, useState, useTransition } from "react";
 import { Ellipsis, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 import {
   removeMealAction,
@@ -13,6 +14,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
+import { formatPortion } from "@/lib/format";
+import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal } from "@/server/plan";
 
 import { RecipeFlags } from "./recipe-flags";
@@ -21,14 +24,18 @@ import { Stepper } from "./stepper";
 /**
  * A meal on the Plan page: everyone's portion, one person per row so it fits a
  * day column; servings and Remove sit behind the options button, as on the
- * Week page.
+ * Week page. `compact` is the desktop grid's cell: just the name, linking to
+ * the meal, with everyone's portions as text and their steppers moved behind
+ * the options button too.
  */
 export const PlanMeal = ({
   meal,
   members,
+  compact = false,
 }: {
   meal: PlannedMeal;
   members: Member[];
+  compact?: boolean;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -53,6 +60,119 @@ export const PlanMeal = ({
 
   const name = meal.recipe?.name ?? meal.slug;
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
+
+  const steppers = (
+    <div className="space-y-1">
+      {members.map((m) => (
+        <div key={m.id} className="flex items-center justify-between gap-2">
+          <span aria-hidden className="min-w-0 truncate text-sm text-muted">
+            {m.name}
+          </span>
+          <Stepper
+            label={`${m.name}'s portion of ${name}`}
+            value={portions[m.id] ?? 0}
+            onChange={(multiplier) =>
+              act(async () => {
+                setOptimisticPortion({ userId: m.id, multiplier });
+                return setPortionAction({
+                  mealId: meal.id,
+                  userId: m.id,
+                  multiplier,
+                });
+              })
+            }
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  const options = open && (
+    <div
+      className={cx(
+        "space-y-3 rounded-control bg-sunken p-2.5 text-sm",
+        // A grid cell is too narrow for steppers: float over the grid instead.
+        compact &&
+          "absolute top-full right-0 z-10 mt-1 w-64 border border-border shadow-card"
+      )}
+    >
+      {compact && steppers}
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={servingsId} className="text-muted">
+          Servings per 1×
+        </label>
+        <Input
+          id={servingsId}
+          type="number"
+          min="0.25"
+          max="100"
+          step="0.25"
+          defaultValue={meal.baseServings}
+          className="w-20 tabular-nums"
+          onBlur={(e) => {
+            const baseServings = Number(e.currentTarget.value);
+            if (baseServings > 0 && baseServings !== meal.baseServings) {
+              act(() => setServingsAction({ mealId: meal.id, baseServings }));
+            }
+          }}
+        />
+      </div>
+      <Button
+        variant="danger"
+        size="sm"
+        block
+        onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
+      >
+        <Trash2 className="size-4" aria-hidden />
+        Remove
+      </Button>
+    </div>
+  );
+
+  const errorText = error && (
+    <p role="alert" className="text-xs text-danger">
+      {error}
+    </p>
+  );
+
+  if (compact) {
+    const eating = members.filter((m) => (portions[m.id] ?? 0) > 0);
+    return (
+      <li
+        className={cx(
+          "relative space-y-0.5 rounded-control border border-border/70 bg-card py-2 pr-2 pl-2.5 shadow-card",
+          pending && "opacity-70"
+        )}
+        data-testid="grid-meal"
+      >
+        <div className="flex items-start gap-1">
+          <Link
+            href={`/week/${weekStartOf(meal.date)}/meals/${meal.id}`}
+            className="line-clamp-2 min-w-0 flex-1 font-serif text-sm leading-snug font-semibold hover:text-accent-ink"
+          >
+            {name}
+          </Link>
+          <IconButton
+            label={`Options for ${name}`}
+            aria-expanded={open}
+            className="-mt-1.5 -mr-1.5"
+            onClick={() => setOpen((o) => !o)}
+          >
+            <Ellipsis className="size-4" aria-hidden />
+          </IconButton>
+        </div>
+        <p className="truncate text-xs text-muted tabular-nums">
+          {eating.length === 0
+            ? "Nobody eats this"
+            : eating
+                .map((m) => `${m.name} ${formatPortion(portions[m.id])}×`)
+                .join(" · ")}
+        </p>
+        {options}
+        {errorText}
+      </li>
+    );
+  }
 
   return (
     <li
@@ -80,70 +200,9 @@ export const PlanMeal = ({
         </IconButton>
       </div>
 
-      <div className="space-y-1">
-        {members.map((m) => (
-          <div key={m.id} className="flex items-center justify-between gap-2">
-            <span aria-hidden className="min-w-0 truncate text-sm text-muted">
-              {m.name}
-            </span>
-            <Stepper
-              label={`${m.name}'s portion of ${name}`}
-              value={portions[m.id] ?? 0}
-              onChange={(multiplier) =>
-                act(async () => {
-                  setOptimisticPortion({ userId: m.id, multiplier });
-                  return setPortionAction({
-                    mealId: meal.id,
-                    userId: m.id,
-                    multiplier,
-                  });
-                })
-              }
-            />
-          </div>
-        ))}
-      </div>
-
-      {open && (
-        <div className="space-y-3 rounded-control bg-sunken p-2.5 text-sm">
-          <div className="flex items-center justify-between gap-2">
-            <label htmlFor={servingsId} className="text-muted">
-              Servings per 1×
-            </label>
-            <Input
-              id={servingsId}
-              type="number"
-              min="0.25"
-              max="100"
-              step="0.25"
-              defaultValue={meal.baseServings}
-              className="w-20 tabular-nums"
-              onBlur={(e) => {
-                const baseServings = Number(e.currentTarget.value);
-                if (baseServings > 0 && baseServings !== meal.baseServings) {
-                  act(() =>
-                    setServingsAction({ mealId: meal.id, baseServings })
-                  );
-                }
-              }}
-            />
-          </div>
-          <Button
-            variant="danger"
-            size="sm"
-            block
-            onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
-          >
-            <Trash2 className="size-4" aria-hidden />
-            Remove
-          </Button>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
+      {steppers}
+      {options}
+      {errorText}
     </li>
   );
 };

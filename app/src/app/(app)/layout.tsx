@@ -57,7 +57,8 @@ export default async function AppLayout({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl min-w-0 px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:pt-10 lg:pb-16">
+      {/* The week grids (`data-wide`) need the room a wide screen has. */}
+      <main className="mx-auto w-full max-w-3xl min-w-0 px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:pt-10 lg:pb-16 xl:has-[[data-wide]]:max-w-none">
         {children}
       </main>
 
