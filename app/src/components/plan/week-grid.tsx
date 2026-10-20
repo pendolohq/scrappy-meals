@@ -9,18 +9,26 @@ import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal, WeekPlan } from "@/server/plan";
 
 import { AddMeal } from "./add-meal";
+import { AdherenceButtons } from "./adherence-cell";
 import { SLOT_ICON } from "./day-card";
+import { FastingToggle } from "./fasting-toggle";
 import { PlanMeal } from "./plan-meal";
 
-/** A planned meal on the Week grid: read-only, opening the meal page. */
+/**
+ * A planned meal on the Week grid, opening the meal page. From its day on,
+ * the viewer logs it here: the day cards that also do are hidden on this
+ * screen.
+ */
 const WeekMeal = ({
   meal,
   members,
   currentUserId,
+  canLog,
 }: {
   meal: PlannedMeal;
   members: Member[];
   currentUserId: string;
+  canLog: boolean;
 }) => {
   const name = meal.recipe?.name ?? meal.slug;
   const mine = meal.portions[currentUserId] ?? 0;
@@ -28,10 +36,13 @@ const WeekMeal = ({
     (m) => m.id !== currentUserId && (meal.portions[m.id] ?? 0) > 0
   );
   return (
-    <li data-testid="grid-meal">
+    <li
+      data-testid="grid-meal"
+      className="space-y-1.5 rounded-control border border-border/70 bg-card px-2.5 py-2 shadow-card transition hover:border-border-strong"
+    >
       <Link
         href={`/week/${weekStartOf(meal.date)}/meals/${meal.id}`}
-        className="block rounded-control border border-border/70 bg-card px-2.5 py-2 shadow-card transition hover:border-border-strong"
+        className="block"
       >
         <span className="line-clamp-2 font-serif text-sm leading-snug font-semibold">
           {name}
@@ -43,6 +54,13 @@ const WeekMeal = ({
           )}
         </span>
       </Link>
+      {canLog && (
+        <AdherenceButtons
+          mealId={meal.id}
+          mealName={name}
+          log={meal.adherence[currentUserId]}
+        />
+      )}
     </li>
   );
 };
@@ -51,7 +69,7 @@ const WeekMeal = ({
  * The week on wide screens: a row per day, a column per meal slot, so the
  * same slot lines up down the week. The Plan page fills empty cells with
  * "Add"; the Week page links them to the Plan page and heads each day with
- * the viewer's calories.
+ * the viewer's calories and fasting toggle.
  */
 export const WeekGrid = ({
   plan,
@@ -108,7 +126,7 @@ export const WeekGrid = ({
         </tr>
       </thead>
       <tbody>
-        {plan.days.map(({ date, meals }) => {
+        {plan.days.map(({ date, meals, fasting }) => {
           const isToday = date === today;
           const { day, weekday } = dayParts(date);
           const macros =
@@ -172,6 +190,19 @@ export const WeekGrid = ({
                     </span>
                   </span>
                 )}
+                {mode === "week" && (
+                  <span className="mt-2 block">
+                    <FastingToggle
+                      date={date}
+                      fasting={fasting[currentUserId] ?? false}
+                      plannedPortions={
+                        meals.filter(
+                          (m) => (m.portions[currentUserId] ?? 0) > 0
+                        ).length
+                      }
+                    />
+                  </span>
+                )}
               </th>
 
               {columns.map(({ slot, snackIndex, label, active }) => {
@@ -203,6 +234,7 @@ export const WeekGrid = ({
                               meal={meal}
                               members={plan.members}
                               currentUserId={currentUserId}
+                              canLog={date <= today}
                             />
                           )
                         )}

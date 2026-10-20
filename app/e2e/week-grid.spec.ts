@@ -69,6 +69,16 @@ test("lays the week out as a grid on desktop, on the Plan and Week pages", async
       .filter({ hasText: recipe.name })
   ).toHaveCount(1);
 
+  // The day cards are hidden here, so fasting is set from the grid's day.
+  // The day after has nothing planned, so there's nothing to confirm.
+  const fast = weekGrid
+    .getByRole("rowheader", { name: new RegExp(formatDay(addDays(date, 1))) })
+    .getByRole("button", { name: "Fast" });
+  await fast.click();
+  await expect(fast).toHaveAttribute("aria-pressed", "true");
+  await fast.click();
+  await expect(fast).toHaveAttribute("aria-pressed", "false");
+
   // Leave next week empty again.
   await page.goto(`/plan/${week}`);
   await planned
