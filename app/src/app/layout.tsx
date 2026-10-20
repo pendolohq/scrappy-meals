@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 
 import { Pwa } from "@/components/pwa";
 import { ThemeSync } from "@/components/theme-sync";
+import { TimeZoneSync } from "@/components/time-zone-sync";
 import { BAR_COLOR, themeScript } from "@/lib/theme";
 
 import "./globals.css";
@@ -44,6 +45,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <ThemeSync />
+        <TimeZoneSync />
         <Pwa />
         {children}
       </body>

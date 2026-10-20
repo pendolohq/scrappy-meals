@@ -38,12 +38,38 @@ export function weekDays(weekStart: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 }
 
-/** Today's date in the server's time zone (TZ env), as YYYY-MM-DD. */
-export function today(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+/**
+ * `timeZone` if it names a zone this runtime knows, else undefined. It comes
+ * from the browser, so anything goes.
+ */
+export function validTimeZone(
+  timeZone: string | undefined
+): string | undefined {
+  if (!timeZone || timeZone.length > 64) {
+    return undefined;
+  }
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone }).resolvedOptions()
+      .timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The date at `now` in `timeZone` (the device's), as YYYY-MM-DD. Without a
+ * valid zone it's the server's (TZ env).
+ */
+export function today(now: Date = new Date(), timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: validTimeZone(timeZone),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 /**

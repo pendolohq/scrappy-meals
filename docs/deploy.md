@@ -61,7 +61,9 @@ cp .env.example .env && chmod 600 .env
 Fill in `.env`. Generate each secret with `openssl rand -hex 32` (hex, because
 the database passwords end up inside a `postgres://` URL):
 
-- `DOMAIN`, `ACME_EMAIL`, `TZ` (your time zone decides what "today" is)
+- `DOMAIN`, `ACME_EMAIL`, `TZ` (your home time zone: "today" follows each
+  device's own zone, and `TZ` stands in until a device has sent it; it also
+  stamps the backups)
 - `POSTGRES_SUPERUSER_PASSWORD`, `PLANNER_DB_PASSWORD`, `MEALIE_DB_PASSWORD`
 - `AUTH_SECRET`
 - `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`

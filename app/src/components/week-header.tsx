@@ -2,7 +2,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { formatRange, formatWeekLabel } from "@/lib/format";
-import { addDays, today, weekStartOf } from "@/server/domain/week";
+import { addDays, weekStartOf } from "@/server/domain/week";
+import { viewerToday } from "@/server/today";
 
 import { iconButtonClass } from "./ui/icon-button";
 
@@ -13,7 +14,7 @@ import { iconButtonClass } from "./ui/icon-button";
  * page ("Shopping"); without it the title is the week itself ("This week").
  * `children` sit under the date range.
  */
-export const WeekHeader = ({
+export const WeekHeader = async ({
   weekStart,
   page = "",
   base = "/week",
@@ -28,7 +29,7 @@ export const WeekHeader = ({
 }) => {
   const href = (days: number) =>
     `${base}/${addDays(weekStart, days)}${page && `/${page}`}`;
-  const label = formatWeekLabel(weekStart, weekStartOf(today()));
+  const label = formatWeekLabel(weekStart, weekStartOf(await viewerToday()));
   const range = formatRange(weekStart, addDays(weekStart, 6));
   return (
     <header className="flex items-end justify-between gap-3">

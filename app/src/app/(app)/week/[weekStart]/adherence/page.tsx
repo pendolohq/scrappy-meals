@@ -10,9 +10,9 @@ import {
   summariseAdherence,
 } from "@/server/domain/adherence";
 import { slotLabel } from "@/server/domain/slots";
-import { today } from "@/server/domain/week";
 import { getWeekPlan } from "@/server/plan";
 import { requireUser } from "@/server/session";
+import { viewerToday } from "@/server/today";
 
 import { canonicalWeek } from "../../week-route";
 
@@ -25,7 +25,7 @@ export default async function AdherencePage({
   const weekStart = canonicalWeek((await params).weekStart, "adherence");
 
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
-  const now = today();
+  const now = await viewerToday();
   const meals = plan.days.flatMap((d) => d.meals);
 
   return (
