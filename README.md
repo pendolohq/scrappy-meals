@@ -25,7 +25,7 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 
 | Path | What |
 |---|---|
-| `docker-compose.yml` | Postgres 16, Mealie, the app, Caddy, plus on-demand `backup` / `restore` services |
+| `docker-compose.yml` | Postgres 18, Mealie, the app, Caddy, plus on-demand `backup` / `restore` services |
 | `Caddyfile` | `app.<domain>` → app, `recipes.<domain>` → Mealie, automatic HTTPS |
 | `postgres/init/` | First-boot script: separate role + database for `planner` and `mealie` |
 | `backup/` | Image and script for encrypted nightly backups to S3 |
