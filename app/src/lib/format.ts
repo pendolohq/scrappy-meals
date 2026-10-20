@@ -52,3 +52,24 @@ export function formatPortion(n: number): string {
 }
 
 export const formatAmount = (n: number) => String(Math.round(n));
+
+/** "This week", "Next week", "Last week", or "Week of 9 Nov" further away. */
+export const formatWeekLabel = (
+  weekStart: string,
+  currentWeekStart: string
+) => {
+  const weeks = Math.round(
+    (utc(weekStart).getTime() - utc(currentWeekStart).getTime()) /
+      (7 * 24 * 60 * 60 * 1000)
+  );
+  if (weeks === 0) {
+    return "This week";
+  }
+  if (weeks === 1) {
+    return "Next week";
+  }
+  if (weeks === -1) {
+    return "Last week";
+  }
+  return `Week of ${dayMonth(utc(weekStart))}`;
+};

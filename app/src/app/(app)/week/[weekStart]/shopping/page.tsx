@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AutoRefresh } from "@/components/auto-refresh";
 import { WeekHeader } from "@/components/week-header";
 import type { ShopItemView } from "@/lib/shop-list";
@@ -121,11 +119,7 @@ export default async function ShoppingPage({
   return (
     <div className="space-y-4 pb-8">
       {sent && <AutoRefresh seconds={15} />}
-      <WeekHeader weekStart={weekStart} page="shopping" title="Shopping">
-        <Link href={`/week/${weekStart}`} className="text-xs text-accent">
-          Back to the plan
-        </Link>
-      </WeekHeader>
+      <WeekHeader weekStart={weekStart} page="shopping" title="Shopping" />
 
       {mealieDown && (
         <p role="alert" className="text-sm text-danger">

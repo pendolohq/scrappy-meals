@@ -25,20 +25,11 @@ export default async function WeekPage({
     <div className="space-y-4 pb-8">
       <AutoRefresh />
       <WeekHeader weekStart={weekStart}>
-        <Link
-          href={`/week/${weekStart}/shopping`}
-          className="mr-3 text-xs text-accent"
-        >
-          Shopping
-        </Link>
-        <Link
-          href={`/week/${weekStart}/adherence`}
-          className="mr-3 text-xs text-accent"
-        >
-          Adherence
-        </Link>
         {weekStartOf(now) !== weekStart && (
-          <Link href="/week" className="text-xs text-accent">
+          <Link
+            href="/week"
+            className="inline-flex min-h-tap items-center font-medium text-accent"
+          >
             Back to this week
           </Link>
         )}

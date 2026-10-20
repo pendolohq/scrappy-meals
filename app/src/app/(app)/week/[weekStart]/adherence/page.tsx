@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { after } from "next/server";
 
 import { WeekHeader } from "@/components/week-header";
@@ -29,11 +28,7 @@ export default async function AdherencePage({
 
   return (
     <div className="space-y-4 pb-8">
-      <WeekHeader weekStart={weekStart} page="adherence" title="Adherence">
-        <Link href={`/week/${weekStart}`} className="text-xs text-accent">
-          Back to the plan
-        </Link>
-      </WeekHeader>
+      <WeekHeader weekStart={weekStart} page="adherence" title="Adherence" />
 
       <p className="text-sm text-muted">
         Score: stuck to it counts 1, partly or swapped ½, skipped 0, averaged
