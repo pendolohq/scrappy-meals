@@ -38,6 +38,7 @@ until every place names the same version (`mealie-version.test.ts`).
 | Read one item | `GET /api/households/shopping/items/{id}` |
 | Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
 | Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
+| Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
@@ -80,6 +81,41 @@ until every place names the same version (`mealie-version.test.ts`).
   `scrappyReview` (`pending` | `done`; absent = done) and `scrappyNutrition`
   (`source` | `estimated` | `reviewed`). `PATCH` replaces `extras` as a
   whole, so write it with `withImportState()`, which keeps other keys.
+
+## Importing with AI
+
+`create/ai` (Mealie ≥ 3.23) builds a recipe from any mix of pasted text
+(`content`), a `url` and screenshots (`images`, multipart). Measured on
+Mealie 3.29 with Claude Sonnet 5.5 as the provider:
+
+- **Providers are per group** (`/api/groups/ai-providers/…`; in Mealie, Group
+  Settings → AI Providers): create a provider (OpenAI-compatible base URL, key,
+  model), then pick it as `default`, `image` and/or `audio`. Without `default`
+  every call fails; with images it also needs `image`. A video URL is only
+  downloaded and transcribed when `audio` is set, otherwise Mealie reads the
+  URL as a web page.
+- **Claude works through Anthropic's OpenAI-compatible endpoint**
+  (`https://api.anthropic.com/v1/`, model `claude-sonnet-5-5`). Mealie asks for
+  JSON with `response_format`, which that endpoint ignores, but the replies
+  parsed cleanly every time. Mealie sends no `temperature`/`top_p`, which
+  current Claude models reject. Claude can't be the `audio` provider: Mealie
+  transcribes with `audio.transcriptions`, which Anthropic doesn't offer.
+- **It never estimates nutrition.** Mealie's prompt says to fill nutrition
+  only when the source states it, and that's what happened: stated values
+  come through per serving and unit-less (`"520"`), missing ones stay empty.
+  So an AI import's nutrition is `source`, not `estimated`.
+- **`orgURL` is set to the `url` passed in**, even when the page itself had
+  nothing useful (an Instagram login wall, with the caption pasted as
+  `content`). Without a `url` it stays empty.
+- **Same shape as a URL import:** ingredients arrive unparsed (`note` only),
+  `recipeServings` is set when the source says so, and `extras` is empty, so
+  the import state and review step work unchanged.
+- **Slow:** 4–40 s for text, about 13 s for one screenshot. Mealie answers only
+  when it's done; `create/ai/stream` sends progress as server-sent events
+  instead.
+- **Errors** come back as 400 with a message (e.g. AI not enabled); with a
+  screenshot, the first image is meant to become the cover image, though
+  `image` was still empty on the recipe that came back.
 
 ## Reviewing a recipe
 

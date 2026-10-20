@@ -145,6 +145,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   transcribe it from the server without signing in to Instagram/Facebook (else Mealie's
   `YTDLP_COOKIEFILE`), does it set `orgURL`, does it fill nutrition when the source has none,
   how long it takes (the app's Mealie timeout is 10 s), what it costs per import.
+  Text, screenshots, `orgURL`, nutrition and timing are answered in `docs/mealie-api.md`
+  (Importing with AI): it never estimates nutrition, and it sets `orgURL`. Still open: a real
+  reel through an `audio` provider (and whether it needs `YTDLP_COOKIEFILE`), and cost.
 
 - [ ] **8. Social import on the "Add recipe" page.** **Complexity:** L (full round)
   Depends on 7 and milestone 1. Instagram/Facebook links (`instagram.com`, `facebook.com`,
