@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { type FormEvent, startTransition, useActionState } from "react";
 import Link from "next/link";
 
 import { importRecipeAction, type ImportFormState } from "./actions";
@@ -10,11 +10,15 @@ export const ImportForm = () => {
     importRecipeAction,
     {}
   );
-  // React resets the form after every action; defaultValue follows what was
-  // typed so the field survives an error.
-  const [typed, setTyped] = useState("");
+  // Submitted by hand rather than with <form action>: React resets a form
+  // after its action, which would clear the URL after an error.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    startTransition(() => action(form));
+  };
   return (
-    <form action={action} className="space-y-4">
+    <form onSubmit={submit} className="space-y-4">
       <label className="block">
         <span className="text-sm text-muted">Recipe URL</span>
         {/* type="text": the browser's own URL check would block submit before
@@ -29,8 +33,6 @@ export const ImportForm = () => {
           autoCapitalize="none"
           required
           placeholder="https://"
-          defaultValue={typed}
-          onChange={(e) => setTyped(e.target.value)}
           aria-invalid={state.error ? true : undefined}
           aria-describedby={state.error ? "import-error" : undefined}
           className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2"

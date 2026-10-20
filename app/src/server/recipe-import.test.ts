@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { UserFacingError } from "./errors";
-import { MealieError } from "./mealie/client";
+import { MealieError, MealieUnavailableError } from "./mealie/client";
 import { importRecipe } from "./recipe-import";
 
 /*
@@ -148,13 +148,12 @@ describe("importRecipe", () => {
         () => new MealieError(502, "/api/recipes/create/url", "bad gateway"),
       ],
       [
-        "a timeout",
+        "Mealie unreachable (refused or timed out)",
         () =>
-          Object.assign(new Error("signal timed out"), {
-            name: "TimeoutError",
+          new MealieUnavailableError("Mealie unreachable", {
+            cause: new TypeError("fetch failed"),
           }),
       ],
-      ["a network failure", () => new TypeError("fetch failed")],
     ];
 
     it.each(failures)(

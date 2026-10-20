@@ -138,19 +138,3 @@ export async function checkMealieVersion(client: MealieClient = mealie()) {
     matches: about.version === MEALIE_SCHEMA_VERSION,
   };
 }
-
-/** Mealie down, overloaded or unreachable: worth trying again later. */
-export function isTransient(err: unknown): boolean {
-  if (err instanceof MealieError) {
-    return err.status >= 500 || err.status === 429;
-  }
-  if (!(err instanceof Error)) {
-    return false;
-  }
-  return (
-    err.name === "TimeoutError" ||
-    err.name === "AbortError" ||
-    (err instanceof TypeError &&
-      (err.message === "fetch failed" || err.cause !== undefined))
-  );
-}

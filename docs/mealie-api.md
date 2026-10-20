@@ -8,9 +8,10 @@ What the planner relies on, checked against a running instance
 - Types: `app/src/server/mealie/schema.d.ts`, generated from the committed
   `openapi.json` snapshot by `bun run mealie:types` (`MEALIE_URL=... bun run mealie:types`).
   Fields that have a server default are optional in the types.
-- Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`; `mealieImporter()`
-  waits 60 s), `recipes.ts`, `import.ts`, `shopping.ts`, `nutrition.ts`. Everything that holds the token imports
-  `server-only`, so it can't end up in a client bundle.
+- Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`,
+  `MealieUnavailableError`; `mealieImporter()` waits 60 s), `recipes.ts`,
+  `import.ts`, `shopping.ts`, `nutrition.ts`. Everything that holds the token
+  imports `server-only`, so it can't end up in a client bundle.
 - Auth: `Authorization: Bearer <token>`. Create a long-lived token in Mealie
   under Profile → API Tokens (`POST /api/users/api-tokens`).
 - `checkMealieVersion()` compares `/api/app/about` with the schema version; the

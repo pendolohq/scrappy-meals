@@ -3,7 +3,7 @@ import "server-only";
 import { getDb } from "./db/client";
 import type { ReviewInput } from "./domain/review-input";
 import { RetryableError, UserFacingError } from "./errors";
-import { isTransient, mealie, unwrap } from "./mealie/client";
+import { isMealieUnavailable, mealie, unwrap } from "./mealie/client";
 import {
   findOrCreateFood,
   findOrCreateUnit,
@@ -144,7 +144,7 @@ async function whenMealieAnswers<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (err) {
-    if (isTransient(err)) {
+    if (isMealieUnavailable(err)) {
       console.error("recipe review failed", err);
       throw new RetryableError("Mealie didn't answer. Try again in a minute.");
     }

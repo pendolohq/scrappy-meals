@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { RetryableError, UserFacingError } from "./errors";
-import { MealieError } from "./mealie/client";
+import { MealieError, MealieUnavailableError } from "./mealie/client";
 import type { ParsedLine } from "./mealie/import";
 import { loadReview, saveReview } from "./recipe-review";
 
@@ -60,8 +60,8 @@ import { loadReview, saveReview } from "./recipe-review";
  *   fields overwritten (calories, proteinContent, carbohydrateContent,
  *   fatContent, fiberContent) as strings, null staying null.
  * - A recipe that no longer exists -> UserFacingError, nothing patched.
- * - Mealie down (any dep throwing a MealieError 5xx/429, TimeoutError,
- *   TypeError "fetch failed") -> RetryableError; other errors pass through.
+ * - Mealie down (a MealieError 5xx/429 or MealieUnavailableError from any dep)
+ *   -> RetryableError; other errors pass through.
  */
 
 type Deps = NonNullable<Parameters<typeof loadReview>[1]>;
@@ -771,13 +771,12 @@ describe("saveReview", () => {
       ["a 503", () => new MealieError(503, "/api/recipes/soup", "down")],
       ["a 429", () => new MealieError(429, "/api/recipes/soup", "slow down")],
       [
-        "a timeout",
+        "Mealie unreachable (refused or timed out)",
         () =>
-          Object.assign(new Error("signal timed out"), {
-            name: "TimeoutError",
+          new MealieUnavailableError("Mealie unreachable", {
+            cause: new TypeError("fetch failed"),
           }),
       ],
-      ["a network failure", () => new TypeError("fetch failed")],
     ];
     const withLine = input({
       lines: [line({ quantity: 1, unit: "cup", food: "flour" })],

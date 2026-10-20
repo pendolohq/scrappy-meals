@@ -1,7 +1,7 @@
 import "server-only";
 
 import { RetryableError, UserFacingError } from "./errors";
-import { isTransient } from "./mealie/client";
+import { isMealieUnavailable } from "./mealie/client";
 import {
   findRecipeBySourceUrl,
   getRawRecipe,
@@ -80,7 +80,7 @@ export async function importRecipe(
     }
     return { status: "imported", slug };
   } catch (err) {
-    if (isTransient(err)) {
+    if (isMealieUnavailable(err)) {
       console.error("recipe import failed", err);
       throw new RetryableError(
         "Mealie didn't answer. If the page was slow, the recipe may still appear: try again in a minute."
