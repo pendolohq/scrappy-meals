@@ -7,7 +7,8 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
 - **Shared week**: one plan for everyone, a column per person with daily
   kcal / protein / carbs / fat / fibre against their own targets.
 - **Per-person portions**: pick recipes from Mealie into breakfast, lunch,
-  dinner or snacks, and set how much each person eats (0 = not eating it).
+  dinner or snacks (0 to 4 a day, set in settings), and set how much each
+  person eats (0 = not eating it).
 - **Fasting days**: per person, by weekday or for one day; portions default
   to 0 and targets are hidden.
 - **Honest numbers**: nutrition comes from Mealie only. Recipes with missing

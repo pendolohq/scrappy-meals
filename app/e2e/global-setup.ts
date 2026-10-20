@@ -35,7 +35,7 @@ export default async function globalSetup() {
   await runMigrations(url, path.join(__dirname, "../drizzle"));
   const { db, pool } = createDb(url, { max: 1 });
   await db.execute(
-    sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes CASCADE`
+    sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes, household_settings CASCADE`
   );
   for (const u of Object.values(USERS)) {
     await createUser(db, u);

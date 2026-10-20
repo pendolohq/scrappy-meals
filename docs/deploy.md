@@ -148,7 +148,8 @@ docker compose exec app scrappy user add      # once per person
 ```
 
 Open `https://app.example.com`, sign in, and set your targets and default
-fasting days under **Settings**.
+fasting days under **Settings**. How many snacks a day the plan has (2 unless
+you change it) is set there too, once for the whole household.
 
 **Install it on your phone:** open the site in Safari (iOS: Share → Add to
 Home Screen) or Chrome (Android: menu → Install app). Weeks you've opened stay

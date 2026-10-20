@@ -4,14 +4,9 @@ import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import { dayParts, formatDay } from "@/lib/format";
 import { personDayTotals } from "@/server/domain/macros";
+import { daySlots, type SlotType } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
-import {
-  type Member,
-  type PlannedMeal,
-  SLOT_LABEL,
-  SLOT_TYPES,
-  type SlotType,
-} from "@/server/plan";
+import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AddMeal } from "./add-meal";
 import { MealRow } from "./meal-row";
@@ -55,6 +50,7 @@ export const DayCard = ({
   date,
   meals,
   members,
+  snackSlots,
   fasting,
   currentUserId,
   isToday,
@@ -63,6 +59,7 @@ export const DayCard = ({
   date: string;
   meals: PlannedMeal[];
   members: Member[];
+  snackSlots: number;
   fasting: Record<string, boolean>;
   currentUserId: string;
   isToday: boolean;
@@ -117,36 +114,54 @@ export const DayCard = ({
       )}
 
       <div className="divide-y divide-border/70">
-        {SLOT_TYPES.map((slot) => {
-          const label = SLOT_LABEL[slot];
-          const Icon = SLOT_ICON[slot];
-          const inSlot = meals.filter((m) => m.slot === slot);
-          return (
-            <div key={slot} className="py-2 first:pt-0 last:pb-0">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted uppercase">
-                  <Icon className="size-4" strokeWidth={1.75} aria-hidden />
-                  {label}
-                </h3>
-                <AddMeal date={date} slot={slot} label={label} />
-              </div>
-              {inSlot.length > 0 && (
-                <ul className="divide-y divide-border/70">
-                  {inSlot.map((meal) => (
-                    <MealRow
-                      key={meal.id}
-                      meal={meal}
-                      weekStart={weekStartOf(date)}
-                      members={members}
-                      currentUserId={currentUserId}
-                      canLog={isPastOrToday}
+        {daySlots(snackSlots, meals).map(
+          ({ slot, snackIndex, label, active }) => {
+            const Icon = SLOT_ICON[slot];
+            const inSlot = meals.filter(
+              (m) => m.slot === slot && m.snackIndex === snackIndex
+            );
+            return (
+              <fieldset
+                key={`${slot}-${snackIndex}`}
+                aria-label={label}
+                className="min-w-0 py-2 first:pt-0 last:pb-0"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted uppercase">
+                    <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+                    {label}
+                  </h3>
+                  {active ? (
+                    <AddMeal
+                      date={date}
+                      slot={slot}
+                      snackIndex={snackIndex}
+                      label={label}
                     />
-                  ))}
-                </ul>
-              )}
-            </div>
-          );
-        })}
+                  ) : (
+                    <span className="text-xs text-muted">
+                      Turned off in settings
+                    </span>
+                  )}
+                </div>
+                {inSlot.length > 0 && (
+                  <ul className="divide-y divide-border/70">
+                    {inSlot.map((meal) => (
+                      <MealRow
+                        key={meal.id}
+                        meal={meal}
+                        weekStart={weekStartOf(date)}
+                        members={members}
+                        currentUserId={currentUserId}
+                        canLog={isPastOrToday}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </fieldset>
+            );
+          }
+        )}
       </div>
     </section>
   );

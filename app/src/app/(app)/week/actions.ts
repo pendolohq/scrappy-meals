@@ -6,6 +6,7 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
+import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { isIsoDate, today } from "@/server/domain/week";
 import {
   addMeal,
@@ -16,7 +17,6 @@ import {
   setBaseServings,
   setFasting,
   setPortion,
-  SLOT_TYPES,
 } from "@/server/plan";
 
 const date = z.string().refine(isIsoDate, "invalid date");
@@ -39,6 +39,11 @@ export const addMealAction = userAction(
   z.object({
     date,
     slot: z.enum(SLOT_TYPES),
+    snackIndex: z
+      .int()
+      .min(0)
+      .max(MAX_SNACK_SLOTS - 1)
+      .default(0),
     // Mealie's slugs; also keeps "..", "/" and the like out of its API paths.
     slug: z
       .string()

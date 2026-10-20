@@ -1,14 +1,19 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/server/db/client";
+import { getSnackSlots } from "@/server/household";
 import { requireUser } from "@/server/session";
 import { findUserById } from "@/server/users";
 
+import { HouseholdForm } from "./household-form";
 import { SettingsForm } from "./settings-form";
 import { ThemePicker } from "./theme-picker";
 
 export default async function SettingsPage() {
   const { id } = await requireUser();
-  const user = await findUserById(getDb(), id);
+  const [user, snackSlots] = await Promise.all([
+    findUserById(getDb(), id),
+    getSnackSlots(getDb()),
+  ]);
   if (!user) {
     return null;
   }
@@ -30,6 +35,7 @@ export default async function SettingsPage() {
           defaultFastingDays: user.defaultFastingDays,
         }}
       />
+      <HouseholdForm snackSlots={snackSlots} />
       <ThemePicker />
     </section>
   );
