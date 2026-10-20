@@ -22,6 +22,7 @@ import {
   MACRO_KEYS,
   type MacroKey,
   normaliseNutrition,
+  NUTRITION_FIELDS,
 } from "./mealie/nutrition";
 import type { components } from "./mealie/schema";
 import { loadRecipes } from "./recipe-cache";
@@ -94,14 +95,6 @@ export type ReviewDraft = {
   lines: ReviewLine[];
 };
 
-const NUTRITION_FIELDS = {
-  kcal: "calories",
-  protein: "proteinContent",
-  carbs: "carbohydrateContent",
-  fat: "fatContent",
-  fibre: "fiberContent",
-} as const;
-
 let cachedGroupSlug: Promise<string> | undefined;
 
 // The group never changes while the app runs; a failed lookup is retried.
@@ -173,8 +166,11 @@ export async function loadReview(
     const unparsed = reviewed
       ? []
       : raw.filter((i) => !isParsed(i) && originalOf(i) !== "");
-    const results =
-      unparsed.length > 0 ? await d.parse(unparsed.map(originalOf)) : [];
+    const mealieBase = d.publicUrl?.replace(/\/$/, "");
+    const [results, group] = await Promise.all([
+      unparsed.length > 0 ? d.parse(unparsed.map(originalOf)) : [],
+      mealieBase ? d.groupSlug() : null,
+    ]);
     // A short answer from the parser leaves the remaining lines as text.
     const parsedBy = new Map(unparsed.map((i, n) => [i, results[n]]));
 
@@ -198,7 +194,8 @@ export async function loadReview(
       }
       const p = parsedBy.get(i);
       if (!p) {
-        const confidence = reviewed ? null : 0;
+        // Nothing to parse (a blank or title-only row) is nothing to check.
+        const confidence = reviewed || base.original === "" ? null : 0;
         return {
           ...base,
           quantity: null,
@@ -220,7 +217,6 @@ export async function loadReview(
       };
     });
 
-    const base = d.publicUrl?.replace(/\/$/, "");
     const { perServing } = normaliseNutrition(recipe.nutrition);
     const unreadableNutrition: Partial<Record<MacroKey, string>> = {};
     for (const macro of MACRO_KEYS) {
@@ -234,7 +230,7 @@ export async function loadReview(
       name: recipe.name,
       servings: recipe.recipeServings || null,
       sourceUrl: recipe.orgURL || null,
-      mealieUrl: base ? `${base}/g/${await d.groupSlug()}/r/${slug}` : null,
+      mealieUrl: mealieBase ? `${mealieBase}/g/${group}/r/${slug}` : null,
       importState: readImportState(recipe.extras),
       nutrition: {
         kcal: perServing.kcal ?? null,
@@ -325,20 +321,20 @@ export async function saveReview(
     const foodLines = input.lines
       .map((line, i) => ({ line, old: matches[i] }))
       .filter((x) => !isText(x.line) && !x.old?.referencedRecipe);
-    const [foods, units] = [
-      await resolveAll(
+    const [foods, units] = await Promise.all([
+      resolveAll(
         foodLines.map((x) =>
           keptRef(x.old?.food, x.line.food) ? null : x.line.food
         ),
         d.findOrCreateFood
       ),
-      await resolveAll(
+      resolveAll(
         foodLines.map((x) =>
           keptRef(x.old?.unit, x.line.unit) ? null : x.line.unit
         ),
         d.findOrCreateUnit
       ),
-    ];
+    ]);
 
     const recipeIngredient = input.lines.map((l, index): Ingredient => {
       const old = matches[index];

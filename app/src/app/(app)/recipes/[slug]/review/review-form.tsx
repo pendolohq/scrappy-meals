@@ -26,9 +26,17 @@ const LOW_CONFIDENCE = 0.8;
 const inputClass =
   "mt-1 w-full rounded-lg border border-border bg-card px-3 py-2";
 
-/** Empty is "not set" (null); anything unreadable becomes NaN and is refused. */
-const toNumber = (text: string): number | null =>
-  text.trim() === "" ? null : Number(text.trim().replace(",", "."));
+/**
+ * Empty is "not set" (null); anything unreadable becomes NaN and is refused.
+ * "1,200" could be a thousand or a decimal comma, so it is refused too.
+ */
+const toNumber = (text: string): number | null => {
+  const t = text.trim();
+  if (t === "") {
+    return null;
+  }
+  return /,\d{3}$/.test(t) ? Number.NaN : Number(t.replace(",", "."));
+};
 
 const macroTexts = (draft: ReviewDraft) =>
   Object.fromEntries(

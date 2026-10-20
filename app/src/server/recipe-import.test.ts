@@ -15,11 +15,14 @@ import { importRecipe } from "./recipe-import";
  *   getRecipe(slug)      -> { nutrition?: Record<string, string | null> | null,
  *                             extras?: Record<string, unknown> | null } | null
  *                           i.e. the raw Mealie recipe fields the import needs.
- *                           "Has nutrition" = at least one nutrition value that is
- *                           a non-empty string.
+ *                           "Has nutrition" = at least one macro field (calories,
+ *                           protein, carbs, fat, fibre) that is a non-blank string.
  *   patch(slug, fields)  -> void; called once with { extras } and nothing else
  *   limiter              -> { hit(key: string): boolean }; false = over the limit.
  *                           Called with the userId, before find/importFromUrl.
+ *
+ * An "exists" recipe without scrappyReview is marked pending (an earlier import
+ * failed before marking it). Concurrent imports of one URL share one run.
  */
 
 type Deps = NonNullable<Parameters<typeof importRecipe>[2]>;
@@ -51,8 +54,9 @@ function makeDeps(overrides: Partial<Deps> = {}) {
 
 describe("importRecipe", () => {
   it("links to a recipe already imported from the URL without importing", async () => {
-    const { deps, find, importFromUrl, patch } = makeDeps();
+    const { deps, find, importFromUrl, getRecipe, patch } = makeDeps();
     find.mockResolvedValue({ slug: "old-soup", name: "Old soup" });
+    getRecipe.mockResolvedValue({ extras: { scrappyReview: "done" } });
 
     await expect(importRecipe(URL_, "u1", deps)).resolves.toEqual({
       status: "exists",
@@ -62,6 +66,43 @@ describe("importRecipe", () => {
     expect(find).toHaveBeenCalledWith(URL_);
     expect(importFromUrl).not.toHaveBeenCalled();
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  it("marks an already-imported recipe pending when an earlier import never did", async () => {
+    const { deps, find, importFromUrl, getRecipe, patch } = makeDeps();
+    find.mockResolvedValue({ slug: "old-soup", name: "Old soup" });
+    getRecipe.mockResolvedValue({ nutrition: null, extras: { note: "x" } });
+
+    await expect(importRecipe(URL_, "u1", deps)).resolves.toMatchObject({
+      status: "exists",
+      slug: "old-soup",
+    });
+    expect(importFromUrl).not.toHaveBeenCalled();
+    expect(patch).toHaveBeenCalledWith("old-soup", {
+      extras: { note: "x", scrappyReview: "pending" },
+    });
+  });
+
+  it("imports a page once when it is submitted twice at the same time", async () => {
+    const { deps, find, importFromUrl } = makeDeps();
+    let finish!: (slug: string) => void;
+    importFromUrl.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+
+    const first = importRecipe(URL_, "u1", deps);
+    const second = importRecipe(URL_, "u2", deps);
+    await vi.waitFor(() => expect(importFromUrl).toHaveBeenCalled());
+    finish("soup");
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { status: "imported", slug: "soup" },
+      { status: "imported", slug: "soup" },
+    ]);
+    expect(find).toHaveBeenCalledTimes(1);
+    expect(importFromUrl).toHaveBeenCalledTimes(1);
   });
 
   it("imports, then marks the recipe pending with nutrition from the source", async () => {
@@ -87,6 +128,8 @@ describe("importRecipe", () => {
     ["null nutrition", null],
     ["no nutrition key", undefined],
     ["only empty values", { calories: null, fatContent: "" }],
+    ["only blank values", { calories: "  " }],
+    ["only non-macro values", { sodiumContent: "300 mg", sugarContent: "4" }],
   ])("leaves scrappyNutrition out with %s", async (_label, nutrition) => {
     const { deps, getRecipe, patch } = makeDeps();
     getRecipe.mockResolvedValue({ nutrition, extras: {} });

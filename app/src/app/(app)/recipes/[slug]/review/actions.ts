@@ -20,10 +20,10 @@ function explain(err: z.ZodError): string {
     return "Servings must be a number above 0 and at most 1000.";
   }
   if (area === "nutrition") {
-    return "Nutrition values must be numbers, 0 or more.";
+    return "Nutrition values must be numbers, 0 or more, without thousands separators.";
   }
   if (area === "lines" && field === "quantity") {
-    return "Ingredient amounts must be numbers from 0 to 10000.";
+    return "Ingredient amounts must be numbers from 0 to 10000, without thousands separators.";
   }
   if (area === "lines") {
     return "An ingredient line is too long, or there are more than 200.";

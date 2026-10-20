@@ -32,6 +32,11 @@ const FIELDS: Record<
   fibre: { key: "fiberContent", units: ["g", "grams"] },
 };
 
+/** The Mealie nutrition field each macro is stored in. */
+export const NUTRITION_FIELDS = Object.fromEntries(
+  MACRO_KEYS.map((m) => [m, FIELDS[m].key])
+) as { [K in MacroKey]: (typeof FIELDS)[K]["key"] };
+
 const NUMBER_WITH_UNIT = /^(\d+(?:[.,]\d+)?)\s*([a-z]*)$/i;
 
 /** Parses one Mealie nutrition string ("12", "12.5", "12,5 g", "250 kcal"); null if not clean. */

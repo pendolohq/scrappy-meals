@@ -44,7 +44,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
 
 - [x] **3. "Add recipe" page.** **Complexity:** L (security: full round)
   Depends on 1. `/recipes/new`, linked from the header nav. One URL field;
-  `userFormAction` with zod: `http(s)` only, no credentials in the URL, no single-label hosts.
+  `userFormAction` with zod: `http(s)` only, no credentials in the URL, no single-label hosts or IPv4 literals.
   Mealie itself refuses loopback and private addresses (`safehttp`), so this is a second
   layer, not the only one.
   Rate-limited per user (20 an hour, `createRateLimiter`). If a recipe with the same

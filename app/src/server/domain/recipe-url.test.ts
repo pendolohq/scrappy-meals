@@ -91,6 +91,20 @@ describe("normaliseRecipeUrl", () => {
     expect(rejected(input)).not.toBe("");
   });
 
+  it.each([
+    "http://10.0.0.5/",
+    "http://169.254.169.254/latest",
+    "http://192.168.1.1:8080/soup",
+    "http://8.8.8.8/",
+    "http://0x7f.1/",
+  ])("rejects the IPv4 address in %s", (input) => {
+    expect(rejected(input)).not.toBe("");
+  });
+
+  it("accepts a host name with digits in it", () => {
+    expect(normaliseRecipeUrl("https://123.example.com/soup").ok).toBe(true);
+  });
+
   it("rejects a URL over 2048 characters", () => {
     const base = "https://example.com/";
     expect(rejected(base + "a".repeat(2049 - base.length))).not.toBe("");

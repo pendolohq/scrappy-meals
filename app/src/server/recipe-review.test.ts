@@ -1042,6 +1042,30 @@ describe("a short answer from the parser", () => {
   });
 });
 
+describe("a row with no text", () => {
+  it("is shown as text without a warning", async () => {
+    const { deps, getRecipe, parse } = makeDeps();
+    getRecipe.mockResolvedValue(
+      recipe({
+        recipeIngredient: [
+          { title: "For the sauce", note: "" },
+          { note: "salt" },
+        ],
+      })
+    );
+    parse.mockResolvedValue([parsedLine()]);
+
+    const draft = await loadReview("soup", deps);
+
+    expect(parse).toHaveBeenCalledWith(["salt"]);
+    expect(draft?.lines[0]).toMatchObject({
+      title: "For the sauce",
+      asText: true,
+      confidence: null,
+    });
+  });
+});
+
 describe("loadReview after the recipe was reviewed", () => {
   const lines = [
     {
