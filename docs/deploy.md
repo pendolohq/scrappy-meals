@@ -285,5 +285,15 @@ When the server is lost, or to practise a restore:
 
 ## Users
 
-See [Users](../README.md#users) in the README for the `scrappy user` commands
-(run them with `docker compose exec app scrappy ...`).
+There is no sign-up page and no default account. Create accounts on the server with
+`docker compose exec app scrappy ...`:
+
+| Command | |
+|---|---|
+| `scrappy user add [--name N] [--email E]` | create a user |
+| `scrappy user passwd EMAIL` | set a new password; signs out that user's sessions |
+| `scrappy user list` | list users |
+| `scrappy user remove EMAIL` | delete a user and their portions/adherence |
+
+Passwords are read from a hidden prompt (or stdin when piped) and stored as argon2id hashes;
+they never go into env vars, files or logs. Failed logins are rate-limited per email and per IP.

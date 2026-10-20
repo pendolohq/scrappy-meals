@@ -64,7 +64,7 @@ lives in a doc; the trigger for reading each one is below.
 - Unit tests sit next to the code as `*.test.ts`; Postgres tests are `*.db.test.ts`, tests
   against a real Mealie are `*.int.test.ts`. The e2e smoke test lives in `app/e2e/`.
 - `bun run test` (unit), `DATABASE_TEST_URL=… bun run test:db`, `MEALIE_TEST_URL=… bun run test:integration`,
-  `bun run test:e2e` against a running build (it empties `DATABASE_URL`; see the README).
+  `bun run test:e2e` against a running build (it empties `DATABASE_URL`; see `docs/development.md`).
 - There is no component test setup (no jsdom/RTL). UI behaviour is covered by e2e.
 
 ## Environment variables

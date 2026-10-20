@@ -1,10 +1,11 @@
 # Docs
 
-How scrappy-meals is put together, shipped and run. The repo [README](../README.md) covers
-features and local development; these pages cover everything else.
+How scrappy-meals is put together, shipped and run. The repo [README](../README.md) is the
+short version; these pages have the details.
 
 | Page | Read it when you… |
 | --- | --- |
+| [development.md](development.md) | run it locally, run the tests, fork or move the repo |
 | [deploy.md](deploy.md) | set up the server, release a version, update or roll back the running app |
 | [security.md](security.md) | add or change a page, server action, route handler, or anything about sign-in |
 | [mealie-api.md](mealie-api.md) | touch the Mealie client, nutrition, shopping lists, or upgrade Mealie |
