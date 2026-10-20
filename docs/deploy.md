@@ -157,8 +157,11 @@ fasting days under **Settings**. How many snacks a day the plan has (2 unless
 you change it) is set there too, once for the whole household.
 
 **Install it on your phone:** open the site in Safari (iOS: Share → Add to
-Home Screen) or Chrome (Android: menu → Install app). Weeks you've opened stay
-readable offline; changes need a connection.
+Home Screen) or Chrome (Android: Install, or menu → Install app); Settings
+shows the steps for the device it's on. This week's plan, meal pages and
+shopping list, and weeks you've opened, stay readable offline; shopping-list
+ticks wait for a connection, other changes need one. After a release, an open
+app offers a reload into the new version.
 
 ## 6. Backups
 

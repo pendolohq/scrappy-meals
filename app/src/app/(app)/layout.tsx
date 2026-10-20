@@ -2,6 +2,8 @@ import { BookPlus, Settings } from "lucide-react";
 import Link from "next/link";
 
 import { SideNav, TabBar } from "@/components/app-nav";
+import { InstallBanner } from "@/components/install-hint";
+import { PrecacheWeek } from "@/components/pwa";
 import { SignOut } from "@/components/sign-out";
 import { Brand, BrandMark } from "@/components/ui/brand";
 import { iconButtonClass } from "@/components/ui/icon-button";
@@ -59,8 +61,11 @@ export default async function AppLayout({
 
       {/* The week grids (`data-wide`) need the room a wide screen has. */}
       <main className="mx-auto w-full max-w-3xl min-w-0 px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:pt-10 lg:pb-16 xl:has-[[data-wide]]:max-w-none">
+        <InstallBanner />
         {children}
       </main>
+
+      <PrecacheWeek week={currentWeek} />
 
       <TabBar currentWeek={currentWeek} />
     </div>

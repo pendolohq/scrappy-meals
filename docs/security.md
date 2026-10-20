@@ -57,7 +57,8 @@ household-wide on purpose: anyone signed in can change them.
 
 - `src/proxy.ts` (Next.js middleware) redirects (or answers 401 under `/api/`) for everything
   except a short public list: `/login`, `/offline`, `/sw.js`, `/api/auth`,
-  `/api/health`, `/manifest.webmanifest`. None of these read user data. It's a second layer: removing a path from that list
+  `/api/health`, `/manifest.webmanifest`, plus the static `/icons/` and `/screenshots/`
+  (the install dialog's, taken from sample data). None of these read user data. It's a second layer: removing a path from that list
   must never be what keeps data private.
 - Sessions are JWTs (30 days) that carry a session version. Every request
   checks it against the database, so removing a user or changing a password
@@ -66,6 +67,11 @@ household-wide on purpose: anyone signed in can change them.
   reached, sessions are kept rather than all signed out. A revoked session then
   gets only Mealie's recipe search and images, since everything else needs the
   database, and ends on the first request after Postgres is back.
+- The service worker (`public/sw.js`) keeps this week's pages, the weeks
+  you've opened and recipe photos for offline use. They're the household's
+  data, so they're dropped on sign-out, and as soon as a page request
+  bounces to `/login` (the session ended elsewhere). Anything new it caches
+  that holds user data goes into the same caches.
 - Auth.js sets the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` when
   `AUTH_URL` is https. Caddy terminates TLS; the app port isn't published.
 - Sign-in failures are rate-limited per IP, per email from one IP, and per
