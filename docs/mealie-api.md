@@ -6,7 +6,7 @@ What the planner relies on, checked against a running instance
 ## Client
 
 - Types: `app/src/server/mealie/schema.d.ts`, generated from the committed
-  `openapi.json` snapshot by `pnpm mealie:types` (`MEALIE_URL=... pnpm mealie:types`).
+  `openapi.json` snapshot by `bun run mealie:types` (`MEALIE_URL=... bun run mealie:types`).
   Fields that have a server default are optional in the types.
 - Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`), `recipes.ts`,
   `shopping.ts`, `nutrition.ts`. Everything that holds the token imports
@@ -17,9 +17,9 @@ What the planner relies on, checked against a running instance
   health route will report a mismatch after a Mealie upgrade.
 
 **Upgrading Mealie:** bump the tag in `docker-compose.yml` and the two in
-`.github/workflows/ci.yml`, run `pnpm mealie:types` against it, update
+`.github/workflows/ci.yml`, run `bun run mealie:types` against it, update
 `MEALIE_SCHEMA_VERSION` in `client.ts` and this page's title, then run
-`pnpm test`, `pnpm typecheck` and `pnpm test:integration`. `pnpm test` fails
+`bun run test`, `bun run typecheck` and `bun run test:integration`. `bun run test` fails
 until every place names the same version (`mealie-version.test.ts`).
 
 ## Endpoints used

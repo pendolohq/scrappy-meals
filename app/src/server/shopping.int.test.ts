@@ -1,5 +1,5 @@
 // Needs both a live Mealie and a throwaway Postgres:
-//   MEALIE_TEST_URL=... DATABASE_TEST_URL=... pnpm test:integration
+//   MEALIE_TEST_URL=... DATABASE_TEST_URL=... bun run test:integration
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

@@ -1,5 +1,5 @@
 # Changes under these paths can break the published image in ways the other
-# CI jobs don't catch (e2e runs the app from a plain `pnpm build`), so a pull
+# CI jobs don't catch (e2e runs the app from a plain `bun run build`), so a pull
 # request that touches one also builds and smoke-tests the image. Read by the
 # `changes` job in ci.yml: one extended regex per line, matched from the start
 # of each changed path. app/src/cli/bundle.test.ts fails if a file bundled
@@ -16,8 +16,7 @@ app/scripts/build-cli\.mjs
 
 # Dependencies
 app/package\.json
-app/pnpm-lock\.yaml
-app/pnpm-workspace\.yaml
+app/bun\.lock
 
 # What the CLI and migrator bundle, and the migrations they apply
 app/drizzle/

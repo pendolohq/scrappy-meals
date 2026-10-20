@@ -19,7 +19,7 @@ build. `src/server/domain/*` (pure date, macro and shopping maths) and
 `src/server/db/schema.ts` (read by drizzle-kit) stay importable anywhere. The
 CLI, the migration runner and the e2e setup run outside Next.js and resolve
 `server-only` with the `react-server` condition instead (`build-cli.mjs`,
-`pnpm cli`, `pnpm test:e2e`).
+`bun run cli`, `bun run test:e2e`).
 
 ## Who is signed in: `src/server/session.ts`
 

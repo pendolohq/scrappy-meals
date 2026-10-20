@@ -24,10 +24,13 @@ lives in a doc; the trigger for reading each one is below.
 
 ## Package management
 
-- Use `pnpm`, from `app/`. Don't use `npm` or `yarn` to add or update packages unless asked.
-- Pin new dependencies to the latest version at the time: `pnpm add -E <pkg>@latest`
+- Use `bun`, from `app/`. Don't use `npm`, `pnpm` or `yarn` to add or update packages unless
+  asked. Bun is only the package manager and script runner: the app and the tests run on Node.
+- Run scripts as `bun run <script>`. `bun test` and `bun build` are Bun's own test runner and
+  bundler, not this project's `test` and `build` scripts.
+- Pin new dependencies to the latest version at the time: `bun add --exact <pkg>@latest`
   (`-D` for dev dependencies). Commit the lockfile.
-- `pnpm update-packages` (`app/scripts/update-packages.ts`, `--dry-run` to preview) applies
+- `bun run update-packages` (`app/scripts/update-packages.mts`, `--dry-run` to preview) applies
   minor and patch updates and lists major ones for review. A major upgrade gets its own PR and a
   read of the package's migration guide (for Next.js, the bundled `upgrading/` docs).
 
@@ -35,10 +38,11 @@ lives in a doc; the trigger for reading each one is below.
 
 - Skills are installed once under `.agents/skills/` (pinned in `skills-lock.json`) and read from
   there by Cursor and, through the symlinks in `.claude/skills/`, by Claude Code. Refresh them
-  with `pnpm skills:update` (from `app/`). Never hand-edit a lock-tracked skill; put repo-specific
+  with `bun run skills:update` (from `app/`). Never hand-edit a lock-tracked skill; put repo-specific
   notes here instead.
 - `agent-browser` is a dev dependency of `app/`, not a global install. Where a skill says to run
-  `agent-browser` from `PATH`, run `pnpm exec agent-browser` in `app/` instead.
+  `agent-browser` from `PATH`, run `bunx agent-browser` in `app/` instead. Where a skill says
+  `pnpm`, use the `bun` equivalent.
 - The Next.js MCP endpoint is built in: `next dev` serves it at `/_next/mcp`. `next-dev-loop`
   uses it together with `agent-browser`.
 
@@ -59,8 +63,8 @@ lives in a doc; the trigger for reading each one is below.
 
 - Unit tests sit next to the code as `*.test.ts`; Postgres tests are `*.db.test.ts`, tests
   against a real Mealie are `*.int.test.ts`. The e2e smoke test lives in `app/e2e/`.
-- `pnpm test` (unit), `DATABASE_TEST_URL=… pnpm test:db`, `MEALIE_TEST_URL=… pnpm test:integration`,
-  `pnpm test:e2e` against a running build (it empties `DATABASE_URL`; see the README).
+- `bun run test` (unit), `DATABASE_TEST_URL=… bun run test:db`, `MEALIE_TEST_URL=… bun run test:integration`,
+  `bun run test:e2e` against a running build (it empties `DATABASE_URL`; see the README).
 - There is no component test setup (no jsdom/RTL). UI behaviour is covered by e2e.
 
 ## Environment variables
@@ -104,8 +108,8 @@ task in the file, in dependency order.
 After every change, from `app/`:
 
 ```sh
-pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
-DATABASE_TEST_URL=postgres://… pnpm test:db     # if server/db code changed
+bun run format:check && bun run lint && bun run typecheck && bun run test
+DATABASE_TEST_URL=postgres://… bun run test:db     # if server/db code changed
 ```
 
 then the `next-dev-loop` skill for anything user-visible.

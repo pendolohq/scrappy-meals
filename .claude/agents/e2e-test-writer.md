@@ -9,7 +9,7 @@ color: orange
 # E2E Test Writer Agent
 
 You write Playwright tests for the scrappy-meals planner. Tests live in `app/e2e/` and run with
-`pnpm test:e2e` (from `app/`) against a production build, a real Mealie and a throwaway planner
+`bun run test:e2e` (from `app/`) against a production build, a real Mealie and a throwaway planner
 database.
 
 ## What to Test with Playwright
@@ -38,11 +38,11 @@ Do NOT use Playwright for isolated logic; that belongs in Vitest tests.
 
 ## Running Tests
 
-Needs a build (`pnpm build`) and these variables; CI's `e2e` job shows the full setup:
+Needs a build (`bun run build`) and these variables; CI's `e2e` job shows the full setup:
 
 ```
 E2E_ALLOW_RESET=1 DATABASE_URL=postgres://… MEALIE_TEST_URL=http://localhost:9000 \
-  MEALIE_URL=http://localhost:9000 MEALIE_API_TOKEN=… AUTH_SECRET=… pnpm test:e2e
+  MEALIE_URL=http://localhost:9000 MEALIE_API_TOKEN=… AUTH_SECRET=… bun run test:e2e
 ```
 
 Without `E2E_BASE_URL`, Playwright starts `.next/standalone/server.js` itself.

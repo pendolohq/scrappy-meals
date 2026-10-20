@@ -1,6 +1,6 @@
-// Surveys outdated dependencies (pnpm outdated), applies minor and patch
-// updates to package.json and the lockfile, and lists major updates for
-// manual review. `--dry-run` only prints what it would do.
+// Surveys outdated dependencies (each one's `latest` on the npm registry),
+// applies minor and patch updates to package.json and the lockfile, and lists
+// major updates for manual review. `--dry-run` only prints what it would do.
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,12 +14,6 @@ type BumpType = "patch" | "minor" | "major";
 type DepField = "dependencies" | "devDependencies";
 type PackageJson = Partial<Record<DepField, Record<string, string>>> &
   Record<string, unknown>;
-
-interface Outdated {
-  current: string;
-  latest: string;
-  dependencyType: string;
-}
 
 interface PackageUpdate {
   name: string;
@@ -52,30 +46,50 @@ function classifyBump(from: string, to: string): BumpType {
   return b[1] !== a[1] ? "minor" : "patch";
 }
 
-function findUpdates(
-  outdated: Record<string, Outdated>,
-  pkg: PackageJson
-): PackageUpdate[] {
-  const updates: PackageUpdate[] = [];
-  for (const [name, info] of Object.entries(outdated)) {
-    const field = info.dependencyType as DepField;
-    const spec = pkg[field]?.[name];
-    if (!spec) {
-      continue;
-    }
-    const pinned = spec.replace(/^[^\d]*/, "");
-    if (pinned === info.latest) {
-      continue;
-    }
-    updates.push({
+// A pinned prerelease can be ahead of `latest` (next-auth 5 betas while 4.x is
+// latest); that's not an update.
+function isOlder(from: string, to: string): boolean {
+  const a = semver(from);
+  const b = semver(to);
+  if (!a || !b) {
+    return false;
+  }
+  const i = a.findIndex((n, j) => n !== b[j]);
+  return i !== -1 && b[i] < a[i];
+}
+
+async function latestVersion(name: string): Promise<string> {
+  const res = await fetch(`https://registry.npmjs.org/${name}/latest`);
+  if (!res.ok) {
+    throw new Error(`${name}: registry answered ${res.status}`);
+  }
+  return ((await res.json()) as { version: string }).version;
+}
+
+async function findUpdates(pkg: PackageJson): Promise<PackageUpdate[]> {
+  const fields: DepField[] = ["dependencies", "devDependencies"];
+  const deps = fields.flatMap((field) =>
+    Object.entries(pkg[field] ?? {}).map(([name, spec]) => ({
       name,
       spec,
-      latest: info.latest,
-      bump: classifyBump(pinned, info.latest),
       field,
-    });
-  }
-  return updates;
+    }))
+  );
+  const latest = await Promise.all(deps.map((d) => latestVersion(d.name)));
+  return deps.flatMap(({ name, spec, field }, i) => {
+    const pinned = spec.replace(/^[^\d]*/, "");
+    return pinned === latest[i] || isOlder(pinned, latest[i])
+      ? []
+      : [
+          {
+            name,
+            spec,
+            latest: latest[i],
+            bump: classifyBump(pinned, latest[i]),
+            field,
+          },
+        ];
+  });
 }
 
 // Keeps each spec's prefix: "^1.2.3" stays a caret range, "1.2.3" stays exact.
@@ -109,30 +123,19 @@ function printTable(title: string, rows: PackageUpdate[]) {
 if (DRY_RUN) {
   log("Preview only: no files will be modified.\n");
 }
-log("Running pnpm outdated...");
-
-// pnpm outdated exits 1 when something is outdated, so only a missing or
-// unparseable report counts as a failure.
-const outdated = spawnSync("pnpm", ["outdated", "--format", "json"], {
-  cwd: ROOT,
-  encoding: "utf-8",
-});
-let report: Record<string, Outdated>;
-try {
-  report = JSON.parse(outdated.stdout || "{}");
-} catch {
-  console.error(
-    "✗ pnpm outdated failed:",
-    outdated.error?.message ?? `${outdated.stderr}${outdated.stdout}`.trim()
-  );
-  process.exit(1);
-}
+log("Checking the npm registry...");
 
 const pkg: PackageJson = JSON.parse(readFileSync(PKG_PATH, "utf-8"));
 const totalDeps =
   Object.keys(pkg.dependencies ?? {}).length +
   Object.keys(pkg.devDependencies ?? {}).length;
-const all = findUpdates(report, pkg);
+let all: PackageUpdate[];
+try {
+  all = await findUpdates(pkg);
+} catch (err) {
+  console.error("✗ Checking the registry failed:", (err as Error).message);
+  process.exit(1);
+}
 
 if (all.length === 0) {
   log(`✓ All ${totalDeps} packages are up to date.`);
@@ -164,13 +167,13 @@ if (safe.length > 0) {
     PKG_PATH,
     JSON.stringify(applyUpdates(safe, pkg), null, 2) + "\n"
   );
-  log("\nRunning pnpm install...");
-  const install = spawnSync("pnpm", ["install"], {
+  log("\nRunning bun install...");
+  const install = spawnSync("bun", ["install"], {
     cwd: ROOT,
     stdio: "inherit",
   });
   if (install.error || install.status !== 0) {
-    console.error("\n✗ pnpm install failed.", install.error?.message ?? "");
+    console.error("\n✗ bun install failed.", install.error?.message ?? "");
     process.exit(1);
   }
   log("✓ Lockfile updated.");

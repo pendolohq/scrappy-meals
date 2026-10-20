@@ -1,6 +1,6 @@
 // Refresh the Mealie OpenAPI snapshot and regenerate its TypeScript types.
 //
-//   MEALIE_URL=http://localhost:9000 pnpm mealie:types
+//   MEALIE_URL=http://localhost:9000 bun run mealie:types
 //
 // Run after bumping the Mealie image tag in docker-compose.yml, then commit
 // both files and update MEALIE_SCHEMA_VERSION (mealie-version.test.ts checks
