@@ -29,3 +29,9 @@ recipes.{$DOMAIN} {
 	}
 	reverse_proxy mealie:9000
 }
+
+# The bare domain and www only point people at the planner.
+{$DOMAIN}, www.{$DOMAIN} {
+	import common
+	redir https://app.{$DOMAIN}{uri} permanent
+}
