@@ -41,8 +41,13 @@ Create `A` (and `AAAA` if you have IPv6) records pointing at the server:
 |---|---|
 | `app.example.com` | the planner |
 | `recipes.example.com` | Mealie |
+| `example.com` | redirects to `app.example.com` |
+| `www.example.com` | the same (an `A`/`AAAA` record, or a `CNAME` to `example.com`) |
 
 Caddy requests the certificates on first start, so DNS must resolve first.
+That includes the bare domain and `www`: Caddy asks for a certificate for
+every name in the Caddyfile, and keeps retrying (and logging errors) for one
+that doesn't point at the server.
 
 ## 3. Configuration
 
