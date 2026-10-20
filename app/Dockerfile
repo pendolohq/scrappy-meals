@@ -3,7 +3,7 @@
 # Keep the version in step with packageManager in package.json.
 FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS bun
 
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS base
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN bun run build
 
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runner
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS runner
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 # The code stays root-owned, so a compromised server process can't rewrite it.
