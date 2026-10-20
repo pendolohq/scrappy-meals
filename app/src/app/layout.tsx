@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
 import { Pwa } from "@/components/pwa";
+import { ThemeSync } from "@/components/theme-sync";
+import { BAR_COLOR, themeScript } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -27,19 +29,21 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  // --background in globals.css; metadata can't read CSS variables.
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2e8cf" },
-    { media: "(prefers-color-scheme: dark)", color: "#131a14" },
-  ],
+  // Light, like the page; ThemeSync swaps it when the theme is dark.
+  themeColor: BAR_COLOR.light,
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={fraunces.variable}>
+    // The inline script may set data-theme="dark" before React hydrates.
+    <html lang="en" className={fraunces.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-dvh bg-background text-foreground antialiased">
+        <ThemeSync />
         <Pwa />
         {children}
       </body>
