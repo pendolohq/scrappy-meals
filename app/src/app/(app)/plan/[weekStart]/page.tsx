@@ -56,7 +56,7 @@ export default async function PlanPage({
         plan={plan}
         today={now}
         mode="plan"
-        className="hidden xl:grid"
+        className="hidden xl:table"
       />
     </div>
   );

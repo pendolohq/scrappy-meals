@@ -62,7 +62,7 @@ export default async function WeekPage({
         today={now}
         mode="week"
         currentUserId={user.id}
-        className="hidden xl:grid"
+        className="hidden xl:table"
       />
     </div>
   );

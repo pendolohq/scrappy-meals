@@ -74,161 +74,161 @@ export const WeekGrid = ({
   );
 
   return (
-    <div
-      role="table"
+    <table
       aria-label={mode === "plan" ? "Plan for the week" : "The week"}
-      className={cx("grid gap-2", className)}
-      style={{
-        gridTemplateColumns: `8.5rem repeat(${columns.length}, minmax(0, 1fr))`,
-      }}
+      className={cx(
+        "-mx-2 w-[calc(100%+1rem)] table-fixed border-separate border-spacing-2",
+        className
+      )}
     >
-      <div role="row" className="contents">
-        {/* A real grid cell (sr-only would take it out of the grid). */}
-        <span role="columnheader">
-          <span className="sr-only">Day</span>
-        </span>
-        {columns.map(({ slot, snackIndex, label }) => {
-          const Icon = SLOT_ICON[slot];
+      <thead>
+        <tr>
+          <th className="w-34">
+            <span className="sr-only">Day</span>
+          </th>
+          {columns.map(({ slot, snackIndex, label }) => {
+            const Icon = SLOT_ICON[slot];
+            return (
+              <th
+                key={`${slot}-${snackIndex}`}
+                scope="col"
+                className="rounded-control bg-sunken px-2 py-2.5 text-xs font-semibold tracking-wider uppercase"
+              >
+                <span className="flex items-center justify-center gap-1.5">
+                  <Icon
+                    className="size-4 shrink-0 text-muted"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                  <span className="truncate">{label}</span>
+                </span>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {plan.days.map(({ date, meals }) => {
+          const isToday = date === today;
+          const { day, weekday } = dayParts(date);
+          const kcal =
+            mode === "week"
+              ? personDayTotals(
+                  meals.map((m) => ({
+                    nutrition: m.recipe?.nutrition ?? null,
+                    recipeName: m.recipe?.name ?? m.slug,
+                    estimated: m.recipe?.nutritionSource === "estimated",
+                    baseServings: m.baseServings,
+                    portions: m.portions,
+                  })),
+                  currentUserId
+                ).macros.kcal
+              : null;
           return (
-            <span
-              key={`${slot}-${snackIndex}`}
-              role="columnheader"
-              className="flex items-center justify-center gap-1.5 rounded-control bg-sunken px-2 py-2.5 text-xs font-semibold tracking-wider uppercase"
-            >
-              <Icon
-                className="size-4 shrink-0 text-muted"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <span className="truncate">{label}</span>
-            </span>
+            <tr key={date} data-testid="grid-day">
+              <th
+                scope="row"
+                className={cx(
+                  "rounded-control px-3 py-2 text-left font-normal",
+                  isToday
+                    ? "bg-highlight-soft ring-1 ring-highlight/40"
+                    : "bg-sunken"
+                )}
+              >
+                <span className="sr-only">{formatDay(date)}</span>
+                <span
+                  aria-hidden
+                  className="flex items-baseline gap-2 font-medium"
+                >
+                  <span
+                    className={cx(
+                      "font-serif text-2xl font-semibold tabular-nums",
+                      isToday && "text-highlight"
+                    )}
+                  >
+                    {day}
+                  </span>
+                  <span className="text-xs font-semibold tracking-wider uppercase">
+                    {weekday}
+                  </span>
+                </span>
+                {isToday && (
+                  <span className="block text-xs font-medium text-highlight">
+                    Today
+                  </span>
+                )}
+                {kcal !== null && kcal > 0 && (
+                  <span className="block text-xs text-muted tabular-nums">
+                    {formatAmount(kcal)} kcal
+                  </span>
+                )}
+              </th>
+
+              {columns.map(({ slot, snackIndex, label, active }) => {
+                const inSlot = meals.filter(
+                  (m) => m.slot === slot && m.snackIndex === snackIndex
+                );
+                return (
+                  <td
+                    key={`${slot}-${snackIndex}`}
+                    aria-label={`${label}, ${formatDay(date)}`}
+                    className={cx(
+                      "space-y-1.5 rounded-control p-1.5 align-top",
+                      isToday ? "bg-highlight-soft/50" : "bg-card/60"
+                    )}
+                  >
+                    {inSlot.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {inSlot.map((meal) =>
+                          mode === "plan" ? (
+                            <PlanMeal
+                              key={meal.id}
+                              meal={meal}
+                              members={plan.members}
+                              compact
+                            />
+                          ) : (
+                            <WeekMeal
+                              key={meal.id}
+                              meal={meal}
+                              members={plan.members}
+                              currentUserId={currentUserId}
+                            />
+                          )
+                        )}
+                      </ul>
+                    )}
+                    {!active ? null : mode === "plan" ? (
+                      <AddMeal
+                        date={date}
+                        slot={slot}
+                        snackIndex={snackIndex}
+                        label={label}
+                        text="Add meal"
+                        className={cx(
+                          "flex w-full items-center gap-1.5 rounded-control px-2.5 text-sm text-muted transition hover:bg-accent-soft hover:text-accent-ink",
+                          inSlot.length === 0 ? "min-h-20" : "min-h-9"
+                        )}
+                      />
+                    ) : (
+                      inSlot.length === 0 && (
+                        <Link
+                          href={`/plan/${weekStartOf(date)}#${date}`}
+                          aria-label={`Plan ${label.toLowerCase()}, ${formatDay(date)}`}
+                          className="flex min-h-20 items-center gap-1.5 rounded-control px-2.5 text-sm text-muted transition hover:bg-accent-soft hover:text-accent-ink"
+                        >
+                          <Plus className="size-4" aria-hidden />
+                          Plan
+                        </Link>
+                      )
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
           );
         })}
-      </div>
-
-      {plan.days.map(({ date, meals }) => {
-        const isToday = date === today;
-        const { day, weekday } = dayParts(date);
-        const kcal =
-          mode === "week"
-            ? personDayTotals(
-                meals.map((m) => ({
-                  nutrition: m.recipe?.nutrition ?? null,
-                  recipeName: m.recipe?.name ?? m.slug,
-                  estimated: m.recipe?.nutritionSource === "estimated",
-                  baseServings: m.baseServings,
-                  portions: m.portions,
-                })),
-                currentUserId
-              ).macros.kcal
-            : null;
-        return (
-          <div
-            key={date}
-            role="row"
-            className="contents"
-            data-testid="grid-day"
-          >
-            <div
-              role="rowheader"
-              className={cx(
-                "flex flex-col justify-center rounded-control px-3 py-2",
-                isToday
-                  ? "bg-highlight-soft ring-1 ring-highlight/40"
-                  : "bg-sunken"
-              )}
-            >
-              <span className="sr-only">{formatDay(date)}</span>
-              <span aria-hidden className="flex items-baseline gap-2">
-                <span
-                  className={cx(
-                    "font-serif text-2xl font-semibold tabular-nums",
-                    isToday && "text-highlight"
-                  )}
-                >
-                  {day}
-                </span>
-                <span className="text-xs font-semibold tracking-wider uppercase">
-                  {weekday}
-                </span>
-              </span>
-              {isToday && (
-                <span className="text-xs font-medium text-highlight">
-                  Today
-                </span>
-              )}
-              {kcal !== null && kcal > 0 && (
-                <span className="text-xs text-muted tabular-nums">
-                  {formatAmount(kcal)} kcal
-                </span>
-              )}
-            </div>
-
-            {columns.map(({ slot, snackIndex, label, active }) => {
-              const inSlot = meals.filter(
-                (m) => m.slot === slot && m.snackIndex === snackIndex
-              );
-              return (
-                <div
-                  key={`${slot}-${snackIndex}`}
-                  role="cell"
-                  aria-label={`${label}, ${formatDay(date)}`}
-                  className={cx(
-                    "flex min-h-24 min-w-0 flex-col gap-1.5 rounded-control p-1.5",
-                    isToday ? "bg-highlight-soft/50" : "bg-card/60"
-                  )}
-                >
-                  {inSlot.length > 0 && (
-                    <ul className="space-y-1.5">
-                      {inSlot.map((meal) =>
-                        mode === "plan" ? (
-                          <PlanMeal
-                            key={meal.id}
-                            meal={meal}
-                            members={plan.members}
-                            compact
-                          />
-                        ) : (
-                          <WeekMeal
-                            key={meal.id}
-                            meal={meal}
-                            members={plan.members}
-                            currentUserId={currentUserId}
-                          />
-                        )
-                      )}
-                    </ul>
-                  )}
-                  {!active ? null : mode === "plan" ? (
-                    <AddMeal
-                      date={date}
-                      slot={slot}
-                      snackIndex={snackIndex}
-                      label={label}
-                      text="Add meal"
-                      className={cx(
-                        "flex w-full items-center gap-1.5 rounded-control px-2.5 text-sm text-muted transition hover:bg-accent-soft hover:text-accent-ink",
-                        inSlot.length === 0 ? "flex-1" : "min-h-9"
-                      )}
-                    />
-                  ) : (
-                    inSlot.length === 0 && (
-                      <Link
-                        href={`/plan/${weekStartOf(date)}#${date}`}
-                        aria-label={`Plan ${label.toLowerCase()}, ${formatDay(date)}`}
-                        className="flex flex-1 items-center gap-1.5 rounded-control px-2.5 text-sm text-muted transition hover:bg-accent-soft hover:text-accent-ink"
-                      >
-                        <Plus className="size-4" aria-hidden />
-                        Plan
-                      </Link>
-                    )
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
+      </tbody>
+    </table>
   );
 };
