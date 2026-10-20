@@ -310,14 +310,14 @@ They become one page.
 
 ## M7 — Forms and accessibility
 
-- [ ] **Task 23: Forms keep what the user typed after an error**
+- [x] **Task 23: Forms keep what the user typed after an error**
   **Complexity:** S
   **Do:** login and settings actions return the submitted values with the error, and the
   fields use them as `defaultValue`. Check the bundled Next/React docs for the current
   recommended pattern first. Add `max` attributes matching the zod bounds in settings.
   **Done when:** e2e: a wrong password keeps the email.
 
-- [ ] **Task 24: Touch targets, contrast, loading state**
+- [x] **Task 24: Touch targets, contrast, loading state**
   **Complexity:** S
   **Do:**
   - Adherence buttons, steppers and the `⋯` menu get touch targets of about 40–44 px.

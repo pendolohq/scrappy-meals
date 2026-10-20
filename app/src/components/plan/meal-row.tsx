@@ -53,7 +53,7 @@ const Stepper = ({
   min?: number;
 }) => {
   const btn =
-    "h-8 w-8 rounded-full border border-border text-lg leading-none disabled:opacity-40";
+    "size-10 rounded-full border border-border text-lg leading-none disabled:opacity-40";
   return (
     <fieldset
       className="flex min-w-0 items-center justify-center gap-1.5"
@@ -150,7 +150,7 @@ export const MealRow = ({
         </div>
         <button
           type="button"
-          className="px-1 text-muted"
+          className="-mr-2 size-10 shrink-0 rounded-full text-muted"
           aria-expanded={open}
           aria-label={`Options for ${name}`}
           onClick={() => setOpen((o) => !o)}
