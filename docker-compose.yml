@@ -30,7 +30,8 @@ x-ops: &ops
 
 services:
   postgres:
-    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    # A new major version needs a dump and restore: docs/deploy.md, "Upgrading Postgres".
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
@@ -43,7 +44,7 @@ services:
       -c effective_cache_size=512MB
       -c max_connections=50
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Over TCP: during first boot the image runs a socket-only server while
