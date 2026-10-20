@@ -1,11 +1,9 @@
-import { Card } from "@/components/ui/card";
+import { formatQuantity } from "@/lib/format";
 import {
   type IngredientLine,
   stepIngredients,
 } from "@/server/domain/ingredients";
 import type { RecipeStep } from "@/server/mealie/recipes";
-
-import { IngredientText } from "./ingredient-text";
 
 /** Headings aren't steps: only steps with text get a number. */
 const numberSteps = (steps: RecipeStep[]) => {
@@ -16,9 +14,29 @@ const numberSteps = (steps: RecipeStep[]) => {
   }));
 };
 
+/** "3 clove Garlic": the amount reads first, so it carries the weight. */
+const IngredientChip = ({ line }: { line: IngredientLine }) => (
+  <li className="rounded-full bg-foreground/10 px-3 py-1.5">
+    {line.scaled ? (
+      <>
+        <span className="font-semibold tabular-nums">
+          {formatQuantity(line.scaled.quantity, line.scaled.unit)}
+        </span>{" "}
+        {line.scaled.food}
+        {line.scaled.note && (
+          <span className="text-muted">, {line.scaled.note}</span>
+        )}
+      </>
+    ) : (
+      line.text
+    )}
+  </li>
+);
+
 /**
  * The recipe's steps, each with the ingredients Mealie links to it, in the
- * amounts the Ingredients card shows (`lines`).
+ * amounts the Ingredients card shows (`lines`). Straight on the page, not in
+ * a card: it is the part you read at the stove, so it gets the full width.
  */
 export const Method = ({
   steps,
@@ -27,14 +45,14 @@ export const Method = ({
   steps: RecipeStep[];
   lines: IngredientLine[];
 }) => (
-  <Card as="section" aria-labelledby="method">
+  <section aria-labelledby="method" className="pt-2">
     <h2
       id="method"
-      className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase"
+      className="mb-4 text-xs font-semibold tracking-wider text-muted uppercase"
     >
       Method
     </h2>
-    <ol className="space-y-3" data-testid="instructions">
+    <ol className="space-y-10" data-testid="instructions">
       {numberSteps(steps).map((step, i) => {
         const linked = step.text
           ? stepIngredients(lines, step.ingredientRefs)
@@ -42,42 +60,34 @@ export const Method = ({
         return (
           <li key={i}>
             {step.title && (
-              <h3 className="pt-2 pb-1 font-serif font-semibold">
+              <h3 className="pb-3 text-sm font-semibold tracking-wider text-accent-ink uppercase">
                 {step.title}
               </h3>
             )}
             {step.text && (
-              <div className="flex gap-3">
-                <span
-                  aria-hidden
-                  className="w-5 shrink-0 font-semibold text-accent-ink tabular-nums"
-                >
-                  {step.number}
-                </span>
-                <div className="min-w-0">
-                  <p className="whitespace-pre-line">{step.text}</p>
-                  {linked.length > 0 && (
-                    <ul
-                      className="mt-1.5 flex flex-wrap gap-1.5 text-sm"
-                      aria-label={`Ingredients for step ${step.number}`}
-                      data-testid="step-ingredients"
-                    >
-                      {linked.map((line, j) => (
-                        <li
-                          key={j}
-                          className="rounded-control bg-sunken/70 px-2 py-0.5"
-                        >
-                          <IngredientText line={line} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
+              <>
+                <h3 className="font-serif text-2xl font-semibold">
+                  Step {step.number}
+                </h3>
+                <p className="mt-2 text-lg/relaxed whitespace-pre-line">
+                  {step.text}
+                </p>
+                {linked.length > 0 && (
+                  <ul
+                    className="mt-5 flex flex-wrap gap-2"
+                    aria-label={`Ingredients for step ${step.number}`}
+                    data-testid="step-ingredients"
+                  >
+                    {linked.map((line, j) => (
+                      <IngredientChip key={j} line={line} />
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </li>
         );
       })}
     </ol>
-  </Card>
+  </section>
 );
