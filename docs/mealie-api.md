@@ -39,7 +39,7 @@ until every place names the same version (`mealie-version.test.ts`).
 | Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
 | Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
 | Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
-| AI provider settings | `GET /api/groups/ai-providers/settings` → `aiEnabled`, `imageProviderEnabled` |
+| AI enabled? | `GET /api/groups/self` → `aiProviderSettings.aiEnabled`, `.imageProviderEnabled` (see below) |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
@@ -85,8 +85,8 @@ until every place names the same version (`mealie-version.test.ts`).
 
 ## Importing with AI
 
-The planner uses it for Instagram and Facebook posts: it reads the AI settings
-first (no provider, or screenshots without an `image` provider, fail with a
+The planner uses it for Instagram and Facebook posts: it reads the group's AI
+flags first (from `groups/self`; no provider, or screenshots without an `image` provider, fail with a
 clear message), then posts the caption as `content`, the screenshots as
 `images` and the post address as `url`, with a 120 s timeout.
 
@@ -100,6 +100,11 @@ Mealie 3.29 with Claude Sonnet 5.5 as the provider:
   every call fails; with images it also needs `image`. A video URL is only
   downloaded and transcribed when `audio` is set, otherwise Mealie reads the
   URL as a web page.
+- **Only group managers can read or change the provider settings**
+  (`/api/groups/ai-providers/settings` answers 403 to a plain member, like the
+  planner's token). `GET /api/groups/self` carries the same `aiEnabled` /
+  `imageProviderEnabled` flags for any member, so the planner reads those.
+  `create/ai` itself works with a member's token.
 - **Claude works through Anthropic's OpenAI-compatible endpoint**
   (`https://api.anthropic.com/v1/`, model `claude-sonnet-5-5`). Mealie asks for
   JSON with `response_format`, which that endpoint ignores, but the replies

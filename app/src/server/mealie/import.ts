@@ -72,12 +72,14 @@ export async function getAiSettings(
   opts: { client?: MealieClient } = {}
 ): Promise<{ aiEnabled: boolean; imageProviderEnabled: boolean }> {
   const client = opts.client ?? mealie();
+  // Read from the group, not /api/groups/ai-providers/settings: that one needs
+  // group-manage permission, which the planner's token deliberately lacks.
   const settings = unwrap(
-    await client.GET("/api/groups/ai-providers/settings")
-  );
+    await client.GET("/api/groups/self")
+  ).aiProviderSettings;
   return {
-    aiEnabled: settings.aiEnabled,
-    imageProviderEnabled: settings.imageProviderEnabled,
+    aiEnabled: settings?.aiEnabled ?? false,
+    imageProviderEnabled: settings?.imageProviderEnabled ?? false,
   };
 }
 

@@ -165,6 +165,6 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   missing and is filled in on the review page. The `estimated` state stays supported for
   recipes marked that way by hand.
 
-- [ ] **10. Deploy docs.** **Complexity:** S
+- [x] **10. Deploy docs.** **Complexity:** S
   `docs/deploy.md`: set up an AI provider in Mealie (`default` and `image`; no `audio`),
   including Claude through Anthropic's OpenAI-compatible endpoint.
