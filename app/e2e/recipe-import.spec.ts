@@ -48,7 +48,9 @@ for (const bad of ["not a url", "http://localhost/x", "ftp://example.com/x"]) {
 
 test("says so when Mealie finds no recipe at the address", async ({ page }) => {
   await page.goto("/recipes/new");
-  await submit(page, "http://127.0.0.1/recipe");
+  // Passes the form's checks (IP literals don't); .invalid never resolves, so
+  // Mealie answers 400 without leaving the machine.
+  await submit(page, "https://no-recipe.invalid/recipe");
   await expect(page.locator("main p[role=alert]")).toHaveText(
     "Couldn't find a recipe on that page."
   );
