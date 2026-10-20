@@ -3,11 +3,20 @@
 import { useOptimistic, useState, useTransition } from "react";
 
 import { setAdherenceAction } from "@/app/(app)/week/actions";
+import { pillClass, type PillTone } from "@/components/ui/pill";
+import { cx } from "@/lib/cx";
 import {
   ADHERENCE_STATUSES,
   type AdherenceStatus,
   STATUS_LABEL,
 } from "@/server/domain/adherence";
+
+const TONE: Record<AdherenceStatus, PillTone> = {
+  stuck: "accent",
+  partial: "neutral",
+  swapped: "neutral",
+  skipped: "highlight",
+};
 
 type Log = { status: AdherenceStatus; note: string | null } | undefined;
 
@@ -59,9 +68,10 @@ export const AdherenceButtons = ({
   };
 
   return (
-    <div className="space-y-1">
+    // Four 44px buttons need 11rem; a narrower column gets two rows.
+    <div className="@container space-y-1">
       <fieldset
-        className="flex min-w-0 justify-center gap-1"
+        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-2 rounded-[1.5rem] border border-border bg-card p-0.5 @[11rem]:grid-cols-4 @[11rem]:rounded-full"
         aria-label={`How did ${mealName} go?`}
       >
         {ADHERENCE_STATUSES.map((s) => {
@@ -79,11 +89,12 @@ export const AdherenceButtons = ({
                   : STATUS_LABEL[s].label
               }
               onClick={() => choose(s)}
-              className={`h-10 w-10 rounded-md border text-sm disabled:opacity-60 ${
+              className={cx(
+                "h-tap min-w-0 rounded-full text-sm transition disabled:opacity-60",
                 active
-                  ? "border-accent bg-accent text-accent-foreground"
-                  : "border-border text-muted"
-              }`}
+                  ? "bg-accent font-semibold text-accent-foreground shadow-card"
+                  : "text-muted hover:bg-sunken hover:text-foreground"
+              )}
             >
               {STATUS_LABEL[s].icon}
             </button>
@@ -111,12 +122,14 @@ export const AdherenceBadge = ({ log }: { log: Log }) => {
   }
   const { icon, label } = STATUS_LABEL[log.status];
   return (
-    <p
-      className="truncate text-center text-xs text-muted"
-      data-testid="adherence-badge"
-    >
-      {icon} {label}
-      {log.note ? `: ${log.note}` : ""}
+    <p className="text-center">
+      <span
+        className={cx(pillClass(TONE[log.status]), "max-w-full truncate")}
+        data-testid="adherence-badge"
+      >
+        {icon} {label}
+        {log.note ? `: ${log.note}` : ""}
+      </span>
     </p>
   );
 };

@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { Plus, Search, X } from "lucide-react";
 
 import { addMealAction } from "@/app/(app)/week/actions";
+import { IconButton } from "@/components/ui/icon-button";
+import { inputClass } from "@/components/ui/input";
+import { Pill } from "@/components/ui/pill";
+import { RecipeImage } from "@/components/ui/recipe-image";
+import { cx } from "@/lib/cx";
+import { formatDay } from "@/lib/format";
 import type { RecipeListItem } from "@/server/mealie/recipes";
 import type { SlotType } from "@/server/plan";
 
@@ -89,49 +96,70 @@ export const AddMeal = ({
       }
     });
 
+  const what = label.toLowerCase();
+
   return (
     <>
       <button
         type="button"
         onClick={show}
-        className="text-sm font-medium text-accent"
+        className="-mr-2 inline-flex min-h-tap items-center gap-1 rounded-full px-3 text-sm font-medium text-accent transition hover:bg-accent-soft"
       >
-        + Add {label.toLowerCase()}
+        <Plus className="size-4" aria-hidden />
+        Add {what}
       </button>
+      {/* A bottom sheet on phones, a centred dialog on wider screens. */}
       <dialog
         ref={dialog}
         onClose={() => setOpen(false)}
-        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-0 text-foreground backdrop:bg-black/40"
-        aria-label={`Add ${label.toLowerCase()}`}
+        className={cx(
+          "mx-auto mt-auto mb-0 w-full max-w-none rounded-t-card border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-black/40 backdrop:backdrop-blur-[2px]",
+          "sm:m-auto sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-card"
+        )}
+        aria-label={`Add ${what}`}
       >
-        <div className="flex max-h-[80dvh] flex-col">
-          <div className="flex items-center gap-2 border-b border-border p-3">
-            <input
-              type="search"
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search recipes in Mealie"
-              aria-label="Search recipes"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2"
-            />
-            <button type="button" onClick={close} className="px-2 text-muted">
-              Cancel
-            </button>
+        <div className="flex max-h-[85dvh] flex-col pb-[env(safe-area-inset-bottom)] sm:max-h-[80dvh] sm:pb-0">
+          <div className="space-y-3 border-b border-border p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-serif text-heading font-semibold">
+                Add {what}{" "}
+                <span className="font-sans text-sm font-normal text-muted">
+                  · {formatDay(date)}
+                </span>
+              </h2>
+              <IconButton label="Close" className="-mr-2" onClick={close}>
+                <X className="size-5" aria-hidden />
+              </IconButton>
+            </div>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
+                aria-hidden
+              />
+              <input
+                type="search"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search recipes in Mealie"
+                aria-label="Search recipes"
+                className={cx(inputClass, "bg-background pl-10")}
+              />
+            </div>
           </div>
           {open && (
             <div className="overflow-y-auto p-2" aria-live="polite">
               {search.status === "loading" && search.items.length === 0 && (
-                <p className="p-2 text-sm text-muted">Searching…</p>
+                <p className="p-3 text-sm text-muted">Searching…</p>
               )}
               {search.status === "error" && (
-                <p className="p-2 text-sm text-danger">{search.error}</p>
+                <p className="p-3 text-sm text-danger">{search.error}</p>
               )}
               {search.status === "done" && search.items.length === 0 && (
-                <p className="p-2 text-sm text-muted">No recipes found.</p>
+                <p className="p-3 text-sm text-muted">No recipes found.</p>
               )}
               {error && (
-                <p role="alert" className="p-2 text-sm text-danger">
+                <p role="alert" className="p-3 text-sm text-danger">
                   {error}
                 </p>
               )}
@@ -142,34 +170,22 @@ export const AddMeal = ({
                       type="button"
                       disabled={pending}
                       onClick={() => pick(r.slug)}
-                      className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-background disabled:opacity-60"
+                      className="flex w-full items-center gap-3 rounded-control p-2 text-left transition hover:bg-sunken disabled:opacity-60"
                     >
-                      {r.imagePath && r.id ? (
-                        // oxlint-disable-next-line nextjs/no-img-element -- proxied Mealie thumbnails
-                        <img
-                          src={`/api/recipe-images/${r.id}`}
-                          alt=""
-                          className="h-10 w-10 rounded-md object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span
-                          className="h-10 w-10 rounded-md bg-border"
-                          aria-hidden
-                        />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
+                      <RecipeImage
+                        mealieId={r.imagePath && r.id ? r.id : null}
+                        className="size-14"
+                      />
+                      <span className="min-w-0 flex-1 space-y-1">
+                        <span className="line-clamp-2 font-serif font-semibold">
                           {r.name}
                         </span>
                         {r.servings ? (
-                          <span className="text-xs text-muted">
+                          <span className="block text-xs text-muted">
                             {r.servings} servings
                           </span>
                         ) : (
-                          <span className="text-xs text-danger">
-                            ⚠ No servings count
-                          </span>
+                          <Pill tone="danger">⚠ No servings count</Pill>
                         )}
                       </span>
                     </button>

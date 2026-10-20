@@ -16,6 +16,30 @@ const MONTHS = [
   "Dec",
 ];
 
+const LONG_WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+const LONG_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 const utc = (date: string) => new Date(`${date}T00:00:00Z`);
 const dayMonth = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 
@@ -23,6 +47,16 @@ const dayMonth = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 export const formatDay = (date: string) => {
   const d = utc(date);
   return `${WEEKDAYS[d.getUTCDay()]} ${dayMonth(d)}`;
+};
+
+/** { day: 20, weekday: "Tuesday", month: "October" } for 2026-10-20. */
+export const dayParts = (date: string) => {
+  const d = utc(date);
+  return {
+    day: d.getUTCDate(),
+    weekday: LONG_WEEKDAYS[d.getUTCDay()],
+    month: LONG_MONTHS[d.getUTCMonth()],
+  };
 };
 
 /** "19 Oct 2026" for 2026-10-19. */
