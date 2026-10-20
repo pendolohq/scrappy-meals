@@ -26,7 +26,10 @@ export default async function WeekPage({
       <AutoRefresh />
       <WeekHeader weekStart={weekStart}>
         {weekStartOf(now) !== weekStart && (
-          <Link href="/week" className="font-medium text-accent">
+          <Link
+            href="/week"
+            className="inline-flex min-h-tap items-center font-medium text-accent"
+          >
             Back to this week
           </Link>
         )}

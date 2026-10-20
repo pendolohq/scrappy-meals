@@ -33,12 +33,12 @@ export const WeekHeader = ({
         <h1 className="font-serif text-title font-semibold sm:text-display">
           {title ?? label}
         </h1>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+        <div className="flex flex-wrap items-center gap-x-3 text-sm text-muted">
           <span className="tabular-nums">
             {title ? `${label} · ${range}` : range}
           </span>
           {children}
-        </p>
+        </div>
       </div>
       <div className="flex shrink-0 gap-2">
         <Link
