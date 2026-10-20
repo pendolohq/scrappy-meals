@@ -134,7 +134,7 @@ Decisions already taken:
 
 ## M2 — When Mealie is down
 
-- [ ] **Task 9: One "Mealie unavailable" check**
+- [x] **Task 9: One "Mealie unavailable" check**
   **Complexity:** S
   **Do:** in `server/mealie/client.ts`, catch network and abort errors in the fetch wrapper and
   rethrow them as `MealieUnavailableError` (with the original as `cause`). Only undici's
@@ -147,7 +147,7 @@ Decisions already taken:
   **Done when:** unit test for the classifier; with the Mealie container stopped, the shop page
   shows its "isn't reachable" banner (`next-dev-loop`).
 
-- [ ] **Task 10: Adding a meal while Mealie is down says so**
+- [x] **Task 10: Adding a meal while Mealie is down says so**
   **Complexity:** XS
   **Depends on:** Task 9
   **Do:** `loadRecipes(…, { force: true })` (`recipe-cache.ts:78-83`) stops swallowing fetch
@@ -155,21 +155,34 @@ Decisions already taken:
   reachable" instead of "Recipe not found".
   **Done when:** db test with a fetch that throws.
 
-- [ ] **Task 11: Error boundaries**
+- [x] **Task 11: Error boundaries**
   **Complexity:** XS
   **Do:** `src/app/(app)/error.tsx` (client: message, retry button, link to `/week`) and a
   minimal `src/app/global-error.tsx`. Check the bundled Next 16 docs for the current props
   (`reset` vs `unstable_retry`).
   **Done when:** a thrown error in a page shows the boundary (`next-dev-loop`).
 
-- [ ] **Task 12: Health check that only the DB can fail**
+- [x] **Task 11b: A database blip doesn't sign everyone out**
+  **Complexity:** S (auth: gets a review pass)
+  **Found while verifying Task 11:** the `jwt` callback in `auth.ts` checks the session
+  version against the database on every request. When that query throws (Postgres
+  restarting), Auth.js drops the session cookie, so everyone who opens the app during
+  the outage is signed out for good.
+  **Do:** if the lookup throws, keep the token and log the error. Data pages fail on their
+  own queries anyway, so nothing is served from a session that should have been revoked.
+  A removed user or a changed password still ends the session as soon as the database
+  answers again.
+  **Done when:** unit or db test; with Postgres stopped then started, the browser is still
+  signed in.
+
+- [x] **Task 12: Health check that only the DB can fail**
   **Complexity:** XS
   **Depends on:** Task 9
   **Do:** `api/health/route.ts`: run the DB and Mealie checks in parallel, give Mealie its own
   client with a ~2 s timeout, and log the version-mismatch warning once per process.
   **Done when:** unit or route test; a hung Mealie doesn't fail the response.
 
-- [ ] **Task 13: Week page doesn't wait on Mealie for stale recipes**
+- [x] **Task 13: Week page doesn't wait on Mealie for stale recipes**
   **Complexity:** S
   **Do:** `loadRecipes` returns cached rows straight away and refreshes stale ones in `after()`
   (`next/server`; check the bundled docs). It only fetches inline for slugs with no cached row.

@@ -6,7 +6,7 @@ import { formatRange } from "@/lib/format";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
 import { addDays, isIsoDate, weekStartOf } from "@/server/domain/week";
-import { MealieError } from "@/server/mealie/client";
+import { isMealieUnavailable } from "@/server/mealie/client";
 import { requireUser } from "@/server/session";
 import { type ShopList, weekShopList } from "@/server/shopping";
 
@@ -33,9 +33,7 @@ export default async function ShopPage({
   try {
     list = await weekShopList(getDb(), weekStart);
   } catch (err) {
-    if (
-      !(err instanceof MealieError || (err as Error).name === "TimeoutError")
-    ) {
+    if (!isMealieUnavailable(err)) {
       throw err;
     }
     mealieDown = true;

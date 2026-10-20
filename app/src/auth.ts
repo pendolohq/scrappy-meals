@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb } from "@/server/db/client";
 import { createRateLimiter } from "@/server/rate-limit";
+import { refreshToken } from "@/server/session-token";
 import {
   findUserById,
   normaliseEmail,
@@ -87,15 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Sign-in: `user` is what authorize() returned.
         return { ...token, uid: user.id, sv: (user as { sv: number }).sv };
       }
-      // Every later request: drop the session if the user was removed or changed their password.
-      if (!token.uid) {
-        return null;
-      }
-      const current = await findUserById(getDb(), token.uid);
-      if (!current || current.sessionVersion !== token.sv) {
-        return null;
-      }
-      return { ...token, name: current.name, email: current.email };
+      return refreshToken(token, (id) => findUserById(getDb(), id));
     },
     session({ session, token }) {
       session.user = {

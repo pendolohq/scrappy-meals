@@ -60,7 +60,11 @@ portions, servings) are household-wide on purpose.
   must never be what keeps data private.
 - Sessions are JWTs (30 days) that carry a session version. Every request
   checks it against the database, so removing a user or changing a password
-  (`scrappy user passwd`) signs out every device.
+  (`scrappy user passwd`) signs out every device
+  (`src/server/session-token.ts`). The one exception: while Postgres can't be
+  reached, sessions are kept rather than all signed out. A revoked session then
+  gets only Mealie's recipe search and images, since everything else needs the
+  database, and ends on the first request after Postgres is back.
 - Auth.js sets the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` when
   `AUTH_URL` is https. Caddy terminates TLS; the app port isn't published.
 - Sign-in is rate-limited per IP and per email (`src/auth.ts`).

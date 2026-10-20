@@ -15,8 +15,10 @@ import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { addDays, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
+import { isMealieUnavailable } from "./mealie/client";
 import {
   type CachedRecipe,
+  type Defer,
   loadRecipes,
   type RecipeFetcher,
 } from "./recipe-cache";
@@ -67,6 +69,8 @@ export type WeekPlan = {
     meals: PlannedMeal[];
     fasting: Record<string, boolean>;
   }[];
+  /** The week's recipes by slug, as loaded for this plan. */
+  recipes: Map<string, CachedRecipe | null>;
 };
 
 export async function listMembers(db: Db): Promise<Member[]> {
@@ -88,7 +92,7 @@ export async function listMembers(db: Db): Promise<Member[]> {
 export async function getWeekPlan(
   db: Db,
   weekStart: string,
-  opts: { fetch?: RecipeFetcher } = {}
+  opts: { fetch?: RecipeFetcher; defer?: Defer } = {}
 ): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
   const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
@@ -187,6 +191,7 @@ export async function getWeekPlan(
         ])
       ),
     })),
+    recipes,
   };
 }
 
@@ -272,9 +277,18 @@ export async function addMeal(
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
-  const recipe = (
-    await loadRecipes(db, [input.slug], { ...opts, force: true })
-  ).get(input.slug);
+  const recipes = await loadRecipes(db, [input.slug], {
+    ...opts,
+    force: true,
+  }).catch((err: unknown) => {
+    if (isMealieUnavailable(err)) {
+      throw new PlanError(
+        "Mealie isn't reachable right now. Try again in a moment."
+      );
+    }
+    throw err;
+  });
+  const recipe = recipes.get(input.slug);
   if (!recipe) {
     throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
   }

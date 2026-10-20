@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
+import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
@@ -155,6 +156,44 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       now: later,
     });
     expect(deleted.get("soup")).toBeNull();
+  });
+
+  it("with defer, serves stale recipes at once and refreshes them afterwards", async () => {
+    const t0 = new Date("2026-10-19T10:00:00Z");
+    await loadRecipes(db, ["soup"], {
+      fetch: async (slug) => recipe(slug, 300),
+      now: t0,
+    });
+
+    const f = vi.fn<RecipeFetcher>(async (slug: string) => recipe(slug, 500));
+    const deferred: Array<() => Promise<void>> = [];
+    const later = new Date(t0.getTime() + 2 * 3600_000);
+    const loaded = await loadRecipes(db, ["soup", "new"], {
+      fetch: f,
+      now: later,
+      defer: (work) => deferred.push(work),
+    });
+    expect(loaded.get("soup")?.nutrition.perServing.kcal).toBe(300);
+    expect(loaded.get("new")?.name).toBe("Recipe new"); // not cached: fetched now
+    expect(f).toHaveBeenCalledTimes(1);
+
+    await Promise.all(deferred.map((work) => work()));
+    const refreshed = await loadRecipes(db, ["soup"], { fetch: f, now: later });
+    expect(refreshed.get("soup")?.nutrition.perServing.kcal).toBe(500);
+  });
+
+  it("says Mealie is down rather than that the recipe doesn't exist", async () => {
+    const { a } = await twoUsers();
+    const down = async () => {
+      throw new MealieUnavailableError("refused");
+    };
+    await expect(
+      addMeal(
+        db,
+        { date: "2026-10-22", slot: "lunch", slug: "soup", createdBy: a.id },
+        { fetch: down }
+      )
+    ).rejects.toThrow(/isn't reachable/);
   });
 
   it("shows a planned recipe that disappeared from Mealie as missing", async () => {

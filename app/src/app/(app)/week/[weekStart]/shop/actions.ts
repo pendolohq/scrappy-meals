@@ -7,7 +7,7 @@ import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { isIsoDate, weekStartOf } from "@/server/domain/week";
 import { RetryableError, UserFacingError } from "@/server/errors";
-import { MealieError } from "@/server/mealie/client";
+import { isMealieUnavailable, MealieError } from "@/server/mealie/client";
 import type { ShoppingItem } from "@/server/mealie/shopping";
 import { addShopItem, checkShopItem, removeShopItem } from "@/server/shopping";
 
@@ -15,12 +15,6 @@ const weekStart = z
   .string()
   .refine((d) => isIsoDate(d) && weekStartOf(d) === d, "invalid week");
 const itemId = z.uuid();
-
-/** Mealie down, overloaded or unreachable: worth trying again later. */
-const isTransient = (err: unknown) =>
-  err instanceof MealieError
-    ? err.status >= 500 || err.status === 429
-    : ["TimeoutError", "TypeError"].includes((err as Error).name);
 
 /**
  * Runs a Mealie change and refreshes the page. The action's response then
@@ -32,7 +26,7 @@ async function viaMealie<T>(week: string, work: () => Promise<T>): Promise<T> {
     revalidatePath(`/week/${week}/shop`);
     return result;
   } catch (err) {
-    if (isTransient(err)) {
+    if (isMealieUnavailable(err)) {
       console.error("shop list change failed", err);
       throw new RetryableError(
         "Mealie didn't answer. Your changes will save when it's back."

@@ -20,7 +20,7 @@ import {
   type ShoppingItem,
 } from "./mealie/shopping";
 import { getWeekPlan } from "./plan";
-import { loadRecipes, type RecipeFetcher } from "./recipe-cache";
+import type { RecipeFetcher } from "./recipe-cache";
 
 type Opts = { client?: MealieClient; fetch?: RecipeFetcher };
 
@@ -62,14 +62,9 @@ export async function weekShoppingList(
   const fetch = fetcher(opts);
   const plan = await getWeekPlan(db, weekStart, { fetch });
   const meals = plan.days.flatMap((d) => d.meals);
-  const recipes = await loadRecipes(
-    db,
-    meals.map((m) => m.slug),
-    { fetch }
-  );
   return buildShoppingList(
     meals.map((m) => {
-      const r = recipes.get(m.slug);
+      const r = plan.recipes.get(m.slug);
       return {
         slug: m.slug,
         baseServings: m.baseServings,
