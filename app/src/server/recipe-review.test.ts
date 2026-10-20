@@ -165,6 +165,15 @@ describe("loadReview", () => {
     });
   });
 
+  it("points at the photo only when Mealie has one", async () => {
+    const { deps, getRecipe } = makeDeps();
+    const id = "6f1e7c2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
+    getRecipe.mockResolvedValueOnce(recipe({ id, image: "abc" }));
+    expect((await loadReview("soup", deps))?.photoId).toBe(id);
+    getRecipe.mockResolvedValueOnce(recipe({ id, image: null }));
+    expect((await loadReview("soup", deps))?.photoId).toBeNull();
+  });
+
   it.each([
     ["0", 0],
     ["null", null],

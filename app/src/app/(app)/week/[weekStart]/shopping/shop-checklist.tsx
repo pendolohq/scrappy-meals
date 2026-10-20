@@ -6,7 +6,13 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { Check, ChevronDown, Plus, X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Card, cardClass } from "@/components/ui/card";
+import { IconButton } from "@/components/ui/icon-button";
+import { Input } from "@/components/ui/input";
+import { cx } from "@/lib/cx";
 import {
   applyQueue,
   flushQueue,
@@ -136,29 +142,33 @@ export const ShopChecklist = ({
   return (
     <div className="space-y-4">
       <form onSubmit={add} className="flex gap-2">
-        <input
+        <Input
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={200}
           placeholder="Add an item, e.g. coffee"
           aria-label="Add an item"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2"
+          className="min-w-0 flex-1"
         />
-        <button
-          type="submit"
-          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground"
-        >
+        <Button type="submit" className="shrink-0">
+          <Plus className="size-4" aria-hidden />
           Add
-        </button>
+        </Button>
       </form>
 
       {waiting && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          role="alert"
+          className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+        >
           {waiting}
         </p>
       )}
       {failed.length > 0 && (
-        <div role="alert" className="space-y-1 text-sm text-danger">
+        <div
+          role="alert"
+          className="space-y-1 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+        >
           {failed.map((message, i) => (
             // oxlint-disable-next-line react/no-array-index-key -- messages repeat and never reorder
             <p key={i}>Not saved: {message}</p>
@@ -166,7 +176,7 @@ export const ShopChecklist = ({
           <button
             type="button"
             onClick={() => setFailed([])}
-            className="text-xs text-muted underline"
+            className="min-h-tap text-xs text-muted underline"
           >
             Dismiss
           </button>
@@ -180,30 +190,35 @@ export const ShopChecklist = ({
       )}
 
       {groups.length === 0 && (
-        <p className="text-sm text-muted">Everything&apos;s in the basket.</p>
+        <Card className="py-8 text-center">
+          <p className="font-serif text-heading font-semibold">
+            Everything&apos;s in the basket.
+          </p>
+        </Card>
       )}
       {groups.map((g) => (
-        <section
-          key={g.label}
-          className="rounded-xl border border-border bg-card p-3"
-        >
-          <h2 className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">
+        <Card as="section" key={g.label} className="py-2 sm:py-3">
+          <h2 className="pt-2 text-xs font-semibold tracking-wider text-muted uppercase">
             {g.label}
           </h2>
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-border/70">
             {g.items.map((item) => (
               <ShopRow key={item.id} item={item} onChange={change} />
             ))}
           </ul>
-        </section>
+        </Card>
       ))}
 
       {done.length > 0 && (
-        <details className="rounded-xl border border-border bg-card p-3">
-          <summary className="cursor-pointer text-sm font-medium">
+        <details className={cx(cardClass(), "group py-2 sm:py-3")}>
+          <summary className="flex min-h-tap cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
             Done ({done.length})
+            <ChevronDown
+              className="size-4 text-muted transition group-open:rotate-180"
+              aria-hidden
+            />
           </summary>
-          <ul className="mt-1 divide-y divide-border">
+          <ul className="divide-y divide-border/70">
             {done.map((item) => (
               <ShopRow key={item.id} item={item} onChange={change} />
             ))}
@@ -229,37 +244,52 @@ const ShopRow = ({
   };
   return (
     <li className="flex items-center gap-2" data-testid="shop-item">
-      <label className="flex min-h-11 flex-1 items-center gap-3 py-1">
-        <input
-          type="checkbox"
-          checked={item.checked}
-          onChange={(e) =>
-            onChange({
-              id: crypto.randomUUID(),
-              kind: "check",
-              itemId: item.id,
-              checked: e.target.checked,
-            })
-          }
-          className="size-5 accent-accent"
-        />
-        <span className={item.checked ? "text-muted line-through" : ""}>
+      <label className="flex min-h-14 flex-1 cursor-pointer items-center gap-3 py-2">
+        {/* A round check like a paper list; still a real checkbox underneath. */}
+        <span className="relative flex size-6 shrink-0 items-center justify-center">
+          <input
+            type="checkbox"
+            checked={item.checked}
+            onChange={(e) =>
+              onChange({
+                id: crypto.randomUUID(),
+                kind: "check",
+                itemId: item.id,
+                checked: e.target.checked,
+              })
+            }
+            className="peer size-6 cursor-pointer appearance-none rounded-full border-2 border-border-strong bg-card transition checked:border-accent checked:bg-accent"
+          />
+          <Check
+            className="pointer-events-none absolute size-3.5 text-accent-foreground opacity-0 peer-checked:opacity-100"
+            strokeWidth={3}
+            aria-hidden
+          />
+        </span>
+        <span
+          className={cx(
+            "min-w-0 flex-1",
+            item.checked ? "text-muted line-through" : "font-medium"
+          )}
+        >
           {item.text}
         </span>
         {item.pending && (
-          <span className="text-xs text-muted" title="Not saved yet">
-            •
+          <span
+            className="size-2 shrink-0 rounded-full bg-highlight"
+            title="Not saved yet"
+          >
+            <span className="sr-only">Not saved yet</span>
           </span>
         )}
       </label>
-      <button
-        type="button"
+      <IconButton
+        label={`Remove ${item.text}`}
         onClick={remove}
-        aria-label={`Remove ${item.text}`}
-        className="size-11 shrink-0 rounded-full text-muted"
+        className="-mr-2"
       >
-        ×
-      </button>
+        <X className="size-4" aria-hidden />
+      </IconButton>
     </li>
   );
 };
