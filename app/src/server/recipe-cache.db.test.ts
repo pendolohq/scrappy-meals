@@ -14,6 +14,8 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   sourceUrl: null,
   importState: { review: "done", nutrition: null },
   ingredients: [],
+  instructions: [],
+  notes: [],
   nutrition: { perServing: {}, missing: [], status: "missing" },
   ...over,
 });
@@ -50,6 +52,20 @@ describe.skipIf(!testDbUrl)("recipe cache (Postgres)", () => {
       sourceUrl: null,
       reviewState: "done",
       nutritionSource: "reviewed",
+    });
+  });
+
+  it("caches instructions and notes for the recipe page", async () => {
+    const rows = await loadRecipes(db, ["soup"], {
+      fetch: async () =>
+        recipe({
+          instructions: [{ title: null, text: "Simmer." }],
+          notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
+        }),
+    });
+    expect(rows.get("soup")).toMatchObject({
+      instructions: [{ title: null, text: "Simmer." }],
+      notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
     });
   });
 });

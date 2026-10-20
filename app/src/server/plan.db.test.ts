@@ -1,11 +1,14 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
+import { recipeCache } from "./db/schema";
 import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
+  getMeal,
   getWeekPlan,
   PlanError,
   removeMeal,
@@ -24,6 +27,8 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
   sourceUrl: null,
   importState: { review: "done", nutrition: null },
   ingredients: [],
+  instructions: [],
+  notes: [],
   nutrition: {
     perServing: { kcal, protein: 20, carbs: 40, fat: 15, fibre: 6 },
     missing: [],
@@ -238,6 +243,91 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
     expect(after.days[3].meals[0]).toMatchObject({
       slug: "temp",
       recipe: null,
+    });
+  });
+
+  describe("getMeal", () => {
+    it("returns one meal with its portions, members and whole recipe", async () => {
+      const { a, b } = await twoUsers();
+      const withSteps = vi.fn<RecipeFetcher>(async (slug) => ({
+        ...recipe(slug),
+        instructions: [{ title: null, text: "Simmer." }],
+      }));
+      const id = await addMeal(
+        db,
+        { date: "2026-10-22", slot: "dinner", slug: "soup", createdBy: a.id },
+        { fetch: withSteps }
+      );
+      await setPortion(db, id, b.id, 0.5);
+
+      const meal = await getMeal(db, id, { fetch: withSteps });
+      expect(meal).toMatchObject({
+        id,
+        date: "2026-10-22",
+        slot: "dinner",
+        slug: "soup",
+        baseServings: 1,
+        portions: { [a.id]: 1, [b.id]: 0.5 },
+        recipe: {
+          name: "Recipe soup",
+          servings: 4,
+          instructions: [{ title: null, text: "Simmer." }],
+        },
+      });
+      expect(meal?.members.map((m) => m.name)).toEqual(["A", "B"]);
+      expect(withSteps).toHaveBeenCalledTimes(1); // served from the cache
+    });
+
+    it("is null for a meal that doesn't exist", async () => {
+      expect(
+        await getMeal(db, "00000000-0000-4000-8000-0000000000ff", { fetch })
+      ).toBeNull();
+    });
+
+    it("fetches instructions for a recipe cached before they were kept", async () => {
+      const { a } = await twoUsers();
+      const id = await addMeal(
+        db,
+        { date: "2026-10-22", slot: "dinner", slug: "soup", createdBy: a.id },
+        { fetch }
+      );
+      await db
+        .update(recipeCache)
+        .set({ instructions: null, notes: null })
+        .where(eq(recipeCache.slug, "soup"));
+
+      const meal = await getMeal(db, id, {
+        fetch: async (slug) => ({
+          ...recipe(slug),
+          instructions: [{ title: null, text: "Simmer." }],
+        }),
+      });
+      expect(meal?.recipe?.instructions).toEqual([
+        { title: null, text: "Simmer." },
+      ]);
+    });
+
+    it("keeps the cached recipe when Mealie is down", async () => {
+      const { a } = await twoUsers();
+      const id = await addMeal(
+        db,
+        { date: "2026-10-22", slot: "dinner", slug: "soup", createdBy: a.id },
+        { fetch }
+      );
+      await db
+        .update(recipeCache)
+        .set({ instructions: null, fetchedAt: new Date("2020-01-01") })
+        .where(eq(recipeCache.slug, "soup"));
+      const down = async () => {
+        throw new MealieUnavailableError("refused");
+      };
+
+      const meal = await getMeal(db, id, { fetch: down });
+      expect(meal?.recipe).toMatchObject({
+        name: "Recipe soup",
+        instructions: null,
+      });
+      expect(meal?.portions[a.id]).toBe(1);
     });
   });
 });

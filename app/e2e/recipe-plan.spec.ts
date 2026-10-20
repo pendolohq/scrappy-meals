@@ -64,10 +64,10 @@ test("an imported recipe is flagged in the plan until it is reviewed", async ({
     0
   );
   await expect(after.getByText("≈ Estimated nutrition")).toHaveCount(0);
-  // The meal name leads to the recipe page too.
+  // The meal name leads to the meal's recipe page.
   await expect(after.getByRole("link", { name: reel.name })).toHaveAttribute(
     "href",
-    `/recipes/${reel.slug}/review`
+    new RegExp(`^/week/${weekStartOf(today())}/meals/[0-9a-f-]{36}$`)
   );
 
   // The smoke test pushes this week's shopping list and expects only its own

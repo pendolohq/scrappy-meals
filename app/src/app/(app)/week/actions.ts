@@ -6,7 +6,7 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
-import { isIsoDate, today, weekStartOf } from "@/server/domain/week";
+import { isIsoDate, today } from "@/server/domain/week";
 import {
   addMeal,
   mealDate,
@@ -22,10 +22,15 @@ import {
 const date = z.string().refine(isIsoDate, "invalid date");
 const id = z.uuid();
 
-/** Refreshes the week that `day` belongs to; returns the empty success result. */
+/**
+ * Refreshes the week pages and the pages under them (a meal's recipe page,
+ * shopping); returns the empty success result. `"layout"` only reaches nested
+ * pages with the route pattern, not a literal path, so this covers every week:
+ * they are all rendered per request anyway.
+ */
 function refreshWeek(day: string | null) {
   if (day) {
-    revalidatePath(`/week/${weekStartOf(day)}`);
+    revalidatePath("/week/[weekStart]", "layout");
   }
   return {};
 }

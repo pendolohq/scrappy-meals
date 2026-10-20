@@ -19,6 +19,10 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
   review page then shows the parsed ingredients (uncertain lines highlighted),
   servings and nutrition to check before the recipe counts as done; the plan
   flags it until then.
+- **Cook from the plan**: each planned meal opens its recipe (photo,
+  nutrition, ingredients, method, notes) for everyone signed in, with no Mealie
+  account. Portions can be changed there too; "cooking for" rescales the
+  ingredients for batch cooking without touching the plan.
 - **Shopping list**: the week's ingredients scaled by everyone's portions,
   merged by food and unit, and sent to a Mealie shopping list.
 - **Shop from the planner**: once sent, the same page is a checklist over that
@@ -26,7 +30,8 @@ handles the shared weekly plan and talks to Mealie only through its REST API.
   save once you're back online, and both phones see each other's ticks.
 - **Adherence**: one tap per meal (stuck / partly / skipped / swapped) and a
   weekly summary.
-- **Installable**: mobile-first PWA; recently viewed weeks work offline.
+- **Installable**: mobile-first PWA; recently viewed weeks and recipes work
+  offline.
 
 ## Layout
 

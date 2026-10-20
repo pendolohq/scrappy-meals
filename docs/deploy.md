@@ -121,6 +121,19 @@ ssh -L 9000:<that address>:9000 deploy@<server>
 
 Then publish it: `docker compose up -d caddy`.
 
+**Who needs a Mealie account.** Only people who add or edit recipes. Everyone
+signed in to the planner can read a planned meal's recipe there (ingredients,
+method, notes) without one. Mealie stays public at `recipes.<domain>`, behind
+its own login, with sign-up off (`ALLOW_SIGNUP=false`). To add an editor, as
+the admin either:
+- create them under Admin → Users → Create User, in the same household as the
+  planner's Mealie user, or
+- send an invite link from the household's settings (Members → Invite). It
+  works with sign-up off and puts them in that household.
+
+The planner's recipe page links to Mealie ("Edit in Mealie") at
+`MEALIE_PUBLIC_URL`; the link only works for people with an account.
+
 Recipes work best in the planner when they have:
 - a **servings** count (needed to scale the shopping list),
 - **nutrition** filled in (per serving),

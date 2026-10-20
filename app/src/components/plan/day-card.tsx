@@ -4,6 +4,7 @@ import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import { dayParts, formatDay } from "@/lib/format";
 import { personDayTotals } from "@/server/domain/macros";
+import { weekStartOf } from "@/server/domain/week";
 import {
   type Member,
   type PlannedMeal,
@@ -135,6 +136,7 @@ export const DayCard = ({
                     <MealRow
                       key={meal.id}
                       meal={meal}
+                      weekStart={weekStartOf(date)}
                       members={members}
                       currentUserId={currentUserId}
                       canLog={isPastOrToday}

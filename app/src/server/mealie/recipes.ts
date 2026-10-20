@@ -8,6 +8,8 @@ import type { components } from "./schema";
 type MealieRecipe = components["schemas"]["Recipe-Output"];
 type MealieSummary = components["schemas"]["RecipeSummary"];
 type MealieIngredient = components["schemas"]["RecipeIngredient-Output"];
+type MealieStep = components["schemas"]["RecipeStep"];
+type MealieNote = components["schemas"]["RecipeNote"];
 
 export type RecipeListItem = {
   id: string | null;
@@ -26,12 +28,24 @@ export type Ingredient = {
   note: string;
   /** Mealie's rendered line, e.g. "2 cups flour, sifted". */
   display: string;
+  /** Section heading shown above this line ("For the sauce"). */
+  title?: string | null;
 };
+
+export type RecipeStep = {
+  /** Section heading shown above this step ("For the sauce"). */
+  title: string | null;
+  text: string;
+};
+
+export type RecipeNote = { title: string; text: string };
 
 export type Recipe = RecipeListItem & {
   id: string;
   nutrition: RecipeNutrition;
   ingredients: Ingredient[];
+  instructions: RecipeStep[];
+  notes: RecipeNote[];
   /** The page or post the recipe was imported from (Mealie's orgURL). */
   sourceUrl: string | null;
   importState: ImportState;
@@ -89,6 +103,8 @@ export function toRecipe(r: MealieRecipe): Recipe {
     id: r.id,
     nutrition: normaliseNutrition(r.nutrition),
     ingredients: (r.recipeIngredient ?? []).map(toIngredient),
+    instructions: (r.recipeInstructions ?? []).flatMap(toStep),
+    notes: (r.notes ?? []).flatMap(toNote),
     sourceUrl: r.orgURL || null,
     importState: readImportState(r.extras),
   };
@@ -128,5 +144,18 @@ function toIngredient(i: MealieIngredient): Ingredient {
     unit,
     note: i.note ?? "",
     display: i.display || i.originalText || i.note || "",
+    title: i.title?.trim() || null,
   };
+}
+
+function toStep(s: MealieStep): RecipeStep[] {
+  const title = s.title?.trim() || null;
+  const text = s.text.trim();
+  return title || text ? [{ title, text }] : [];
+}
+
+function toNote(n: MealieNote): RecipeNote[] {
+  const title = n.title.trim();
+  const text = n.text.trim();
+  return title || text ? [{ title, text }] : [];
 }

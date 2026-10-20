@@ -101,6 +101,11 @@ export default async function globalSetup() {
         note: "",
       },
     ],
+    recipeInstructions: [
+      { title: "Soup", text: "Rinse the lentils." },
+      { text: "Simmer for 20 minutes." },
+    ],
+    notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
   });
 
   // A recipe that already came from a web page, for the duplicate check on
