@@ -1,0 +1,37 @@
+# Local development only: Postgres and Mealie for `bun run dev`, published on
+# localhost. Set up with scripts/dev-up.sh; the production stack is
+# docker-compose.yml. Its own project name keeps its volumes apart from that one.
+name: scrappy-meals-dev
+
+services:
+  postgres:
+    # Same image as docker-compose.yml.
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      # Throwaway local data, reachable only from this machine: no password.
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: planner
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mealie:
+    # Keep the tag in step with docker-compose.yml: the app's Mealie client is
+    # generated from that version. Uses Mealie's built-in SQLite and default admin.
+    image: ${MEALIE_IMAGE:-ghcr.io/mealie-recipes/mealie}:v3.29.0
+    environment:
+      BASE_URL: http://localhost:9000
+      ALLOW_SIGNUP: "false"
+      UVICORN_WORKERS: 1
+    ports: ["127.0.0.1:9000:9000"]
+    volumes:
+      - mealie-data:/app/data
+
+volumes:
+  pgdata: {}
+  mealie-data: {}
