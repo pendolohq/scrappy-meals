@@ -78,9 +78,8 @@ export const DayCard = ({
     baseServings: m.baseServings,
     portions: m.portions,
   }));
-  const cols = {
-    gridTemplateColumns: `repeat(${Math.max(members.length, 1)}, minmax(0, 1fr))`,
-  };
+  // The week shows the viewer's own numbers; the Plan page has everyone's portions.
+  const viewer = members.find((m) => m.id === currentUserId);
 
   return (
     <section
@@ -98,24 +97,17 @@ export const DayCard = ({
         {isToday && <Pill tone="highlight">Today</Pill>}
       </div>
 
-      {members.length > 0 && (
-        <div
-          className="mb-4 grid gap-x-4 gap-y-3 rounded-control bg-sunken/70 p-3"
-          style={cols}
-        >
-          {members.map((m) => (
-            <PersonTotals
-              key={m.id}
-              member={m}
-              totals={personDayTotals(forMacros, m.id)}
-              date={date}
-              fasting={fasting[m.id] ?? false}
-              isSelf={m.id === currentUserId}
-              plannedPortions={
-                meals.filter((meal) => (meal.portions[m.id] ?? 0) > 0).length
-              }
-            />
-          ))}
+      {viewer && (
+        <div className="mb-4 rounded-control bg-sunken/70 p-3">
+          <PersonTotals
+            member={viewer}
+            totals={personDayTotals(forMacros, viewer.id)}
+            date={date}
+            fasting={fasting[viewer.id] ?? false}
+            plannedPortions={
+              meals.filter((meal) => (meal.portions[viewer.id] ?? 0) > 0).length
+            }
+          />
         </div>
       )}
 

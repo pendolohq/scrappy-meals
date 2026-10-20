@@ -82,10 +82,9 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
     .getByRole("button", { name: `Less (Sam's portion of ${recipe.name})` })
     .click();
   await expect(meal.getByTestId("portion").nth(1)).toHaveText("½×");
-  await expect(meal.getByTestId("portion-text").nth(1)).toHaveText("½×");
-  await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText(
-    "200"
-  );
+  // The week shows Alex's own numbers; Sam's portion is one short line.
+  await expect(meal.getByTestId("portions")).toHaveText("You 1× · Sam ½×");
+  await expect(day.getByTestId("totals-Sam")).toHaveCount(0);
 
   // One tap to log it.
   const stuck = meal.getByRole("button", {
@@ -171,12 +170,17 @@ test("the other person sees the plan and logs only their own meals", async ({
 }) => {
   const { recipe } = state();
   await signIn(page, USERS.sam);
-  const meal = page
-    .locator(`section[aria-label="${formatDay(today())}"]`)
-    .getByTestId("meal")
-    .filter({ hasText: recipe.name });
-  await expect(meal.getByTestId("adherence-badge")).toHaveText("✓ Stuck to it");
+  const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
+  const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
+  await expect(meal.getByTestId("adherence-mark")).toHaveText(/Stuck to it/);
   await expect(meal.getByRole("group", { name: /How did/ })).toHaveCount(1); // Sam's own buttons only
+
+  // Sam's own totals and portion; Alex's only as their portion in the line.
+  await expect(day.getByTestId("totals-Sam").getByTestId("kcal")).toHaveText(
+    "200"
+  );
+  await expect(day.getByTestId("totals-Alex")).toHaveCount(0);
+  await expect(meal.getByTestId("portions")).toHaveText(/^You ½× · Alex 1×/);
 
   // One shopping page only: the header has no separate "Shop" link.
   await expect(
