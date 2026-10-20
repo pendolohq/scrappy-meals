@@ -3,6 +3,7 @@ import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { DayCard } from "@/components/plan/day-card";
+import { DayCarousel } from "@/components/plan/day-carousel";
 import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
@@ -24,6 +25,7 @@ export default async function WeekPage({
   const weekStart = canonicalWeek((await params).weekStart);
   const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
   const now = today();
+  const dates = plan.days.map((day) => day.date);
 
   return (
     <div className="space-y-5 pb-8" data-wide>
@@ -42,7 +44,14 @@ export default async function WeekPage({
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>
       )}
-      <div className="space-y-5 xl:hidden">
+      {/* Opens on today in this week; any other week opens on its Monday. */}
+      <DayCarousel
+        key={weekStart}
+        dates={dates}
+        today={now}
+        initial={dates.includes(now) ? now : weekStart}
+        className="xl:hidden"
+      >
         {plan.days.map((day) => (
           <DayCard
             key={day.date}
@@ -56,7 +65,7 @@ export default async function WeekPage({
             isPastOrToday={day.date <= now}
           />
         ))}
-      </div>
+      </DayCarousel>
       <WeekGrid
         plan={plan}
         today={now}
