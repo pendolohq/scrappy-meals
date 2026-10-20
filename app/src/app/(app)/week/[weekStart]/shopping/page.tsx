@@ -1,8 +1,9 @@
-import { ExternalLink, TriangleAlert } from "lucide-react";
+import { ChevronDown, ExternalLink, TriangleAlert } from "lucide-react";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Card, cardClass } from "@/components/ui/card";
 import { WeekHeader } from "@/components/week-header";
+import { cx } from "@/lib/cx";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
 import type { WeekIngredients } from "@/server/domain/shopping";
@@ -183,9 +184,13 @@ export default async function ShoppingPage({
       <PushButton weekStart={weekStart} disabled={empty} pushedBefore={sent} />
 
       {sent && (
-        <details className={cardClass()}>
-          <summary className="flex min-h-tap cursor-pointer items-center text-sm font-medium">
+        <details className={cx(cardClass(), "group")}>
+          <summary className="flex min-h-tap cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
             What the plan needs ({needed} item{needed === 1 ? "" : "s"})
+            <ChevronDown
+              className="size-4 text-muted transition group-open:rotate-180"
+              aria-hidden
+            />
           </summary>
           <div className="mt-3 space-y-4">
             <Preview list={plan} />

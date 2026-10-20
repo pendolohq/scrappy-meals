@@ -131,12 +131,15 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? "Saving…" : "Save"}
         </Button>
-        {state.ok && (
-          <p className="flex items-center gap-1.5 text-sm font-medium text-accent">
-            <Check className="size-4" aria-hidden />
-            Saved.
-          </p>
-        )}
+        {/* Always in the page so screen readers announce "Saved" when it appears. */}
+        <output className="flex items-center gap-1.5 text-sm font-medium text-accent">
+          {state.ok && (
+            <>
+              <Check className="size-4" aria-hidden />
+              Saved.
+            </>
+          )}
+        </output>
       </div>
     </form>
   );
