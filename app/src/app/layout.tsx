@@ -29,8 +29,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // --background in globals.css; metadata can't read CSS variables.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6efe0" },
-    { media: "(prefers-color-scheme: dark)", color: "#1e1a15" },
+    { media: "(prefers-color-scheme: light)", color: "#f2e8cf" },
+    { media: "(prefers-color-scheme: dark)", color: "#131a14" },
   ],
 };
 

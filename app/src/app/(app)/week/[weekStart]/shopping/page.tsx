@@ -58,7 +58,7 @@ const Preview = ({ list }: { list: WeekIngredients }) => {
                 </span>
               </span>
               <span
-                className="shrink-0 font-semibold text-accent tabular-nums"
+                className="shrink-0 font-semibold text-accent-ink tabular-nums"
                 data-testid="qty"
               >
                 {l.quantity === null
@@ -149,11 +149,11 @@ export default async function ShoppingPage({
 
       {(plan.missing.length > 0 || plan.unscaled.length > 0) && (
         <div
-          className="flex gap-3 rounded-control bg-highlight-soft px-4 py-3 text-sm"
+          className="flex gap-3 rounded-control bg-danger-soft px-4 py-3 text-sm"
           role="note"
         >
           <TriangleAlert
-            className="mt-0.5 size-4 shrink-0 text-highlight"
+            className="mt-0.5 size-4 shrink-0 text-danger"
             aria-hidden
           />
           <div className="space-y-1">
@@ -204,7 +204,7 @@ export default async function ShoppingPage({
             href={`${base}/shopping-lists/${shop.listId}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-tap items-center gap-1.5 font-medium text-accent underline-offset-2 hover:underline"
+            className="inline-flex min-h-tap items-center gap-1.5 font-medium text-accent-ink underline-offset-2 hover:underline"
           >
             Open “{shop.listName}” in Mealie
             <ExternalLink className="size-3.5" aria-hidden />

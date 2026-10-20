@@ -28,7 +28,7 @@ export default async function WeekPage({
         {weekStartOf(now) !== weekStart && (
           <Link
             href="/week"
-            className="inline-flex min-h-tap items-center font-medium text-accent"
+            className="inline-flex min-h-tap items-center font-medium text-accent-ink"
           >
             Back to this week
           </Link>

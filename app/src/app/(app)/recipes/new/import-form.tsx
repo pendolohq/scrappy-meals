@@ -61,7 +61,7 @@ export const ImportForm = () => {
         <output className="block rounded-control bg-accent-soft px-4 py-3 text-sm">
           <Link
             href={`/recipes/${encodeURIComponent(state.exists.slug)}/review`}
-            className="inline-flex items-center gap-1.5 font-medium text-accent underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1.5 font-medium text-accent-ink underline-offset-2 hover:underline"
           >
             Already imported: {state.exists.name}
             <ArrowRight className="size-4" aria-hidden />

@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 export const inputClass = cx(
-  "block min-h-tap w-full rounded-control border border-border-strong bg-card px-3.5 text-base text-foreground",
+  "block min-h-tap w-full rounded-button border border-border-strong bg-card px-3.5 text-base text-foreground",
   "placeholder:text-muted/80 transition",
   "focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0",
   "aria-invalid:border-danger disabled:opacity-60"

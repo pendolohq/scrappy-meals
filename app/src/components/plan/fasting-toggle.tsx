@@ -52,7 +52,7 @@ export const FastingToggle = ({
       >
         <span
           className={cx(
-            pillClass(fasting ? "solid" : "neutral"),
+            pillClass(fasting ? "solid" : "neutral", true),
             "border transition",
             fasting
               ? "border-transparent"

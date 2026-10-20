@@ -103,7 +103,7 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
           {WEEKDAYS.map((day, i) => (
             <label
               key={day}
-              className="relative flex min-h-tap cursor-pointer items-center gap-1.5 rounded-full border border-border-strong bg-card px-4 text-sm font-medium transition hover:bg-sunken has-checked:border-accent has-checked:bg-accent has-checked:text-accent-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent"
+              className="relative flex min-h-tap cursor-pointer items-center gap-1.5 rounded-button border border-border-strong bg-card px-4 text-sm font-medium transition hover:bg-sunken has-checked:border-accent has-checked:bg-accent has-checked:text-accent-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent"
             >
               <input
                 type="checkbox"
@@ -132,7 +132,7 @@ export const SettingsForm = ({ profile }: { profile: ProfileInput }) => {
           {pending ? "Saving…" : "Save"}
         </Button>
         {/* Always in the page so screen readers announce "Saved" when it appears. */}
-        <output className="flex items-center gap-1.5 text-sm font-medium text-accent">
+        <output className="flex items-center gap-1.5 text-sm font-medium text-highlight">
           {state.ok && (
             <>
               <Check className="size-4" aria-hidden />

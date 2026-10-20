@@ -47,14 +47,14 @@ export const PushButton = ({
         </p>
       )}
       {state.ok && (
-        <output className="block rounded-control bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
+        <output className="block rounded-control bg-highlight-soft px-4 py-3 text-sm font-medium text-highlight">
           Added {state.ok.added} item{state.ok.added === 1 ? "" : "s"} to “
           {state.ok.listName}”
           {state.ok.replaced ? `, replacing ${state.ok.replaced}` : ""}.
         </output>
       )}
       {state.ok && state.ok.merged > 0 && (
-        <p className="rounded-control bg-highlight-soft px-4 py-3 text-sm text-highlight">
+        <p className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger">
           {state.ok.merged === 1
             ? "1 item was added to a line already on the list in Mealie"
             : `${state.ok.merged} items were added to lines already on the list in Mealie`}

@@ -19,7 +19,7 @@ const tone = (total: number, target: number) => {
     return "bg-danger";
   }
   if (ratio >= 0.9) {
-    return "bg-accent";
+    return "bg-highlight";
   }
   return "bg-muted/60";
 };

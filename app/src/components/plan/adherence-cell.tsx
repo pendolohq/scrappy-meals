@@ -12,10 +12,10 @@ import {
 } from "@/server/domain/adherence";
 
 const TONE: Record<AdherenceStatus, PillTone> = {
-  stuck: "accent",
+  stuck: "highlight",
   partial: "neutral",
   swapped: "neutral",
-  skipped: "highlight",
+  skipped: "danger",
 };
 
 type Log = { status: AdherenceStatus; note: string | null } | undefined;
@@ -71,7 +71,7 @@ export const AdherenceButtons = ({
     // Four 44px buttons need 11rem; a narrower column gets two rows.
     <div className="@container space-y-1">
       <fieldset
-        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-2 rounded-[1.5rem] border border-border bg-card p-0.5 @[11rem]:grid-cols-4 @[11rem]:rounded-full"
+        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-2 rounded-button border border-border bg-card p-0.5 @[11rem]:grid-cols-4"
         aria-label={`How did ${mealName} go?`}
       >
         {ADHERENCE_STATUSES.map((s) => {
@@ -90,7 +90,7 @@ export const AdherenceButtons = ({
               }
               onClick={() => choose(s)}
               className={cx(
-                "h-tap min-w-0 rounded-full text-sm transition disabled:opacity-60",
+                "h-tap min-w-0 rounded-[3px] text-sm transition disabled:opacity-60",
                 active
                   ? "bg-accent font-semibold text-accent-foreground shadow-card"
                   : "text-muted hover:bg-sunken hover:text-foreground"

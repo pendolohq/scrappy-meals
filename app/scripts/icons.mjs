@@ -4,13 +4,13 @@ import sharp from "sharp";
 
 const out = new URL("../public/icons/", import.meta.url);
 
-// A steaming bowl on the app's olive, in cream. `pad` shrinks the artwork for maskable
+// A steaming bowl on the app's red, in cream. `pad` shrinks the artwork for maskable
 // icons, whose outer 20% may be cropped into a circle or squircle.
 const svg = (pad) => `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#4f6b30"/>
-  <g transform="translate(256 256) scale(${1 - pad}) translate(-256 -256)" fill="none" stroke="#fffaf0" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M96 248h320a160 136 0 0 1-320 0z" fill="#fffaf0" stroke="none"/>
+  <rect width="512" height="512" fill="#bc4749"/>
+  <g transform="translate(256 256) scale(${1 - pad}) translate(-256 -256)" fill="none" stroke="#f2e8cf" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 248h320a160 136 0 0 1-320 0z" fill="#f2e8cf" stroke="none"/>
     <path d="M200 120c-12 28 12 44 0 72M256 104c-12 28 12 44 0 72M312 120c-12 28 12 44 0 72"/>
     <path d="M176 424h160"/>
   </g>

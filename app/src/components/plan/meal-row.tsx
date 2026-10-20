@@ -82,7 +82,7 @@ const Stepper = ({
   min?: number;
 }) => {
   const btn =
-    "flex size-tap items-center justify-center rounded-full border border-border-strong bg-card text-foreground transition hover:bg-sunken disabled:opacity-40";
+    "flex size-tap items-center justify-center rounded-button border border-border-strong bg-card text-foreground transition hover:bg-sunken disabled:opacity-40";
   return (
     <fieldset
       className="flex min-w-0 items-center justify-center gap-1"

@@ -8,8 +8,8 @@ export default function WeekLoading() {
           <div className="h-4 w-28 animate-pulse rounded-control bg-sunken" />
         </div>
         <div className="flex gap-2">
-          <div className="size-tap animate-pulse rounded-full bg-sunken" />
-          <div className="size-tap animate-pulse rounded-full bg-sunken" />
+          <div className="size-tap animate-pulse rounded-button bg-sunken" />
+          <div className="size-tap animate-pulse rounded-button bg-sunken" />
         </div>
       </div>
       {Array.from({ length: 3 }, (_, i) => (

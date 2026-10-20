@@ -1,54 +1,60 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. Cream paper with an olive accent and a terracotta highlight
- * (for "today" and other things that should catch the eye). Every text colour
- * here is WCAG AA on every surface it is used on: foreground, muted, accent,
- * highlight and danger on background, card, sunken and their own -soft tint.
+ * Design tokens, from the palette 386641 6a994e a7c957 f2e8cf bc4749:
+ * cream paper, a red accent for primary actions and a green highlight for
+ * "today" and things that went well. Every text colour here is WCAG AA on
+ * every surface it is used on (background, card, sunken and its own -soft).
+ * The palette red (#bc4749) is a fill only: as text it is under 4.5:1 on
+ * cream and on the dark surfaces, so red text uses --accent-ink instead.
  * --border-strong outlines controls (inputs, checkboxes, steppers), so it
  * keeps 3:1 against every surface; --border is for decoration only.
  */
 :root {
   color-scheme: light dark;
-  --background: #f6efe0;
-  --foreground: #2b2620;
-  --muted: #6f6353;
-  --card: #fffaf0;
+  --background: #f2e8cf;
+  --foreground: #1f2a20;
+  --muted: #5c5d4c;
+  --card: #faf4e4;
   /* Wells inside a card: inputs, option panels, stat tiles. */
-  --sunken: #efe6d3;
-  --border: #e4d9c3;
-  --border-strong: #8f7f62;
-  --accent: #4f6b30;
+  --sunken: #ebdfc1;
+  --border: #e0d3b2;
+  --border-strong: #857a5a;
+  --accent: #bc4749;
+  --accent-ink: #a13a3c;
   --accent-foreground: #ffffff;
-  --accent-soft: #e9eed9;
-  --highlight: #9c4a2b;
+  --accent-soft: #f5dcd4;
+  --highlight: #386641;
   --highlight-foreground: #ffffff;
-  --highlight-soft: #f6e4d7;
-  --danger: #b3261e;
+  --highlight-soft: #e2e9c8;
+  --danger: #9b2226;
   --danger-foreground: #ffffff;
-  --danger-soft: #fbe9e5;
-  --shadow-color: 60deg 30% 20%;
+  --danger-soft: #f6d9d3;
+  --shadow-color: 80deg 25% 15%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1e1a15;
-    --foreground: #f2ead9;
-    --muted: #b3a790;
-    --card: #28231c;
-    --sunken: #221e18;
-    --border: #3d362c;
-    --border-strong: #7d705c;
-    --accent: #a9c47f;
-    --accent-foreground: #1e1a15;
-    --accent-soft: #2f3424;
-    --highlight: #e8a07c;
-    --highlight-foreground: #1e1a15;
-    --highlight-soft: #3a2a20;
-    --danger: #f0907f;
-    --danger-foreground: #1e1a15;
-    --danger-soft: #3a2420;
-    --shadow-color: 30deg 30% 3%;
+    --background: #131a14;
+    --foreground: #f2e8cf;
+    --muted: #b5b096;
+    --card: #1b241c;
+    --sunken: #172018;
+    --border: #2c3a2d;
+    --border-strong: #66755f;
+    /* The palette red as-is: white on it is AA, and it keeps 3:1 against the
+       dark surfaces for focus rings and borders. */
+    --accent: #bc4749;
+    --accent-ink: #e07b7c;
+    --accent-foreground: #ffffff;
+    --accent-soft: #3a2224;
+    --highlight: #a7c957;
+    --highlight-foreground: #131a14;
+    --highlight-soft: #26331d;
+    --danger: #f08a7e;
+    --danger-foreground: #131a14;
+    --danger-soft: #3b1f1f;
+    --shadow-color: 120deg 30% 3%;
   }
 }
 
@@ -61,6 +67,7 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
   --color-highlight: var(--highlight);
@@ -91,6 +98,8 @@
 
   --radius-card: 1.25rem;
   --radius-control: 0.75rem;
+  /* Buttons, inputs and other things you press are squared off. */
+  --radius-button: 0.25rem;
   --radius-photo: 0.875rem;
 
   --shadow-card:
