@@ -1,6 +1,10 @@
 "use client";
 
 import { type FormEvent, startTransition, useActionState } from "react";
+import { CircleAlert } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
 
 import { login, type LoginState } from "./actions";
 
@@ -17,40 +21,39 @@ export const LoginForm = ({ next }: { next?: string }) => {
     startTransition(() => action(form));
   };
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-5">
       {next && <input type="hidden" name="next" value={next} />}
-      <label className="block">
-        <span className="text-sm text-muted">Email</span>
-        <input
+      <Field label="Email">
+        <Input
           name="email"
           type="email"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           required
-          className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2"
+          aria-invalid={state.error ? true : undefined}
         />
-      </label>
-      <label className="block">
-        <span className="text-sm text-muted">Password</span>
-        <input
+      </Field>
+      <Field label="Password">
+        <Input
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2"
+          aria-invalid={state.error ? true : undefined}
         />
-      </label>
+      </Field>
       {state.error && (
-        <p role="alert" className="text-sm text-danger">
-          {state.error}
-        </p>
+        <div className="flex items-start gap-2.5 rounded-control bg-danger-soft px-3.5 py-3 text-danger">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p role="alert" className="text-sm font-medium">
+            {state.error}
+          </p>
+        </div>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-lg bg-accent px-3 py-2 font-medium text-accent-foreground disabled:opacity-60"
-      >
+      <Button type="submit" size="lg" block disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 };
