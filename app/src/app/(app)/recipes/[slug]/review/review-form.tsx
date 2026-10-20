@@ -3,6 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 
+import {
+  parseDecimal,
+  THREE_DIGIT_GROUP,
+  type ThreeDigitGroup,
+} from "@/server/domain/decimal";
 import type { ReviewDraft } from "@/server/recipe-review";
 
 import { saveReviewAction } from "./actions";
@@ -28,15 +33,15 @@ const inputClass =
 
 /**
  * Empty is "not set" (null); anything unreadable becomes NaN and is refused.
- * "1,200" could be a thousand or a decimal comma, so it is refused too.
+ * "1,200" and "1.200" read the way the server reads Mealie's own values.
  */
-const toNumber = (text: string): number | null => {
-  const t = text.trim();
-  if (t === "") {
-    return null;
-  }
-  return /,\d{3}$/.test(t) ? Number.NaN : Number(t.replace(",", "."));
-};
+const toNumber = (
+  text: string,
+  threeDigitGroup: ThreeDigitGroup = "thousands"
+): number | null =>
+  text.trim() === ""
+    ? null
+    : (parseDecimal(text, threeDigitGroup) ?? Number.NaN);
 
 const macroTexts = (draft: ReviewDraft) =>
   Object.fromEntries(
@@ -99,7 +104,10 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
         // NaN is refused by the server with a message about servings.
         servings: toNumber(servings) ?? Number.NaN,
         nutrition: Object.fromEntries(
-          MACROS.map((m) => [m.key, toNumber(nutrition[m.key])])
+          MACROS.map((m) => [
+            m.key,
+            toNumber(nutrition[m.key], THREE_DIGIT_GROUP[m.key]),
+          ])
         ) as Record<(typeof MACROS)[number]["key"], number | null>,
         lines: lines.map((l, i) => {
           const asText = l.asText || l.food.trim() === "";
