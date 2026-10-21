@@ -8,12 +8,15 @@ import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
-import { isIsoDate } from "@/server/domain/week";
+import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
 import {
   addMeal,
+  copyWeek,
   mealDate,
+  moveMeal,
   PlanError,
   removeMeal,
+  removeMeals,
   setAdherence,
   setBaseServings,
   setFasting,
@@ -23,6 +26,12 @@ import { viewerToday } from "@/server/today";
 
 const date = z.string().refine(isIsoDate, "invalid date");
 const id = z.uuid();
+const slot = z.enum(SLOT_TYPES);
+const snackIndex = z
+  .int()
+  .min(0)
+  .max(MAX_SNACK_SLOTS - 1)
+  .default(0);
 
 /**
  * Refreshes the week pages and the pages under them (a meal's recipe page,
@@ -41,12 +50,8 @@ function refreshWeek(day: string | null) {
 export const addMealAction = userAction(
   z.object({
     date,
-    slot: z.enum(SLOT_TYPES),
-    snackIndex: z
-      .int()
-      .min(0)
-      .max(MAX_SNACK_SLOTS - 1)
-      .default(0),
+    slot,
+    snackIndex,
     slug: recipeSlug,
   }),
   async (data, user) => {
@@ -78,6 +83,39 @@ export const removeMealAction = userAction(
   async ({ mealId }) => {
     const day = await mealDate(getDb(), mealId);
     await removeMeal(getDb(), mealId);
+    return refreshWeek(day);
+  }
+);
+
+export const moveMealAction = userAction(
+  z.object({ mealId: id, date, slot, snackIndex }),
+  async ({ mealId, ...to }) => {
+    await moveMeal(getDb(), mealId, to);
+    return refreshWeek(to.date);
+  }
+);
+
+/** Copies last week's meals into the empty slots of `weekStart`. */
+export const copyLastWeekAction = userAction(
+  z.object({ weekStart: weekStartSchema }),
+  async ({ weekStart }, user) => {
+    const result = await copyWeek(
+      getDb(),
+      addDays(weekStart, -7),
+      weekStart,
+      user.id
+    );
+    refreshWeek(weekStart);
+    return result;
+  }
+);
+
+// A week holds a few dozen meals at most; the cap only bounds the input.
+export const undoCopyAction = userAction(
+  z.object({ mealIds: z.array(id).min(1).max(500) }),
+  async ({ mealIds }) => {
+    const day = await mealDate(getDb(), mealIds[0]);
+    await removeMeals(getDb(), mealIds);
     return refreshWeek(day);
   }
 );

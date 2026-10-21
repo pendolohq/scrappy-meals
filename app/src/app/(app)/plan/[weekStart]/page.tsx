@@ -2,11 +2,13 @@ import Link from "next/link";
 import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
+import { CopyLastWeek } from "@/components/plan/copy-last-week";
 import { PlanDay } from "@/components/plan/plan-day";
 import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
-import { getWeekPlan } from "@/server/plan";
+import { addDays } from "@/server/domain/week";
+import { getWeekPlan, hasMeals } from "@/server/plan";
 import { requireUser } from "@/server/session";
 import { viewerToday } from "@/server/today";
 
@@ -22,7 +24,10 @@ export default async function PlanPage({
 }) {
   await requireUser();
   const weekStart = canonicalWeek((await params).weekStart, "", "/plan");
-  const plan = await getWeekPlan(getDb(), weekStart, { defer: after });
+  const [plan, lastWeekHasMeals] = await Promise.all([
+    getWeekPlan(getDb(), weekStart, { defer: after }),
+    hasMeals(getDb(), addDays(weekStart, -7)),
+  ]);
   const now = await viewerToday();
 
   return (
@@ -33,6 +38,7 @@ export default async function PlanPage({
           See the week
         </Link>
       </WeekHeader>
+      {lastWeekHasMeals && <CopyLastWeek weekStart={weekStart} />}
 
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>

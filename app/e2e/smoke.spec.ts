@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { formatDay } from "../src/lib/format";
 import { createDb } from "../src/server/db/client";
-import { today, weekStartOf } from "../src/server/domain/week";
+import { addDays, today, weekStartOf } from "../src/server/domain/week";
 import { setPassword } from "../src/server/users";
 
 import { STATE_FILE, USERS } from "./global-setup";
@@ -78,6 +78,41 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
       .getByTestId("meal")
       .filter({ hasText: recipe.name })
   ).toBeVisible();
+
+  // Next week repeats this one: copy it in, see it on the Week page, then
+  // move the copy to another day from its options.
+  const nextWeek = addDays(week, 7);
+  const copyDay = addDays(today(), 7);
+  const moveDay = addDays(nextWeek, copyDay === nextWeek ? 1 : 0);
+  await page.goto(`/plan/${nextWeek}`);
+  await page.getByRole("button", { name: "Copy last week" }).click();
+  await expect(page.getByText("Copied 1 meal.")).toBeVisible();
+  await page.goto(`/week/${nextWeek}#${copyDay}`);
+  await expect(
+    page
+      .locator(`section[aria-label="${formatDay(copyDay)}"]`)
+      .getByTestId("meal")
+      .filter({ hasText: recipe.name })
+  ).toBeVisible();
+  await page.goto(`/plan/${nextWeek}`);
+  const copy = page
+    .locator(`section[aria-label="${formatDay(copyDay)}"]`)
+    .getByTestId("meal")
+    .filter({ hasText: recipe.name });
+  await copy
+    .getByRole("button", { name: `Options for ${recipe.name}` })
+    .click();
+  await copy.getByRole("button", { name: "Move", exact: true }).click();
+  await copy.getByLabel("Day").selectOption({ label: formatDay(moveDay) });
+  await copy.getByRole("button", { name: "Move here" }).click();
+  await expect(
+    page
+      .locator(`section[aria-label="${formatDay(moveDay)}"]`)
+      .getByRole("group", { name: "Lunch" })
+      .getByTestId("meal")
+      .filter({ hasText: recipe.name })
+  ).toBeVisible();
+  await expect(copy).toHaveCount(0);
 
   // The hash opens the phone's day carousel on today.
   await page.goto(`/week/${week}#${today()}`);

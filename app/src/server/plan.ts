@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import "server-only";
 
@@ -13,7 +13,7 @@ import {
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { slotRank, type SlotType } from "./domain/slots";
-import { addDays, weekDays } from "./domain/week";
+import { addDays, isoWeekday, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
 import { getSnackSlots } from "./household";
 import { isMealieUnavailable } from "./mealie/client";
@@ -348,6 +348,38 @@ export async function setFasting(
   });
 }
 
+/** Refuses a slot nobody can add to: a second "lunch", or a snack turned off in settings. */
+async function checkSlot(db: Db, slot: SlotType, snackIndex: number) {
+  if (slot !== "snack" && snackIndex !== 0) {
+    throw new PlanError("Only snacks have more than one slot a day");
+  }
+  if (slot === "snack" && snackIndex >= (await getSnackSlots(db))) {
+    throw new PlanError("That snack slot is turned off in settings");
+  }
+}
+
+/** The position after the last meal already in a day's slot, so a new one goes at the end. */
+async function nextPosition(
+  tx: Pick<Db, "select">,
+  date: string,
+  slot: SlotType,
+  snackIndex: number
+): Promise<number> {
+  const [{ next }] = await tx
+    .select({
+      next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
+    })
+    .from(mealSlots)
+    .where(
+      and(
+        eq(mealSlots.date, date),
+        eq(mealSlots.slot, slot),
+        eq(mealSlots.snackIndex, snackIndex)
+      )
+    );
+  return next;
+}
+
 /** Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone fasting that day. */
 export async function addMeal(
   db: Db,
@@ -361,12 +393,7 @@ export async function addMeal(
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   const snackIndex = input.snackIndex ?? 0;
-  if (input.slot !== "snack" && snackIndex !== 0) {
-    throw new PlanError("Only snacks have more than one slot a day");
-  }
-  if (input.slot === "snack" && snackIndex >= (await getSnackSlots(db))) {
-    throw new PlanError("That snack slot is turned off in settings");
-  }
+  await checkSlot(db, input.slot, snackIndex);
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
   const recipes = await loadRecipes(db, [input.slug], {
     ...opts,
@@ -396,18 +423,7 @@ export async function addMeal(
   // Two people adding to the same slot at the same moment can collide on
   // position; the second then gets "Something went wrong" and adds it again.
   return db.transaction(async (tx) => {
-    const [{ next }] = await tx
-      .select({
-        next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
-      })
-      .from(mealSlots)
-      .where(
-        and(
-          eq(mealSlots.date, input.date),
-          eq(mealSlots.slot, input.slot),
-          eq(mealSlots.snackIndex, snackIndex)
-        )
-      );
+    const next = await nextPosition(tx, input.date, input.slot, snackIndex);
     const [slot] = await tx
       .insert(mealSlots)
       .values({
@@ -466,6 +482,184 @@ export async function setBaseServings(
 
 export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
   await db.delete(mealSlots).where(eq(mealSlots.id, mealSlotId));
+}
+
+/**
+ * Moves a planned meal to another day or slot, after any meals already there.
+ * It keeps its id, so portions, servings and everyone's log go with it.
+ * Returns the day it left.
+ */
+export async function moveMeal(
+  db: Db,
+  mealSlotId: string,
+  to: { date: string; slot: SlotType; snackIndex?: number }
+): Promise<string> {
+  const snackIndex = to.snackIndex ?? 0;
+  await checkSlot(db, to.slot, snackIndex);
+  return db.transaction(async (tx) => {
+    const [meal] = await tx
+      .select()
+      .from(mealSlots)
+      .where(eq(mealSlots.id, mealSlotId))
+      .for("update");
+    if (!meal) {
+      throw new PlanError("That meal no longer exists");
+    }
+    if (
+      meal.date === to.date &&
+      meal.slot === to.slot &&
+      meal.snackIndex === snackIndex
+    ) {
+      return meal.date;
+    }
+    await tx
+      .update(mealSlots)
+      .set({
+        date: to.date,
+        slot: to.slot,
+        snackIndex,
+        position: await nextPosition(tx, to.date, to.slot, snackIndex),
+      })
+      .where(eq(mealSlots.id, mealSlotId));
+    return meal.date;
+  });
+}
+
+const slotKey = (date: string, slot: SlotType, snackIndex: number) =>
+  `${date}|${slot}|${snackIndex}`;
+
+const inWeek = (weekStart: string) =>
+  and(
+    gte(mealSlots.date, weekStart),
+    lte(mealSlots.date, addDays(weekStart, 6))
+  );
+
+export type CopyResult = {
+  /** The new meals' ids, to undo the copy. */
+  copied: string[];
+  /** Meals left out because their slot already had something planned. */
+  skipped: number;
+};
+
+/**
+ * Copies every meal of the week starting `from` into the same weekday and
+ * slot of the week starting `to`, with its portions and servings but not
+ * anyone's log. A slot that already has a meal is left as it is, and its
+ * meals from `from` are counted as skipped. Snacks keep their index even
+ * past the household's count, where they show as turned off. Portions follow
+ * the new day's fasting, as when adding a meal.
+ */
+export async function copyWeek(
+  db: Db,
+  from: string,
+  to: string,
+  createdBy: string
+): Promise<CopyResult> {
+  const sameWeekday = (date: string) => addDays(to, isoWeekday(date) - 1);
+
+  return db.transaction(async (tx) => {
+    // One after another: a transaction runs on a single connection.
+    const source = await tx
+      .select()
+      .from(mealSlots)
+      .where(inWeek(from))
+      .orderBy(asc(mealSlots.position));
+    const taken = await tx
+      .select({
+        date: mealSlots.date,
+        slot: mealSlots.slot,
+        snackIndex: mealSlots.snackIndex,
+      })
+      .from(mealSlots)
+      .where(inWeek(to));
+    const members = await tx
+      .select({ id: users.id, days: users.defaultFastingDays })
+      .from(users);
+    const overrides = await tx
+      .select()
+      .from(dayOverrides)
+      .where(
+        and(gte(dayOverrides.date, to), lte(dayOverrides.date, addDays(to, 6)))
+      );
+    const filled = new Set(
+      taken.map((t) => slotKey(t.date, t.slot, t.snackIndex))
+    );
+    const copying = source.filter(
+      (m) => !filled.has(slotKey(sameWeekday(m.date), m.slot, m.snackIndex))
+    );
+    if (copying.length === 0) {
+      return { copied: [], skipped: source.length };
+    }
+
+    const portions = await tx
+      .select()
+      .from(slotPortions)
+      .where(
+        inArray(
+          slotPortions.mealSlotId,
+          copying.map((m) => m.id)
+        )
+      );
+    const portionOf = new Map(
+      portions.map((p) => [`${p.mealSlotId}|${p.userId}`, p.multiplier])
+    );
+    const override = new Map(
+      overrides.map((o) => [`${o.userId}|${o.date}`, o.isFasting])
+    );
+
+    // The target slot is empty, so positions restart at 0 in the old order.
+    const positions = new Map<string, number>();
+    const rows = copying.map((m) => {
+      const date = sameWeekday(m.date);
+      const target = slotKey(date, m.slot, m.snackIndex);
+      const position = positions.get(target) ?? 0;
+      positions.set(target, position + 1);
+      return {
+        from: m.id,
+        meal: {
+          id: crypto.randomUUID(),
+          date,
+          slot: m.slot,
+          snackIndex: m.snackIndex,
+          position,
+          mealieRecipeSlug: m.mealieRecipeSlug,
+          baseServings: m.baseServings,
+          createdBy,
+        },
+      };
+    });
+    await tx.insert(mealSlots).values(rows.map((r) => r.meal));
+    const newPortions = rows.flatMap(({ from: original, meal }) =>
+      members.map((u) => ({
+        mealSlotId: meal.id,
+        userId: u.id,
+        multiplier: isFasting(
+          u.days,
+          meal.date,
+          override.get(`${u.id}|${meal.date}`)
+        )
+          ? 0
+          : (portionOf.get(`${original}|${u.id}`) ?? 1),
+      }))
+    );
+    if (newPortions.length > 0) {
+      await tx.insert(slotPortions).values(newPortions);
+    }
+    return {
+      copied: rows.map((r) => r.meal.id),
+      skipped: source.length - copying.length,
+    };
+  });
+}
+
+/** Removes several meals at once: undoing a copy. */
+export async function removeMeals(
+  db: Db,
+  mealSlotIds: string[]
+): Promise<void> {
+  if (mealSlotIds.length > 0) {
+    await db.delete(mealSlots).where(inArray(mealSlots.id, mealSlotIds));
+  }
 }
 
 /** The date a slot belongs to, for revalidating the right week. */

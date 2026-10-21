@@ -57,7 +57,12 @@ export const PlanDay = ({
               {inSlot.length > 0 && (
                 <ul className="space-y-2">
                   {inSlot.map((meal) => (
-                    <PlanMeal key={meal.id} meal={meal} members={members} />
+                    <PlanMeal
+                      key={meal.id}
+                      meal={meal}
+                      members={members}
+                      snackSlots={snackSlots}
+                    />
                   ))}
                 </ul>
               )}
