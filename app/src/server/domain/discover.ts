@@ -10,6 +10,12 @@ export type DiscoverState = {
 
 type Params = Record<string, string | string[] | undefined>;
 
+/**
+ * The highest `?page=` honoured. A page renders every page up to its own in
+ * one Mealie request, so a made-up page number mustn't ask for thousands.
+ */
+export const MAX_DISCOVER_PAGE = 20;
+
 const all = (value: string | string[] | undefined) =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
 
@@ -30,7 +36,10 @@ export function parseDiscoverParams(
     tags: pick("tag", known.tags),
     categories: pick("category", known.categories),
     quick: all(params.quick)[0] === "1",
-    page: Number.isInteger(page) && page > 1 ? page : 1,
+    page:
+      Number.isInteger(page) && page > 1
+        ? Math.min(page, MAX_DISCOVER_PAGE)
+        : 1,
   };
 }
 
@@ -51,6 +60,26 @@ export function discoverHref(state: DiscoverState): string {
   }
   const qs = query.toString();
   return qs ? `/recipes?${qs}` : "/recipes";
+}
+
+/** The page to load after the first `loaded` pages, or null when that was all. */
+export const nextDiscoverPage = (
+  loaded: number,
+  total: number,
+  pageSize: number
+): number | null => (loaded * pageSize < total ? loaded + 1 : null);
+
+/**
+ * The recipes shown so far followed by the next page's. Pages are fetched
+ * minutes apart and a recipe added in between shifts the rest along by one,
+ * so the next page can repeat the last one shown: it's kept only once.
+ */
+export function appendRecipes<T extends { slug: string }>(
+  shown: T[],
+  more: T[]
+): T[] {
+  const seen = new Set(shown.map((r) => r.slug));
+  return [...shown, ...more.filter((r) => !seen.has(r.slug))];
 }
 
 const toggled = (list: string[], slug: string) =>
