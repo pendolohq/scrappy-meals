@@ -57,7 +57,7 @@ describe("lookupOpenFoodFacts", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url, init] = fetcher.mock.calls[0];
     expect(String(url)).toBe(
-      "https://world.openfoodfacts.org/api/v3/product/5000159461122?fields=product_name,brands,quantity,product_quantity,product_quantity_unit,serving_quantity,serving_quantity_unit,nutriments"
+      "https://world.openfoodfacts.org/api/v3/product/5000159461122?fields=product_name,brands,quantity,product_quantity,product_quantity_unit,serving_quantity,serving_quantity_unit,image_front_url,nutriments"
     );
     const headers = new Headers(init?.headers);
     expect(headers.get("user-agent")).toBe(
@@ -129,6 +129,20 @@ describe("lookupOpenFoodFacts", () => {
       servingQuantity: 51,
     });
     expect(foundProduct(result).per100).toEqual({});
+  });
+
+  it("keeps the front photo only from Open Food Facts' image hosts", async () => {
+    const photo = async (image_front_url: unknown) =>
+      foundProduct(
+        await lookupOpenFoodFacts("5000159461122", {
+          fetch: answering(() => json(productBody({ image_front_url }))),
+        })
+      ).imageUrl;
+    const ok = "https://images.openfoodfacts.org/images/products/1/front.jpg";
+    await expect(photo(ok)).resolves.toBe(ok);
+    await expect(photo("https://evil.example/front.jpg")).resolves.toBeNull();
+    await expect(photo(42)).resolves.toBeNull();
+    await expect(photo(undefined)).resolves.toBeNull();
   });
 
   it("ignores _serving nutriments", async () => {

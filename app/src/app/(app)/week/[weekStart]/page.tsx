@@ -64,6 +64,7 @@ export default async function WeekPage({
             currentUserId={user.id}
             isToday={day.date === now}
             isPastOrToday={day.date <= now}
+            today={now}
           />
         ))}
       </DayCarousel>

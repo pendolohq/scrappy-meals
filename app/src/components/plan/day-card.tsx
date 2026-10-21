@@ -61,6 +61,7 @@ export const DayCard = ({
   currentUserId,
   isToday,
   isPastOrToday,
+  today,
 }: {
   date: string;
   meals: PlannedMeal[];
@@ -70,6 +71,7 @@ export const DayCard = ({
   currentUserId: string;
   isToday: boolean;
   isPastOrToday: boolean;
+  today: string;
 }) => {
   const forMacros = meals.map((m) => ({
     nutrition: m.recipe?.nutrition ?? null,
@@ -157,6 +159,7 @@ export const DayCard = ({
                         members={members}
                         currentUserId={currentUserId}
                         canLog={isPastOrToday}
+                        today={today}
                       />
                     ))}
                   </ul>

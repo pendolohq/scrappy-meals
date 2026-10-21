@@ -176,12 +176,13 @@ Snickers, Grenade, Huel, Kind and Fage ones above make good fixtures):
 - **Adherence leaves unplanned entries out entirely:** they are neither *unlogged* nor scored
   (`summariseAdherence` skips them; the week grid shows an "Unplanned" pill instead of the log
   buttons). They count in `personDayTotals` like any meal.
-- **Who ate it:** a product entry gives a portion of 1 to the person who added it and 0 to
-  everyone else, planned or not. Portions stay editable by anyone, as now. It keys on the
+- **Who ate it:** a product entry, and any unplanned entry (a recipe too), gives a portion of 1
+  to the person who added it and 0 to everyone else; a planned product does the same. Portions stay editable by anyone, as now. It keys on the
   session's `user.id`, never an id from the input. If that person is fasting that day, the
   entry is still added at 1, since they ate it; the sheet says so.
-- **Swaps:** "Swapped" stays a note for now. A follow-up can offer "Log what you had" from the
-  swap prompt, which opens the same sheet and adds an unplanned entry.
+- **Swaps:** a swapped log offers "Log what you had", which opens the Add dialog on the
+  Product tab; whatever is picked (a product, or a recipe from search) is added as an
+  unplanned entry for the person who swapped. The swapped meal keeps its log.
 - The Add snack dialog also lists **recent products** (the Product tag, most recently added
   first), so the second bar of the week is two taps with no scan, and something eaten in the
   shop can be logged at home from that list.
@@ -305,10 +306,11 @@ existing review page cover that.
 
 ### PR 4: follow-ups
 
-- [ ] Shopping: planned products as "Name ×N" free-text lines; unit test in
+- [x] Shopping: planned products as "Name ×N" free-text lines; unit test in
       `domain/shopping.test.ts`.
-- [ ] "Log what you had" from the Swapped prompt.
-- [ ] Product photo from OFF on the recipe; taking front and nutrition photos for OFF.
+- [x] "Log what you had" from the Swapped prompt.
+- [x] Product photo from OFF on the recipe.
+- [ ] Taking front and nutrition photos for OFF (needs PR 3's contribution account).
 
 ## Settled
 

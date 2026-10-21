@@ -9,6 +9,7 @@ import { shoppingPushes } from "./db/schema";
 import {
   buildShoppingList,
   formatAmounts,
+  formatProductLine,
   type WeekIngredients,
 } from "./domain/shopping";
 import { type MealieClient, MealieError } from "./mealie/client";
@@ -56,12 +57,14 @@ export async function weekShoppingList(
         slug: m.slug,
         baseServings: m.baseServings,
         portions: m.portions,
+        unplanned: m.unplanned,
         recipe: r
           ? {
               id: r.mealieId,
               name: r.name,
               servings: r.servings,
               ingredients: r.ingredients,
+              product: r.product,
             }
           : null,
       };
@@ -123,6 +126,11 @@ async function toItems(
 
   return [
     ...lines,
+    ...list.products.map((p) => ({
+      quantity: 0,
+      note: formatProductLine(p),
+      recipeIds: [p.recipeId],
+    })),
     ...list.freeText.map((f) => ({
       quantity: 0,
       note: `${f.text}${f.times > 1 ? ` (×${f.times})` : ""} · ${f.recipeName}`,

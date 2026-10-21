@@ -7,7 +7,11 @@ import { cx } from "@/lib/cx";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
 import { AISLES } from "@/server/domain/aisles";
-import { formatAmounts, type WeekIngredients } from "@/server/domain/shopping";
+import {
+  formatAmounts,
+  formatProductLine,
+  type WeekIngredients,
+} from "@/server/domain/shopping";
 import { isMealieUnavailable } from "@/server/mealie/client";
 import { requireUser } from "@/server/session";
 import { type ShopList, weekShopList } from "@/server/shop";
@@ -24,9 +28,12 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   </h2>
 );
 
+const needed = (list: WeekIngredients) =>
+  list.lines.length + list.products.length + list.freeText.length;
+
 /** What the plan needs, as it will be sent to Mealie. */
 const Preview = ({ list }: { list: WeekIngredients }) => {
-  if (list.lines.length === 0 && list.freeText.length === 0) {
+  if (needed(list) === 0) {
     return (
       <Card className="py-10 text-center">
         <p className="font-serif text-heading font-semibold">
@@ -74,6 +81,19 @@ const Preview = ({ list }: { list: WeekIngredients }) => {
           );
         })}
       </div>
+
+      {list.products.length > 0 && (
+        <Card as="section">
+          <SectionTitle>Products</SectionTitle>
+          <ul className="divide-y divide-border/70" data-testid="products">
+            {list.products.map((p) => (
+              <li key={p.recipeId} className="py-2.5 font-medium">
+                {formatProductLine(p)}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {list.freeText.length > 0 && (
         <Card as="section">
@@ -125,8 +145,8 @@ export default async function ShoppingPage({
     }
   }
   const sent = shop !== null || mealieDown;
-  const needed = plan.lines.length + plan.freeText.length;
-  const empty = needed === 0;
+  const count = needed(plan);
+  const empty = count === 0;
   const items: ShopItemView[] =
     shop?.items.map((i) => ({
       id: i.id,
@@ -191,7 +211,7 @@ export default async function ShoppingPage({
       {sent && (
         <details className={cx(cardClass(), "group")}>
           <summary className="flex min-h-tap cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
-            What the plan needs ({needed} item{needed === 1 ? "" : "s"})
+            What the plan needs ({count} item{count === 1 ? "" : "s"})
             <ChevronDown
               className="size-4 text-muted transition group-open:rotate-180"
               aria-hidden

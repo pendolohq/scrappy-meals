@@ -11,6 +11,7 @@ import { lookupOpenFoodFacts } from "../openfoodfacts";
 import {
   draftFromOff,
   macrosInconsistent,
+  offImageUrl,
   type OffProduct,
   type ProductInfo,
   perServing,
@@ -46,6 +47,7 @@ const off = (over: Partial<OffProduct> = {}): OffProduct => ({
   servingQuantityUnit: null,
   per100: {},
   kcalFromKj: false,
+  imageUrl: null,
   ...over,
 });
 
@@ -56,6 +58,38 @@ const serving = (over: Partial<OffProduct>) => {
   );
   return { servingGrams, servingUnit, packGrams };
 };
+
+describe("offImageUrl", () => {
+  it.each([
+    "https://images.openfoodfacts.org/images/products/500/front_en.3.400.jpg",
+    "https://static.openfoodfacts.org/images/logo.png",
+  ])("accepts %s", (url) => {
+    expect(offImageUrl(url)).toBe(url);
+  });
+
+  it.each([
+    "http://images.openfoodfacts.org/a.jpg",
+    "https://openfoodfacts.org/a.jpg",
+    "https://images.openfoodfacts.org.evil.example/a.jpg",
+    "https://evil.example/https://images.openfoodfacts.org/a.jpg",
+    "https://images.openfoodfacts.org@evil.example/a.jpg",
+    "https://user:pw@images.openfoodfacts.org/a.jpg",
+    "https://images.openfoodfacts.org:8443/a.jpg",
+    "http://169.254.169.254/latest",
+    "javascript:alert(1)",
+    "/images/a.jpg",
+    "",
+    "   ",
+  ])("refuses %j", (url) => {
+    expect(offImageUrl(url)).toBeNull();
+  });
+
+  it("refuses what isn't a string", () => {
+    expect(offImageUrl(undefined)).toBeNull();
+    expect(offImageUrl(null)).toBeNull();
+    expect(offImageUrl(12)).toBeNull();
+  });
+});
 
 describe("productName", () => {
   it("puts the first brand in front of the name", () => {

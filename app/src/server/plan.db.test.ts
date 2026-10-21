@@ -910,6 +910,16 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       expect(soup.portions).toEqual({ [a.id]: 1, [b.id]: 1 });
     });
 
+    it("gives an unplanned recipe to whoever added it alone", async () => {
+      const { a, b } = await twoUsers();
+      await add(a.id, { slug: "soup", unplanned: true });
+      await add(b.id, { slug: "soup" });
+
+      const [eaten, planned] = await meals();
+      expect(eaten.portions).toEqual({ [a.id]: 1, [b.id]: 0 });
+      expect(planned.portions).toEqual({ [a.id]: 1, [b.id]: 1 });
+    });
+
     it("still gives the adder a portion when they fast that day", async () => {
       const { a, b } = await twoUsers();
       await setFasting(db, a.id, today, true);

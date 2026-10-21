@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import "server-only";
 
-import type { OffProduct } from "./domain/product";
+import { type OffProduct, offImageUrl } from "./domain/product";
 import { RetryableError, UserFacingError } from "./errors";
 
 export type OffResult =
@@ -17,6 +17,7 @@ const FIELDS = [
   "product_quantity_unit",
   "serving_quantity",
   "serving_quantity_unit",
+  "image_front_url",
   "nutriments",
 ].join(",");
 
@@ -55,6 +56,10 @@ const productSchema = z.object({
   product_quantity_unit: text,
   serving_quantity: amount,
   serving_quantity_unit: text,
+  image_front_url: z
+    .unknown()
+    .optional()
+    .transform((v) => offImageUrl(v)),
   nutriments: z
     .object({
       "energy-kcal_100g": amount,
@@ -111,6 +116,7 @@ function toProduct(p: z.output<typeof productSchema>): OffProduct {
     servingQuantityUnit: p.serving_quantity_unit?.toLowerCase() ?? null,
     per100,
     kcalFromKj,
+    imageUrl: p.image_front_url,
   };
 }
 

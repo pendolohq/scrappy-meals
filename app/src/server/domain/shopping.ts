@@ -2,6 +2,7 @@ import type { Ingredient } from "../mealie/recipes";
 
 import { type Aisle, aisleOf, aisleOrder } from "./aisles";
 import { plannedServings, servingsScale, unitLabel } from "./ingredients";
+import type { ProductInfo } from "./product";
 import { isBaseUnit, measure, roundCount, roundMeasured } from "./units";
 
 export type MealForShopping = {
@@ -11,9 +12,13 @@ export type MealForShopping = {
     name: string;
     servings: number | null;
     ingredients: Ingredient[];
+    /** Set for a packaged product, which is bought as itself, not as ingredients. */
+    product: ProductInfo | null;
   } | null;
   slug: string;
   baseServings: number;
+  /** Eaten off-plan already: there is nothing left to buy. */
+  unplanned: boolean;
   portions: Record<string, number>;
 };
 
@@ -50,8 +55,19 @@ export type FreeTextLine = {
   times: number;
 };
 
+/** A packaged product to buy as it is: "Grenade Carb Killa ×3". */
+export type ProductLine = {
+  recipeId: string;
+  name: string;
+  count: number;
+  /** The pack size ("450 g") when `count` is packs; null when it counts servings. */
+  unitLabel: string | null;
+};
+
 export type WeekIngredients = {
   lines: ShoppingLine[];
+  /** Products planned this week, one line each. */
+  products: ProductLine[];
   /** Ingredients Mealie hasn't parsed into a food: passed through as written, never merged. */
   freeText: FreeTextLine[];
   /** Recipes without a servings count: their ingredients are listed unscaled, as free text. */
@@ -84,12 +100,16 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   const freeText = new Map<string, FreeTextLine>();
   const unscaled = new Set<string>();
   const missing = new Set<string>();
+  const products = new Map<
+    string,
+    { id: string; name: string; info: ProductInfo; servings: number }
+  >();
   // Mealie's own gram and millilitre units, as the recipes name them.
   const baseUnits: Record<"g" | "ml", string | null> = { g: null, ml: null };
 
   for (const meal of meals) {
     const eaten = plannedServings(meal.baseServings, meal.portions);
-    if (eaten <= 0) {
+    if (eaten <= 0 || meal.unplanned) {
       continue;
     }
     if (!meal.recipe) {
@@ -97,6 +117,17 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       continue;
     }
     const { recipe } = meal;
+    if (recipe.product) {
+      const total = products.get(recipe.id) ?? {
+        id: recipe.id,
+        name: recipe.name,
+        info: recipe.product,
+        servings: 0,
+      };
+      total.servings += eaten;
+      products.set(recipe.id, total);
+      continue;
+    }
     const scale = servingsScale(recipe.servings, eaten);
     if (scale === null) {
       unscaled.add(recipe.name);
@@ -182,11 +213,48 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
         aisleOrder(a.aisle) - aisleOrder(b.aisle) ||
         a.foodName.localeCompare(b.foodName)
     ),
+    products: [...products.values()]
+      .map(productLine)
+      .toSorted((a, b) => a.name.localeCompare(b.name)),
     freeText: [...freeText.values()],
     unscaled: [...unscaled],
     missing: [...missing],
   };
 }
+
+const PACK_TOLERANCE = 0.01;
+
+function productLine({
+  id,
+  name,
+  info,
+  servings,
+}: {
+  id: string;
+  name: string;
+  info: ProductInfo;
+  servings: number;
+}): ProductLine {
+  const base = { recipeId: id, name };
+  // A multipack or a tub is bought whole, so it counts packs; a bar or a can
+  // is about one serving, and half of one still means buying one.
+  if (info.packGrams !== null && info.packGrams / info.servingGrams >= 2) {
+    return {
+      ...base,
+      // A hair under a whole pack (3 × 70 g from a 210 g box, in floating
+      // point) is still that pack.
+      count: Math.ceil(
+        (servings * info.servingGrams) / info.packGrams - PACK_TOLERANCE
+      ),
+      unitLabel: `${info.packGrams} ${info.servingUnit}`,
+    };
+  }
+  return { ...base, count: Math.ceil(servings), unitLabel: null };
+}
+
+/** "Grenade Carb Killa ×3", "FAGE Total 0% fat ×1 (450 g)": how a product line reads. */
+export const formatProductLine = (p: ProductLine) =>
+  `${p.name} ×${p.count}${p.unitLabel ? ` (${p.unitLabel})` : ""}`;
 
 function addAmount(
   food: Sums,

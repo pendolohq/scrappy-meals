@@ -3,6 +3,7 @@ import "server-only";
 import { parseBarcode } from "./domain/barcode";
 import {
   draftFromOff,
+  offImageUrl,
   offProductUrl,
   perServing,
   type ProductDraft,
@@ -48,6 +49,8 @@ export type SaveProductInput = {
   fromOpenFoodFacts: boolean;
   /** Someone changed a value from what Open Food Facts had. */
   edited: boolean;
+  /** Open Food Facts' front photo, from the draft; checked again here. */
+  imageUrl?: string | null;
 };
 
 type Deps = {
@@ -188,6 +191,8 @@ export async function saveProduct(
       orgURL: input.fromOpenFoodFacts ? offProductUrl(barcode) : null,
       nutrition:
         input.edited || !input.fromOpenFoodFacts ? "reviewed" : "source",
+      // The browser sends it back, so it is only trusted as far as the allow-list.
+      imageUrl: input.fromOpenFoodFacts ? offImageUrl(input.imageUrl) : null,
     });
     return { slug };
   });

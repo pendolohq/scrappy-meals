@@ -366,6 +366,7 @@ const DraftSheet = ({
           packGrams: info.packGrams,
           per100: values,
           fromOpenFoodFacts: draft !== null,
+          imageUrl: draft?.imageUrl ?? null,
           edited:
             draft !== null &&
             MACRO_KEYS.some((k) => values[k] !== draft.per100[k]),
@@ -391,14 +392,28 @@ const DraftSheet = ({
           Open Food Facts has no nutrition for this: type it from the pack.
         </Notice>
       )}
-      <Field label="Name">
-        <Input
-          value={name}
-          maxLength={120}
-          required
-          onChange={(e) => setName(e.target.value)}
-        />
-      </Field>
+      <div className="flex items-end gap-3">
+        {draft?.imageUrl && (
+          // oxlint-disable-next-line nextjs/no-img-element -- Open Food Facts' own photo, shown small while the product is checked
+          <img
+            src={draft.imageUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="size-16 shrink-0 rounded-control border border-border bg-sunken object-contain"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <Field label="Name">
+            <Input
+              value={name}
+              maxLength={120}
+              required
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
 
       <fieldset className="space-y-2">
         <legend className="mb-1.5 text-sm font-medium text-muted">

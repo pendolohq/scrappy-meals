@@ -3,7 +3,7 @@
 //
 //   MEALIE_TEST_URL=http://localhost:9000 bun run test:integration
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   checkMealieVersion,
@@ -491,6 +491,39 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         product: { servingGrams: 330, servingUnit: "ml", packGrams: null },
       });
       expect(r.nutrition.perServing).toEqual({ kcal: 140 });
+    });
+
+    it("still saves the product when its photo can't be fetched", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const failing = {
+        ...client,
+        POST: (path: string, init: unknown) =>
+          String(path).endsWith("/image")
+            ? Promise.reject(new Error("no route to host"))
+            : (client.POST as (p: string, i: unknown) => unknown)(path, init),
+      } as unknown as MealieClient;
+      const photoSlug = await createProductRecipe(
+        {
+          name: `IT No Photo ${run}`,
+          info: {
+            barcode: barcodeFor(digits(6)),
+            servingGrams: 100,
+            servingUnit: "g",
+            packGrams: null,
+          },
+          perServing: { kcal: 100 },
+          orgURL: null,
+          nutrition: "source",
+          imageUrl: "https://images.openfoodfacts.org/images/nope.jpg",
+        },
+        { client: failing }
+      );
+      cleanup.push(remove(photoSlug));
+      const r = (await getRecipe(photoSlug, { client }))!;
+      expect(r.imagePath).toBeNull();
+      expect(r.product).not.toBeNull();
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     it("leaves ordinary recipes without product info", async () => {

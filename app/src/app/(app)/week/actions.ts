@@ -106,6 +106,8 @@ export const saveProductAction = userAction(
     }),
     fromOpenFoodFacts: z.boolean(),
     edited: z.boolean(),
+    // Checked against Open Food Facts' hosts by `saveProduct`.
+    imageUrl: z.string().max(500).nullable(),
     date,
     slot,
     snackIndex,

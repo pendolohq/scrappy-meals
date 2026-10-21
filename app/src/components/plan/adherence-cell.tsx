@@ -9,6 +9,9 @@ import {
   type AdherenceStatus,
   STATUS_LABEL,
 } from "@/server/domain/adherence";
+import { type SlotType, slotLabel } from "@/server/domain/slots";
+
+import { AddMeal } from "./add-meal";
 
 type Log = { status: AdherenceStatus; note: string | null } | undefined;
 
@@ -18,15 +21,22 @@ export const AdherenceButtons = ({
   mealName,
   log,
   fill = false,
+  at,
+  today,
 }: {
   mealId: string;
   mealName: string;
   log: Log;
   /** Span the whole width on phones, where the buttons are the main target. */
   fill?: boolean;
+  /** Where the meal is: a swapped log then offers to add what they had there. */
+  at?: { date: string; slot: SlotType; snackIndex: number };
+  /** The viewer's today, for the Add dialog opened from a swap. */
+  today: string;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
+  const [adding, setAdding] = useState(false);
   const [current, setOptimistic] = useOptimistic(
     log,
     (_: Log, next: Log) => next
@@ -103,6 +113,27 @@ export const AdherenceButtons = ({
         <p className="truncate text-center text-xs text-muted">
           Had: {current.note}
         </p>
+      )}
+      {current?.status === "swapped" && at && !pending && (
+        <>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            aria-label={`Log what you had instead of ${mealName}`}
+            className="mx-auto flex min-h-tap items-center px-2 text-xs font-medium text-accent-ink underline underline-offset-2"
+          >
+            Log what you had
+          </button>
+          <AddMeal
+            date={at.date}
+            slot={at.slot}
+            snackIndex={at.snackIndex}
+            label={slotLabel(at.slot, at.snackIndex)}
+            today={today}
+            initialMode="product"
+            controlled={{ open: adding, onClose: () => setAdding(false) }}
+          />
+        </>
       )}
       {error && (
         <p role="alert" className="text-center text-xs text-danger">

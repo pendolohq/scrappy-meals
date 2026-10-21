@@ -235,6 +235,7 @@ const grenadeInput = {
   per100: { kcal: 364, protein: 33.8, carbs: 28.2, fat: 14.8 },
   fromOpenFoodFacts: true,
   edited: false,
+  imageUrl: null,
 };
 
 function saveDeps() {
@@ -287,6 +288,25 @@ describe("saveProduct", () => {
     const arg = create.mock.calls[0][0];
     expect(arg.nutrition).toBe("reviewed");
     expect(arg.orgURL ?? null).toBeNull();
+  });
+
+  it("passes on Open Food Facts' photo, and drops any other address", async () => {
+    const photo = "https://images.openfoodfacts.org/images/products/1.jpg";
+    const { deps, create } = saveDeps();
+    await saveProduct({ ...grenadeInput, imageUrl: photo }, deps);
+    await saveProduct(
+      { ...grenadeInput, imageUrl: "http://169.254.169.254/latest" },
+      deps
+    );
+    await saveProduct(
+      { ...grenadeInput, fromOpenFoodFacts: false, imageUrl: photo },
+      deps
+    );
+    expect(create.mock.calls.map(([arg]) => arg.imageUrl)).toEqual([
+      photo,
+      null,
+      null,
+    ]);
   });
 
   it("normalises the barcode it saves under", async () => {

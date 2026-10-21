@@ -18,7 +18,27 @@ export type ProductRecipeInput = {
   orgURL: string | null;
   /** `reviewed` when someone changed a value or typed it in. */
   nutrition: "source" | "reviewed";
+  /** Open Food Facts' front photo, for Mealie to fetch. */
+  imageUrl?: string | null;
 };
+
+/**
+ * Asks Mealie to download an image for the recipe (its "scrape image"
+ * endpoint). Mealie fetches the URL itself and refuses private addresses.
+ */
+export async function setRecipeImageFromUrl(
+  slug: string,
+  url: string,
+  opts: { client?: MealieClient } = {}
+): Promise<void> {
+  const client = opts.client ?? mealie();
+  unwrap(
+    await client.POST("/api/recipes/{slug}/image", {
+      params: { path: { slug } },
+      body: { url, includeTags: false },
+    })
+  );
+}
 
 /**
  * Creates the Mealie recipe for a packaged product and returns its slug. One
@@ -60,6 +80,15 @@ export async function createProductRecipe(
     },
     { client }
   );
+  if (input.imageUrl) {
+    // The photo is a nicety: Mealie may not reach the image, and the product
+    // is saved either way.
+    await setRecipeImageFromUrl(slug, input.imageUrl, { client }).catch(
+      (err: unknown) => {
+        console.warn(`Product ${slug}: could not fetch its image`, err);
+      }
+    );
+  }
   return slug;
 }
 

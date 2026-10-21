@@ -423,8 +423,9 @@ const checkHadIt = (date: string, today: string | undefined) => {
 
 /**
  * Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone
- * fasting that day. A product is one person's snack: 1 for whoever added it
- * (even on a fast, since they ate it) and 0 for everyone else.
+ * fasting that day. A product, or anything already eaten off-plan, is one
+ * person's: 1 for whoever added it (even on a fast, since they ate it) and 0
+ * for everyone else.
  *
  * `unplanned` marks something already eaten off-plan, so it needs `today` (the
  * viewer's) and can't be a later day.
@@ -495,11 +496,12 @@ export async function addMeal(
         members.map((m) => ({
           mealSlotId: slot.id,
           userId: m.id,
-          multiplier: recipe.product
-            ? Number(m.id === input.createdBy)
-            : isFasting(m.days, input.date, override.get(m.id))
-              ? 0
-              : 1,
+          multiplier:
+            recipe.product || unplanned
+              ? Number(m.id === input.createdBy)
+              : isFasting(m.days, input.date, override.get(m.id))
+                ? 0
+                : 1,
         }))
       );
     }

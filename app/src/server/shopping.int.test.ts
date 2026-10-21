@@ -8,6 +8,7 @@ import { testDbUrl, useTestDb } from "../../test/db";
 import { addDays, weekStartOf } from "./domain/week";
 import { UserFacingError } from "./errors";
 import { createMealieClient, type MealieClient, unwrap } from "./mealie/client";
+import { createProductRecipe } from "./mealie/products";
 import { getRecipe } from "./mealie/recipes";
 import {
   addShoppingItems,
@@ -34,6 +35,15 @@ const run = randomUUID().slice(0, 8);
 // Each test gets its own far-future week, so its Mealie list name is unique: the
 // push falls back to finding the week's list by name, and a same-named list left
 // by another run would otherwise be picked up.
+// A valid EAN-13 that differs on every run.
+const uniqueBarcode = () => {
+  const body = `599${String(Number.parseInt(run, 16) % 1e9).padStart(9, "0")}`;
+  const sum = [...body].reduce(
+    (t, c, i) => t + Number(c) * (i % 2 === 0 ? 1 : 3),
+    0
+  );
+  return body + String((10 - (sum % 10)) % 10);
+};
 const uniqueWeek = () =>
   weekStartOf(`${2100 + Math.floor(Math.random() * 800)}-06-15`);
 
@@ -190,6 +200,80 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       expect(items).toHaveLength(3);
       expect(items.find((i) => i.foodId === ids.lentils)?.quantity).toBe(200);
       expect(items.some((i) => i.id === manual.created[0].id)).toBe(true);
+    });
+
+    it("sends planned products as notes linked to their recipe, not as ingredients", async () => {
+      const WEEK = uniqueWeek();
+      const opts = { client: admin };
+      const a = await createUser(db, {
+        name: "A",
+        email: "a@example.test",
+        password: "correct horse battery",
+      });
+      const name = `IT Yoghurt ${run}`;
+      const slug = await createProductRecipe(
+        {
+          name,
+          info: {
+            barcode: uniqueBarcode(),
+            servingGrams: 100,
+            servingUnit: "g",
+            packGrams: 450,
+          },
+          perServing: { kcal: 60 },
+          orgURL: null,
+          nutrition: "reviewed",
+        },
+        opts
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      );
+      for (const [day, unplanned] of [
+        [1, false],
+        [2, false],
+        [3, true],
+      ] as const) {
+        await addMeal(
+          db,
+          {
+            date: addDays(WEEK, day),
+            slot: "snack",
+            slug,
+            baseServings: 2,
+            unplanned,
+            today: addDays(WEEK, 3),
+            createdBy: a.id,
+          },
+          { fetch: fromMealie }
+        );
+      }
+
+      const preview = await weekShoppingList(db, WEEK, opts);
+      expect(preview.lines).toEqual([]);
+      // 4 servings of 100 g from a 450 g pot: one pot; the unplanned one is eaten.
+      expect(preview.products).toMatchObject([
+        { name, count: 1, unitLabel: "450 g" },
+      ]);
+
+      const pushed = await pushShoppingList(db, WEEK, opts);
+      cleanup.push(() =>
+        admin.DELETE("/api/households/shopping/lists/{item_id}", {
+          params: { path: { item_id: pushed.listId } },
+        })
+      );
+      expect(pushed.added).toBe(1);
+      const [item] = await getShoppingListItems(pushed.listId, opts);
+      expect(item.note).toBe(`${name} ×1 (450 g)`);
+      expect(item.foodId).toBeNull();
+      const raw = unwrap(
+        await admin.GET("/api/households/shopping/items/{item_id}", {
+          params: { path: { item_id: item.id } },
+        })
+      );
+      expect(raw.recipeReferences?.map((r) => r.recipeId)).toEqual([
+        (await fromMealie(slug))!.id,
+      ]);
     });
 
     it("starts a new list if the old one was deleted in Mealie", async () => {
