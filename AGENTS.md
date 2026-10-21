@@ -62,10 +62,17 @@ lives in a doc; the trigger for reading each one is below.
 ## Tests
 
 - Unit tests sit next to the code as `*.test.ts`; Postgres tests are `*.db.test.ts`, tests
-  against a real Mealie are `*.int.test.ts`. The e2e smoke test lives in `app/e2e/`.
+  against a real Mealie are `*.int.test.ts`. The e2e journeys live in `app/e2e/`.
 - `bun run test` (unit), `DATABASE_TEST_URL=… bun run test:db`, `MEALIE_TEST_URL=… bun run test:integration`,
   `bun run test:e2e` against a running build (it empties `DATABASE_URL`; see `docs/development.md`).
-- There is no component test setup (no jsdom/RTL). UI behaviour is covered by e2e.
+- There is no component test setup (no jsdom/RTL). Rules, maths, validation and error messages
+  go in unit and DB tests, not e2e.
+- E2e covers only the critical journeys, in order: a wrong password is rejected; Alex plans, logs
+  and shops a meal and the week stays readable offline until sign-out; Sam sees the plan, logs
+  only their own meals and ticks the list offline; a recipe is imported, reviewed and saved. A new
+  e2e test needs a reason a unit or DB test can't do the job (wiring across pages, server actions
+  against the real Mealie, the service worker). Add a step to an existing journey before adding a
+  test.
 
 ## Environment variables
 

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Smoke test against a running production build, a real Mealie and a
-// throwaway planner database. See e2e/global-setup.ts for what it needs.
+// The critical journeys against a running production build, a real Mealie
+// and a throwaway planner database. See e2e/global-setup.ts for what it needs.
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({

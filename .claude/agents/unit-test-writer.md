@@ -17,8 +17,9 @@ projects (`app/vitest.config.mts`):
 | db | `*.db.test.ts` | a throwaway Postgres: `DATABASE_TEST_URL` | `bun run test:db` |
 | integration | `*.int.test.ts` | a running Mealie: `MEALIE_TEST_URL` | `bun run test:integration` |
 
-There is no component test setup (no jsdom or React Testing Library). Don't add one; UI
-behaviour belongs in the Playwright smoke test.
+There is no component test setup (no jsdom or React Testing Library). Don't add one: test the
+functions behind what the UI shows here. Playwright covers only the few critical journeys
+listed in `AGENTS.md`.
 
 ## What to Test Here (not in Playwright)
 

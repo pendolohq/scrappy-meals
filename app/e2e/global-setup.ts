@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-// Prepares a known state for the smoke test:
+// Prepares a known state for the e2e journeys:
 // - empties the planner database (DATABASE_URL) and creates two users,
-// - creates a recipe with nutrition and parsed ingredients in Mealie (MEALIE_TEST_URL, admin login).
+// - creates a recipe with nutrition and parsed ingredients in Mealie (MEALIE_TEST_URL, admin login),
+//   and one imported from a web page, for the import and review journey.
 // Refuses to run unless E2E_ALLOW_RESET=1, so it can never wipe a real database by accident.
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -113,8 +114,8 @@ export default async function globalSetup() {
     notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
   });
 
-  // A recipe that already came from a web page, for the duplicate check on
-  // /recipes/new. Mealie won't fetch a page in CI, so it scrapes given HTML.
+  // A recipe that already came from a web page, for the import and review
+  // journey. Mealie won't fetch a page in CI, so it scrapes given HTML.
   const imported = {
     name: `E2E Imported Soup ${run}`,
     url: `https://example.com/e2e/imported-soup-${run}`,
@@ -141,63 +142,11 @@ export default async function globalSetup() {
     }
   );
 
-  // A recipe imported from a social post with AI-estimated nutrition that
-  // nobody has reviewed yet, as the planner shows it until someone does.
-  const reel = {
-    name: `E2E Reel Curry ${run}`,
-    url: `https://www.instagram.com/reel/e2e-${run}/`,
-  };
-  const reelSlug: string = await api("POST", "/api/recipes", {
-    name: reel.name,
-  });
-  await api("PATCH", `/api/recipes/${reelSlug}`, {
-    recipeServings: 2,
-    orgURL: reel.url,
-    nutrition: {
-      calories: "600",
-      proteinContent: "20",
-      carbohydrateContent: "70",
-      fatContent: "25",
-      fiberContent: "12",
-    },
-    recipeIngredient: [{ quantity: 0, note: "1 tin chickpeas" }],
-    extras: { scrappyReview: "pending", scrappyNutrition: "estimated" },
-  });
-
-  // A tagged, quick recipe for the Discover page. Its own tag keeps it apart
-  // from whatever else a reused Mealie holds; Breakfast picks its slot.
-  const discover = {
-    name: `E2E Discover Oats ${run}`,
-    tag: { name: `E2E Discover ${run}`, slug: `e2e-discover-${run}` },
-  };
-  const discoverSlug: string = await api("POST", "/api/recipes", {
-    name: discover.name,
-  });
-  await api("PATCH", `/api/recipes/${discoverSlug}`, {
-    recipeServings: 1,
-    totalTimeSeconds: 10 * 60,
-    tags: [{ name: discover.tag.name }, { name: "Breakfast" }],
-    recipeCategory: [{ name: "Vegan" }],
-    recipeIngredient: [{ quantity: 0, note: "80 g oats" }],
-  });
-  // Same tag, vegetarian and slow: what the other filters leave out.
-  const slowName = `E2E Discover Pancakes ${run}`;
-  const slowSlug: string = await api("POST", "/api/recipes", {
-    name: slowName,
-  });
-  await api("PATCH", `/api/recipes/${slowSlug}`, {
-    totalTimeSeconds: 45 * 60,
-    tags: [{ name: discover.tag.name }],
-    recipeCategory: [{ name: "Vegetarian" }],
-  });
-
   await writeFile(
     STATE_FILE,
     JSON.stringify({
       recipe: { name, slug },
       imported: { ...imported, slug: importedSlug },
-      reel: { ...reel, slug: reelSlug },
-      discover: { ...discover, slug: discoverSlug, slowName },
       food: food.name,
       extra: `coffee ${run}`,
     })

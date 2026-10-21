@@ -46,7 +46,7 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
 ## From a commit to the server
 
 1. **Pull request:** CI (`.github/workflows/ci.yml`) runs format, lint, typecheck, unit/db/
-   integration tests, the e2e smoke test and a secret scan. PRs that touch what goes into the
+   integration tests, the e2e journeys and a secret scan. PRs that touch what goes into the
    image (listed in `.github/image-paths`; a unit test keeps the list complete) also build and
    smoke-test it; PRs that touch the compose file, Caddyfile or backups validate them and run a
    backup and restore round trip. Nothing is published.

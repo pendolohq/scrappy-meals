@@ -18,24 +18,9 @@ defaults:
     working-directory: app
 
 jobs:
+  # What needs nothing but the code; kept apart so it reports in seconds.
   check:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
-        env:
-          # Throwaway database that only exists for this job, so no password.
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: planner_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
-      mealie:
-        # Must match docker-compose.yml; uses Mealie's built-in SQLite and default admin.
-        image: ghcr.io/mealie-recipes/mealie:v3.29.0
-        env:
-          ALLOW_SIGNUP: "false"
-        ports: ["9000:9000"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -51,22 +36,54 @@ jobs:
         run: bun run lint
       - run: bun run typecheck
       - run: bun run test
-      - run: bun run test:db
-        env:
-          DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
-      - name: Wait for Mealie
-        run: |
-          for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about && exit 0; sleep 3; done
-          exit 1
-      - run: bun run test:integration
-        env:
-          MEALIE_TEST_URL: http://localhost:9000
-          DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
       - name: Migrations match the schema
         run: |
           DATABASE_URL=unused bunx drizzle-kit generate --name ci-check
           git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run bunx drizzle-kit generate" && exit 1)
           test -z "$(git status --porcelain -- drizzle)" || (echo "::error::uncommitted migration generated" && exit 1)
+
+  # The tests against a real Postgres and a real Mealie.
+  test-services:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          # Throwaway database that only exists for this job, so no password.
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: planner_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    # Mealie isn't a service: services start before the first step, so its
+    # ~1 GB image would be pulled while nothing else runs. Started as the first
+    # step, it's up by the time the integration tests need it.
+    env:
+      DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
+    steps:
+      - name: Start Mealie
+        working-directory: .
+        # Must match docker-compose.yml; uses Mealie's built-in SQLite and default admin.
+        # In the background: `docker run` waits for the pull. "Wait for Mealie" catches a failed start.
+        run: |
+          nohup docker run -d --name mealie -p 9000:9000 -e ALLOW_SIGNUP=false \
+            ghcr.io/mealie-recipes/mealie:v3.29.0 > "$RUNNER_TEMP/mealie-start.log" 2>&1 &
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: app/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: bun install --frozen-lockfile
+      - run: bun run test:db
+      - name: Wait for Mealie
+        run: |
+          for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about && exit 0; sleep 3; done
+          cat "$RUNNER_TEMP/mealie-start.log"; exit 1
+      - run: bun run test:integration
+        env:
+          MEALIE_TEST_URL: http://localhost:9000
 
   e2e:
     runs-on: ubuntu-latest
@@ -79,11 +96,9 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
-      mealie:
-        image: ghcr.io/mealie-recipes/mealie:v3.29.0
-        env:
-          ALLOW_SIGNUP: "false"
-        ports: ["9000:9000"]
+    # Mealie isn't a service here: services start before the first step, so
+    # its ~1 GB image would be pulled while nothing else runs. Started as the
+    # first step instead, it downloads while the app builds.
     env:
       DATABASE_URL: postgres://postgres@localhost:5432/planner_e2e
       MEALIE_URL: http://localhost:9000
@@ -93,6 +108,12 @@ jobs:
       E2E_BASE_URL: http://localhost:3000
       E2E_ALLOW_RESET: "1"
     steps:
+      - name: Start Mealie
+        working-directory: .
+        # In the background: `docker run` waits for the pull. "Wait for Mealie" catches a failed start.
+        run: |
+          nohup docker run -d --name mealie -p 9000:9000 -e ALLOW_SIGNUP=false \
+            ghcr.io/mealie-recipes/mealie:v3.29.0 > "$RUNNER_TEMP/mealie-start.log" 2>&1 &
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -106,10 +127,24 @@ jobs:
         run: |
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public
-      - run: bunx playwright install --with-deps chromium
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(jq -r '.devDependencies["@playwright/test"]' package.json)" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+      # The cache holds the browser, not the system libraries it needs.
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
       - name: Wait for Mealie and create an API token for the app
         run: |
           for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about >/dev/null && break; sleep 3; done
+          curl -fsS http://localhost:9000/api/app/about >/dev/null || { cat "$RUNNER_TEMP/mealie-start.log"; exit 1; }
           jwt=$(curl -fsS -X POST http://localhost:9000/api/auth/token \
             -d 'username=changeme@example.com&password=MyPassword' | jq -r .access_token)
           token=$(curl -fsS -X POST http://localhost:9000/api/users/api-tokens \
@@ -219,7 +254,7 @@ jobs:
   # v* tags:       publish :X.Y.Z, :X.Y and :latest. Only a release moves :latest,
   #                which is what the server runs by default (APP_TAG).
   image:
-    needs: [changes, check, e2e, secrets]
+    needs: [changes, check, test-services, e2e, secrets]
     if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     permissions:
