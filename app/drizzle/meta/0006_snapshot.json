@@ -1,5 +1,5 @@
 {
-  "id": "e56ffa08-69ec-4164-bf79-c1ce51b5d0c2",
+  "id": "3824adb0-5dc5-4fd4-b85d-024bac26f435",
   "prevId": "c884a42b-ad77-4bfc-9bfc-bf55262839a6",
   "version": "7",
   "dialect": "postgresql",
@@ -231,13 +231,6 @@
           "notNull": true,
           "default": 1
         },
-        "unplanned": {
-          "name": "unplanned",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -383,12 +376,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "product": {
-          "name": "product",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_state": {
           "name": "review_state",
           "type": "text",
@@ -427,40 +414,209 @@
       },
       "isRLSEnabled": false
     },
-    "public.shopping_pushes": {
-      "name": "shopping_pushes",
+    "public.shopping_extras": {
+      "name": "shopping_extras",
       "schema": "",
       "columns": {
-        "week_start": {
-          "name": "week_start",
-          "type": "date",
+        "id": {
+          "name": "id",
+          "type": "uuid",
           "primaryKey": true,
           "notNull": true
         },
-        "mealie_list_id": {
-          "name": "mealie_list_id",
-          "type": "uuid",
+        "week_start": {
+          "name": "week_start",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "mealie_item_ids": {
-          "name": "mealie_item_ids",
-          "type": "uuid[]",
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked": {
+          "name": "checked",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'"
+          "default": false
         },
-        "pushed_at": {
-          "name": "pushed_at",
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "shopping_extras_week_idx": {
+          "name": "shopping_extras_week_idx",
+          "columns": [
+            {
+              "expression": "week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "shopping_extras_created_by_users_id_fk": {
+          "name": "shopping_extras_created_by_users_id_fk",
+          "tableFrom": "shopping_extras",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.shopping_hidden": {
+      "name": "shopping_hidden",
+      "schema": "",
+      "columns": {
+        "week_start": {
+          "name": "week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_key": {
+          "name": "line_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hidden_at": {
+          "name": "hidden_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "hidden_by": {
+          "name": "hidden_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "shopping_hidden_hidden_by_users_id_fk": {
+          "name": "shopping_hidden_hidden_by_users_id_fk",
+          "tableFrom": "shopping_hidden",
+          "tableTo": "users",
+          "columnsFrom": [
+            "hidden_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "shopping_hidden_week_start_line_key_pk": {
+          "name": "shopping_hidden_week_start_line_key_pk",
+          "columns": [
+            "week_start",
+            "line_key"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.shopping_ticks": {
+      "name": "shopping_ticks",
+      "schema": "",
+      "columns": {
+        "week_start": {
+          "name": "week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_key": {
+          "name": "line_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amounts": {
+          "name": "amounts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "checked_at": {
+          "name": "checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "checked_by": {
+          "name": "checked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "shopping_ticks_checked_by_users_id_fk": {
+          "name": "shopping_ticks_checked_by_users_id_fk",
+          "tableFrom": "shopping_ticks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "checked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "shopping_ticks_week_start_line_key_pk": {
+          "name": "shopping_ticks_week_start_line_key_pk",
+          "columns": [
+            "week_start",
+            "line_key"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

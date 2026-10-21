@@ -103,9 +103,9 @@ ssh -L 9000:<that address>:9000 deploy@<server>
    account's email and password** (Profile → Edit).
 2. Create a second, non-admin user for the planner (Admin → Users, in the same
    household). Sign in as it and create an API token (Profile → API Tokens).
-   Put the token in `MEALIE_API_TOKEN` in `.env`. The planner only reads
-   recipes and writes shopping lists, so if the token leaks it can't manage
-   users or Mealie's settings.
+   Put the token in `MEALIE_API_TOKEN` in `.env`. The planner reads and
+   imports recipes (creating the foods and units they need); if the token
+   leaks it can't manage users or Mealie's settings.
 3. Add or import a few recipes.
 4. Optional, for importing Instagram and Facebook posts: as the admin, add an
    AI provider (Group Settings → AI Providers), test it, then pick it as the

@@ -89,7 +89,7 @@ services:
     environment:
       DATABASE_URL: postgres://planner:${PLANNER_DB_PASSWORD:?}@postgres:5432/planner
       MEALIE_URL: http://mealie:9000
-      # Only used to link people to Mealie pages (e.g. the pushed shopping list).
+      # Only used to link people to Mealie pages (e.g. "Edit in Mealie" on a recipe).
       MEALIE_PUBLIC_URL: https://recipes.${DOMAIN:?}
       MEALIE_API_TOKEN: ${MEALIE_API_TOKEN:-}
       AUTH_SECRET: ${AUTH_SECRET:?}

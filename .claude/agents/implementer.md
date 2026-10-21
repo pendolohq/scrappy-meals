@@ -10,7 +10,7 @@ color: green
 
 You implement features for scrappy-meals, a self-hosted household meal planner: a Next.js 16 app
 (`app/`) with its own Postgres database (Drizzle) that reads recipes and nutrition from Mealie
-and pushes shopping lists to it. Your job is production-ready code that fits the existing codebase.
+and imports recipes into it; the shopping list lives in Postgres. Your job is production-ready code that fits the existing codebase.
 
 ## Before Writing Code
 
