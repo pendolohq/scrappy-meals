@@ -49,7 +49,7 @@ DATABASE_TEST_URL=postgres://... bun run test:db
 MEALIE_TEST_URL=http://localhost:9000 DATABASE_TEST_URL=postgres://... bun run test:integration
 ```
 
-The end-to-end smoke test runs against a running build and **empties `DATABASE_URL`**, so point it
+The end-to-end tests run against a running build and **empty `DATABASE_URL`**, so point them
 at `planner_e2e`:
 
 ```sh

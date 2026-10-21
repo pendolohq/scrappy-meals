@@ -1,6 +1,6 @@
 ---
 name: e2e-test-writer
-description: Writes Playwright e2e tests for user journeys and page-level flows. Use when testing navigation, multi-step interactions, or full page behavior.
+description: Writes Playwright e2e tests for the critical user journeys only. Use when a journey needs a real browser, build, Postgres and Mealie to check; logic and page details go to unit-test-writer.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 color: orange
@@ -14,26 +14,34 @@ database.
 
 ## What to Test with Playwright
 
-- Full page renders and navigation (week view, adherence, shopping, settings)
-- Multi-step flows: sign in, add a meal, change portions, log adherence, push a shopping list
-- Behaviour that needs the real app: server actions, the proxy's redirects, two users seeing
-  each other's changes
+The suite is kept to the critical journeys, four tests in two files:
 
-Do NOT use Playwright for isolated logic; that belongs in Vitest tests.
+- `smoke.spec.ts`, in order: a wrong password is rejected; Alex plans, logs and shops a meal,
+  and the week, its meal pages and the list stay readable offline until sign-out; Sam sees the
+  plan, logs only their own meals and ticks the list offline.
+- `recipes.spec.ts`: a recipe is imported, reviewed and saved.
+
+A test earns its place only if it covers a journey that would hurt if it broke **and** that
+only a browser can check: wiring across pages, server actions against the real Mealie, the
+service worker, offline behaviour. Rules, maths, validation, error messages and layout belong in
+Vitest tests (`unit-test-writer`). If what you've been asked to cover fits neither, say so
+instead of writing a test.
 
 ## Before Writing Tests
 
 1. Read the feature or spec you've been given
-2. Read `app/e2e/global-setup.ts` (it empties `DATABASE_URL`, creates two users and a Mealie
-   recipe) and `app/e2e/smoke.spec.ts` to match the existing style and helpers
+2. Read `app/e2e/global-setup.ts` (it empties `DATABASE_URL`, creates two users and the Mealie
+   recipes) and both specs, to match the existing style and helpers
 3. Check the actual pages in `app/src/app/` so selectors match the real DOM
 
 ## Writing Good Tests
 
+- Add a step to an existing journey before adding a test, and a test before adding a file
 - Prefer user-facing selectors: `getByRole`, `getByText`, `getByLabel`
 - Test what the user sees and does, not implementation details
-- One test file per feature area (e.g. `e2e/shopping.spec.ts`)
-- Keep each test independent; reuse the users and recipe from global setup
+- The smoke tests share one database and one Mealie and build on each other, which is why they
+  run serially. Don't add a test that has to clean up after itself so the others still pass;
+  fold it into the journey instead
 - Use `page.waitForURL` or `expect(page).toHaveURL` when testing navigation
 
 ## Running Tests

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 import { formatDay } from "../src/lib/format";
@@ -7,8 +7,9 @@ import { today, weekStartOf } from "../src/server/domain/week";
 import { setPassword } from "../src/server/users";
 
 import { STATE_FILE, USERS } from "./global-setup";
-import { planMeal } from "./plan-meal";
 
+// The critical journeys, in order: each test picks up where the last left
+// off (Alex plans and ticks, Sam sees it), so they run serially.
 const state = () =>
   JSON.parse(readFileSync(STATE_FILE, "utf8")) as {
     recipe: { name: string };
@@ -34,25 +35,15 @@ async function signIn(page: Page, user: { email: string; password: string }) {
   await expect(page).toHaveURL(/\/week\/\d{4}-\d{2}-\d{2}$/);
 }
 
-test.describe.configure({ mode: "serial" });
+// Playwright cuts the service worker off only when offline is set: a worker
+// started since then would still reach the network. So set it per navigation.
+async function gotoOffline(page: Page, context: BrowserContext, url: string) {
+  await context.setOffline(false);
+  await context.setOffline(true);
+  await page.goto(url).catch(() => undefined);
+}
 
-test("is installable", async ({ request }) => {
-  const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest).toMatchObject({
-    name: "Scrappy Meals",
-    display: "standalone",
-    start_url: "/week",
-  });
-  expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual([
-    "192x192",
-    "512x512",
-    "512x512",
-  ]);
-  expect((await request.get("/sw.js")).ok()).toBe(true);
-  expect(
-    (await request.get("/icons/icon-512.png")).headers()["content-type"]
-  ).toBe("image/png");
-});
+test.describe.configure({ mode: "serial" });
 
 test("rejects a wrong password", async ({ page }) => {
   await page.goto("/login");
@@ -71,11 +62,26 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   context,
 }) => {
   const { recipe, food, extra } = state();
+  const week = weekStartOf(today());
   await signIn(page, USERS.alex);
-  const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
 
-  // Plan today's lunch from Mealie.
-  await planMeal(page, { date: today(), slot: "Lunch", recipe: recipe.name });
+  // Plan today's lunch from Mealie, on the Plan page.
+  await page.goto(`/plan/${week}`);
+  const planDay = page.locator(`section[aria-label="${formatDay(today())}"]`);
+  await planDay.getByRole("button", { name: "Add lunch" }).click();
+  const picker = page.getByRole("dialog");
+  await picker.getByLabel("Search recipes").fill(recipe.name);
+  await picker.getByRole("button", { name: new RegExp(recipe.name) }).click();
+  await expect(
+    planDay
+      .getByRole("group", { name: "Lunch" })
+      .getByTestId("meal")
+      .filter({ hasText: recipe.name })
+  ).toBeVisible();
+
+  // The hash opens the phone's day carousel on today.
+  await page.goto(`/week/${week}#${today()}`);
+  const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
   await expect(meal).toBeVisible();
   await expect(day.getByTestId("totals-Alex").getByTestId("kcal")).toHaveText(
@@ -97,6 +103,21 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   // The week shows Alex's own numbers; Sam's portion is one short line.
   await expect(meal.getByTestId("portions")).toHaveText("You 1× · Sam ½×");
   await expect(day.getByTestId("totals-Sam")).toHaveCount(0);
+
+  // The meal's page has the recipe, in the amounts the plan needs.
+  const mealLink = meal.getByRole("link", { name: recipe.name });
+  const mealUrl = (await mealLink.getAttribute("href"))!;
+  await mealLink.click();
+  await expect(page).toHaveURL(/\/meals\/[0-9a-f-]{36}$/);
+  await expect(page.getByTestId("instructions")).toContainText(
+    "Rinse the lentils."
+  );
+  await expect(page.getByTestId("ingredients").getByTestId("qty")).toHaveText(
+    "150 g"
+  );
+  await page.getByRole("link", { name: "Back to the plan" }).click();
+  await expect(page).toHaveURL(`/week/${week}#${today()}`);
+  await expect(day).toBeInViewport();
 
   // One tap to log it.
   const stuck = meal.getByRole("button", {
@@ -128,7 +149,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await expect(page.getByTestId("pending")).toHaveCount(0); // all saved
 
   // Offline: once the service worker controls the page, the week stays readable.
-  await page.goto("/week");
+  await page.goto(`/week/${week}`);
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
@@ -136,6 +157,22 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await expect(
     page.getByTestId("meal").filter({ hasText: recipe.name })
   ).toBeVisible();
+  // The worker also fetches the week's meal pages in the background.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (url) => {
+          const keys = await caches.keys();
+          const pages = keys.find((k) => k.startsWith("pages-"));
+          return Boolean(
+            pages &&
+            (await (await caches.open(pages)).match(url, { ignoreVary: true }))
+          );
+        }, mealUrl),
+      { timeout: 20_000 }
+    )
+    .toBe(true);
+
   await context.setOffline(true);
   await page.reload();
   await expect(
@@ -150,6 +187,17 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await expect(
     page.getByTestId("meal").filter({ hasText: recipe.name })
   ).toBeVisible();
+  await gotoOffline(page, context, mealUrl);
+  await expect(page.getByTestId("instructions")).toContainText(
+    "Rinse the lentils."
+  );
+  // The list too; the item still to buy, as the lentils are folded under "Done".
+  const toBuy = page.getByTestId("shop-item").filter({ hasText: extra });
+  await gotoOffline(page, context, `/week/${week}/shopping`);
+  await expect(toBuy).toBeVisible();
+  // So does the shopping shortcut, which also only redirects.
+  await gotoOffline(page, context, "/shopping");
+  await expect(toBuy).toBeVisible();
   await context.setOffline(false);
 
   // A session that ended elsewhere (password changed) drops the cached plan
@@ -159,30 +207,31 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await endSessions(USERS.alex);
   await page.goto("/week");
   await expect(page).toHaveURL(/\/login/);
-  await context.setOffline(true);
-  await page.goto(`/week/${weekStartOf(today())}`).catch(() => undefined);
+  await gotoOffline(page, context, `/week/${week}`);
   await expect(
     page.getByRole("heading", { name: "You're offline" })
   ).toBeVisible();
   await context.setOffline(false);
   await signIn(page, USERS.alex);
 
-  // Signing out drops the cached plan from this device.
+  // Signing out drops the cached week, meal pages and list from this device.
   await page.getByRole("button", { name: /Sign out/ }).click();
   await expect(page).toHaveURL(/\/login/);
-  await context.setOffline(true);
-  await page.goto("/week").catch(() => undefined);
-  await expect(
-    page.getByRole("heading", { name: "You're offline" })
-  ).toBeVisible();
-  await expect(page.getByText(recipe.name)).toHaveCount(0);
+  for (const url of ["/week", mealUrl, `/week/${week}/shopping`]) {
+    await gotoOffline(page, context, url);
+    await expect(
+      page.getByRole("heading", { name: "You're offline" })
+    ).toBeVisible();
+    await expect(page.getByText(recipe.name)).toHaveCount(0);
+  }
   await context.setOffline(false);
 });
 
-test("the other person sees the plan and logs only their own meals", async ({
+test("the other person sees the plan, logs only their own meals, and ticks offline", async ({
   page,
+  context,
 }) => {
-  const { recipe } = state();
+  const { recipe, extra } = state();
   await signIn(page, USERS.sam);
   const day = page.locator(`section[aria-label="${formatDay(today())}"]`);
   const meal = day.getByTestId("meal").filter({ hasText: recipe.name });
@@ -196,33 +245,9 @@ test("the other person sees the plan and logs only their own meals", async ({
   await expect(day.getByTestId("totals-Alex")).toHaveCount(0);
   await expect(meal.getByTestId("portions")).toHaveText(/^You ½× · Alex 1×/);
 
-  // One shopping page only: the header has no separate "Shop" link.
-  await expect(
-    page.getByRole("link", { name: "Shop", exact: true })
-  ).toHaveCount(0);
-});
-
-test("the other person sees the ticks, and ticks saved offline sync later", async ({
-  page,
-  context,
-}) => {
-  const { extra } = state();
-  await signIn(page, USERS.sam);
-  const week = weekStartOf(today());
-
-  // The old /shop URL may still be cached by an installed app.
-  await page.goto(`/week/${week}/shop`);
-  await expect(page).toHaveURL(new RegExp(`/week/${week}/shopping$`));
+  // Alex's tick is there too.
+  await page.goto(`/week/${weekStartOf(today())}/shopping`);
   await expect(page.getByText("Done (1)")).toBeVisible();
-
-  // The plan's preview stays reachable, folded away under the checklist.
-  const needs = page.locator("details", { hasText: "What the plan needs" });
-  await expect(needs).not.toHaveAttribute("open", "");
-  await needs.getByText("What the plan needs").click();
-  await expect(needs.getByTestId("lines")).toContainText(state().food);
-  await expect(needs.getByTestId("qty")).toHaveText("150 g");
-  await needs.getByText("What the plan needs").click();
-
   const coffee = page.getByTestId("shop-item").filter({ hasText: extra });
   await expect(coffee).toBeVisible();
 
