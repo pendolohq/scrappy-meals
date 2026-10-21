@@ -105,9 +105,10 @@ The recipe:
 - `extras`: `scrappyProduct: <canonical barcode>`, `scrappyServingGrams`, `scrappyPackGrams`
   (when known), and `scrappyNutrition: source | reviewed` (reviewed when someone changed a value
   on the scan sheet). `scrappyReview: done`: the scan sheet *is* the review.
-- A **"Product" tag**, so the Discover page and the add-meal search can leave products out by
-  default and the Add snack dialog can list them. It joins `RECIPE_TAGS`, but `classifyRecipe`
-  never assigns it.
+- A **"Product" tag**, so the Add snack dialog can list products and the search can label them.
+  Products **do appear in the normal meal search**, with a "Product" pill. On the Discover page
+  they show under the Product tag filter, so the default grid of recipes isn't buried in
+  snack bars. The tag joins `RECIPE_TAGS`, but `classifyRecipe` never assigns it.
 - Image: optional, `POST /api/recipes/{slug}/image { url }` with OFF's front image (CC BY-SA;
   the Source link covers attribution). Not needed for the first PR.
 
@@ -164,9 +165,14 @@ Snickers, Grenade, Huel, Kind and Fage ones above make good fixtures):
 
 ### 4. Logging after the fact: unplanned entries
 
-- `meal_slots` gains **`unplanned boolean not null default false`**. An entry added from
-  "Add snack → product" to **today or an earlier day** is unplanned; one added to a future day is
-  a normal planned meal. That keeps adherence meaning "stuck to the plan".
+- `meal_slots` gains **`unplanned boolean not null default false`**. An unplanned entry is
+  something eaten off-plan: it is logged as eaten, not planned ahead. That keeps adherence
+  meaning "stuck to the plan".
+- **Deciding which one it is:** the sheet asks "Already had it?". The answer starts as yes for
+  today or an earlier day and no for a future day, and can be flipped. Going by the date alone
+  gets two cases wrong: a bar added at breakfast for this afternoon is planned, even though
+  it's today; and a snack someone forgot to plan for tomorrow, added a day late, is unplanned.
+  The toggle covers both. A future day's entry can't be "already had".
 - **Adherence leaves unplanned entries out entirely:** they are neither *unlogged* nor scored
   (`summariseAdherence` skips them; the week grid shows an "Unplanned" pill instead of the log
   buttons). They count in `personDayTotals` like any meal.
@@ -203,13 +209,48 @@ you're back online", and keeps the barcode filled in so retrying is one tap. The
 products list covers the common case of logging later. A queued, unresolved barcode would need a
 second review step later for little gain.
 
+### 8. Sending missing products back to Open Food Facts
+
+When OFF doesn't know a product, or knows it without nutrition (the Huel bar, the empty Dairy
+Milk record), what we type from the pack goes to OFF too, so the next scan anywhere finds it.
+
+- **One app account.** OFF's guidance for apps is a dedicated account (plus its API usage form)
+  rather than one account per user. Its username and password come from two new optional
+  variables, `OFF_USER_ID` and `OFF_PASSWORD`. Each goes into `.env.example`, `docker-compose.yml`
+  and `docs/deploy.md`, and is read only in `server/openfoodfacts.ts`. Without them,
+  contributing is off and nothing else changes. Test writes go to staging
+  (`world.openfoodfacts.net`), which has its own accounts.
+- **The write:** `POST /cgi/product_jqm2.pl` (form fields), with `code`, `user_id`, `password`,
+  `product_name`, `brands`, `quantity`, `serving_size`, `nutrition_data_per=100g`,
+  `nutriment_energy-kcal`, `nutriment_proteins`, `nutriment_carbohydrates`, `nutriment_fat`,
+  `nutriment_fiber` (each with a `_unit`), and `app_name`, `app_version` and `app_uuid`.
+  OFF asks for `app_uuid` to be a salted random id per user, so a moderator can block one
+  person without blocking the app; we derive it from the user's id and `AUTH_SECRET`.
+- **Per 100 g, as printed.** UK packs always print per 100 g, so the sheet's manual entry asks
+  for that column plus the serving size, and we work out per serving ourselves. That's also
+  what OFF wants.
+- **Only fill gaps, never correct.** We send new products and fields OFF has empty. We never
+  overwrite a value OFF already has, even one that looks wrong (the Kind bar's kJ): a household
+  app shouldn't make public corrections without a photo to back them. The change stays in our
+  copy in Mealie.
+- **Asked every time.** A tick box on the sheet, "Also add to Open Food Facts (public,
+  ODbL)". It's on by default when the account is configured, and the choice is remembered on
+  the device. Only product data is sent: no user names and nothing about who ate it.
+- **Not on the critical path.** The Mealie save happens first; the OFF write runs after the
+  response (`after()`), with one retry on a network error, 429 or 5xx, as OFF recommends. The
+  outcome is kept in an `off_contributions` row (barcode, status, error, time). A failed one
+  shows "Not sent to Open Food Facts yet: retry" on the product's recipe page.
+- **Photos, later.** OFF moderators trust products with a front and a nutrition-table photo
+  more. Taking those two photos (uploaded with `/api/v3.3/product/<code>/images`) is a
+  follow-up. Reading nutrition from the photo stays out of scope.
+
 ### Out of scope
 
 As in the issue: reading nutrition from a photo of the label, and products used inside recipes.
 Also editing a product's nutrition from the planner after it's saved; Mealie's editor and the
 existing review page cover that.
 
-## Implementation: three PRs
+## Implementation: four PRs
 
 ### PR 1: products by typed barcode (the core)
 
@@ -223,15 +264,15 @@ existing review page cover that.
       tag). Integration test in `mealie.int.test.ts`. `Recipe` and `recipe_cache` gain
       `barcode`.
 - [ ] Migration: `products` table, `meal_slots.unplanned`, `recipe_cache.barcode`.
-- [ ] `server/plan.ts`: `addProduct` (portion 1 for the adder, 0 for the others; unplanned when the
-      date ≤ the viewer's today). `summariseAdherence` skips unplanned entries. DB tests for
-      both.
+- [ ] `server/plan.ts`: `addProduct` (portion 1 for the adder, 0 for the others; `unplanned`
+      from the sheet's "Already had it?", refused for a day after the viewer's today).
+      `summariseAdherence` skips unplanned entries. DB tests for both.
 - [ ] Actions `lookupProductAction`, `saveProductAction` (`userAction`, zod). They show up in
       `access.test.ts` automatically.
 - [ ] UI: an Add snack dialog with a "Product" tab: barcode field, the sheet (name, the
       macros per serving, editable, serving size, portion choice, OFF credit link), recent
-      products. "Unplanned" pill in the week grid and day card. Products are hidden from
-      Discover and from the meal search by default.
+      products. "Unplanned" pill in the week grid and day card. A "Product" pill in the meal
+      search; on Discover, products only under the Product filter.
 - [ ] `docs/mealie-api.md`: the product recipe's fields and the endpoints used.
 - No new e2e journey: the parts unit and DB tests can't reach are the camera (PR 2) and OFF
   itself, which CI can't call. Optionally, add one step to Alex's journey later, logging a
@@ -250,17 +291,25 @@ existing review page cover that.
 - [ ] Optional hardening in the Caddyfile: `Permissions-Policy: camera=(self), microphone=(),
       geolocation=()` (with `docs/deploy.md`).
 
-### PR 3: follow-ups
+### PR 3: contributing to Open Food Facts
+
+- [ ] `OFF_USER_ID` / `OFF_PASSWORD` (optional) in `.env.example`, `docker-compose.yml` and
+      `docs/deploy.md`.
+- [ ] The write in `server/openfoodfacts.ts` (gaps only, per 100 g, `app_uuid` per user),
+      the `off_contributions` table, the run after the response with one retry, and "retry"
+      on the recipe page. Unit tests with an injected `fetch`. Try it once by hand against
+      staging.
+- [ ] The tick box on the sheet, and per-100 g manual entry.
+
+### PR 4: follow-ups
 
 - [ ] Shopping: planned products as "Name ×N" free-text lines; unit test in
       `domain/shopping.test.ts`.
 - [ ] "Log what you had" from the Swapped prompt.
-- [ ] Product photo from OFF on the recipe.
+- [ ] Product photo from OFF on the recipe; taking front and nutrition photos for OFF.
 
-## Open questions for the household
+## Settled
 
-1. Is "a product added today or earlier is unplanned, a future one is planned" the right rule?
-   The alternative is a "Planned / Unplanned" toggle on the sheet.
-2. Should products appear in the normal meal search at all, or only in the Add snack dialog?
-3. Contributing missing products back to OFF (it has a write API) is possible but needs an OFF
-   account. Worth it, or not for now?
+- Products appear in the normal meal search (with a "Product" pill).
+- Missing products and empty fields are sent back to Open Food Facts (§8).
+- Planned vs unplanned is the "Already had it?" toggle, defaulting from the date (§4).
