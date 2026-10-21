@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SLOT_TYPES } from "./slots";
 import {
   categoryFilter,
   classifyCategories,
@@ -10,6 +11,7 @@ import {
   RECIPE_CATEGORIES,
   RECIPE_TAGS,
   slotFromTags,
+  tagForSlot,
 } from "./taxonomy";
 
 describe("agreed list", () => {
@@ -45,6 +47,15 @@ describe("slotFromTags", () => {
     expect(slotFromTags(["lunch", "dinner"])).toBeNull();
     expect(slotFromTags(["dessert"])).toBeNull();
     expect(slotFromTags([])).toBeNull();
+  });
+});
+
+describe("tagForSlot", () => {
+  it("names each slot's meal tag, the way back from slotFromTags", () => {
+    for (const slot of SLOT_TYPES) {
+      expect(slotFromTags([tagForSlot(slot)])).toBe(slot);
+    }
+    expect(tagForSlot("dinner")).toBe("dinner");
   });
 });
 

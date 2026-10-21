@@ -65,6 +65,10 @@ export function slotFromTags(tagSlugs: string[]): SlotType | null {
   return slots.length === 1 ? slots[0][1] : null;
 }
 
+/** The meal tag that names a slot: what the add-meal picker starts filtered on. */
+export const tagForSlot = (slot: SlotType): TagSlug =>
+  MEAL_TAG_SLOTS.find(([, s]) => s === slot)![0];
+
 /**
  * Categories to ask Mealie for when filtering. Vegan food is vegetarian too,
  * but a recipe usually carries only the narrower category.

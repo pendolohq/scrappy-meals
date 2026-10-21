@@ -59,7 +59,10 @@ until every place names the same version (`mealie-version.test.ts`).
 ## Tags, categories and total time
 
 The Discover page (`/recipes`) filters on Mealie's own tags and categories,
-so they stay editable in Mealie. The agreed set is `RECIPE_TAGS` /
+so they stay editable in Mealie. The add-meal picker uses the same filters
+(`discoverRecipes`, through `/api/recipes/search`) with a name search on
+top, starting on the slot's meal tag; Mealie ranks by relevance while
+searching and by name otherwise. The agreed set is `RECIPE_TAGS` /
 `RECIPE_CATEGORIES` in `src/server/domain/taxonomy.ts`; imports and the review
 page only ever assign those.
 

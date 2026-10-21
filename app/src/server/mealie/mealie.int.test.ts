@@ -25,7 +25,6 @@ import {
   discoverRecipes,
   getRecipe,
   listOrganizers,
-  searchRecipes,
 } from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
@@ -155,13 +154,19 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
 
   it("rejects a bad token with a MealieError", async () => {
     const bad = createMealieClient({ baseUrl: baseUrl!, token: "nope" });
-    const err = await searchRecipes("", { client: bad }).catch((e) => e);
+    const err = await discoverRecipes(
+      { tags: [], categories: [], quick: false },
+      { client: bad }
+    ).catch((e) => e);
     expect(err).toBeInstanceOf(MealieError);
     expect(err.status).toBe(401);
   });
 
   it("searches recipes", async () => {
-    const page = await searchRecipes(`Lentil Soup ${run}`, { client });
+    const page = await discoverRecipes(
+      { tags: [], categories: [], quick: false, search: `Lentil Soup ${run}` },
+      { client }
+    );
     expect(page.items.map((r) => r.slug)).toContain(ids.fullSlug);
     const hit = page.items.find((r) => r.slug === ids.fullSlug)!;
     expect(hit.servings).toBe(4);
@@ -309,6 +314,19 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(
         await slugs({ ...none, tags: [tag.slug], categories: [category.slug] })
       ).toEqual([ids.fullSlug]);
+    });
+
+    it("combines a search with the filters", async () => {
+      const { items } = await discoverRecipes(
+        {
+          tags: [tag.slug],
+          categories: [],
+          quick: false,
+          search: "Lentil",
+        },
+        { client }
+      );
+      expect(items.map((r) => r.slug)).toEqual([ids.fullSlug]);
     });
   });
 
