@@ -76,6 +76,10 @@ export function slotFromTags(tagSlugs: string[]): SlotType | null {
   return slots.length === 1 ? slots[0][1] : null;
 }
 
+/** The meal tag that names a slot: what the add-meal picker starts filtered on. */
+export const tagForSlot = (slot: SlotType): TagSlug =>
+  MEAL_TAG_SLOTS.find(([, s]) => s === slot)![0];
+
 /**
  * Categories to ask Mealie for when filtering. Vegan food is vegetarian too,
  * but a recipe usually carries only the narrower category.
@@ -144,7 +148,8 @@ const meat = (list: string[]) =>
 const CHICKEN = meat(["chicken", "turkey"]);
 
 const MEAT = meat([
-  "beef",
+  // A beef tomato is a tomato, whichever way round the parser wrote it.
+  "(?<!tomato(?:es)? )beef(?! tomato)",
   // "Cauliflower steaks" and "tuna steaks" aren't beef.
   "(?<!(?:cauliflower|mushroom|celeriac|aubergine|eggplant|cabbage|tuna|salmon|swordfish) )steaks?",
   // Mince on its own is beef; poultry mince says so. Mince pies are mincemeat.
@@ -236,41 +241,127 @@ const FLAVOURINGS = [FLAVOURING_CHICKEN, FLAVOURING_MEAT, FLAVOURING_FISH].map(
 const withoutFlavourings = (text: string) =>
   FLAVOURINGS.reduce((rest, re) => rest.replace(re, " "), text);
 
+// Parsed lines put the modifier wherever the source did ("mayonnaise vegan",
+// "sour cream plant-based", "greek yogurt Greek style, Alpro"), so these
+// count anywhere in the line, and make all of it plant-based.
+const PLANT_LINE = words([
+  "vegan",
+  "plant[- ]based",
+  "alpro",
+  "oatly",
+  "violife",
+  "koko",
+  "naturli",
+  "tofurky",
+  "vbites",
+  "this isn'?t",
+  "happy (?:pancetta|bacon)",
+  "beyond meat",
+  "linda mccartney'?s?",
+]);
+
+// A substitute rules out meat and fish, not dairy or egg (Quorn has egg).
+const MEAT_FREE_LINE = words([
+  "vegetarian",
+  "veggie",
+  "meat[- ]free",
+  "meatless",
+  "quorn",
+  "tofu",
+  "tempeh",
+  "seitan",
+  "soya? mince",
+  "tvp",
+  "textured (?:vegetable|soya?) protein",
+  "jackfruit",
+  "(?:chicken|beef|pork|meat|fish|seafood)[- ](?:free|style)",
+]);
+
+const DAIRY_FREE_LINE = words(["dairy[- ]free", "non[- ]dairy", "egg[- ]free"]);
+
+// Quotes mark a mock: "'Chicken' tenders", "Tempeh “meatballs”". An
+// apostrophe inside a word ("goat's") isn't one.
+const QUOTED = /(?<!\p{L})['‘"“][^'‘’"“”\n]{1,40}['’"”](?!\p{L})/gu;
+
+type LineReading = {
+  main: CategorySlug[];
+  flavouring: CategorySlug[];
+  dairyOrEgg: boolean;
+  substitute: boolean;
+};
+
+// One line at a time, so "vegan" in one line can't excuse the butter in
+// the next.
+const readLine = (line: string): LineReading => {
+  const quoted = line.match(QUOTED) ?? [];
+  const text = line.replace(QUOTED, " ");
+  const plant = PLANT_LINE.test(line);
+  const meatFree = plant || MEAT_FREE_LINE.test(line);
+  const rest = withoutFlavourings(text);
+  const main: CategorySlug[] = [];
+  const flavouring: CategorySlug[] = [];
+  if (!meatFree) {
+    for (const [slug, re] of [
+      ["fish", FISH],
+      ["chicken", CHICKEN],
+      ["meat", MEAT],
+    ] as const) {
+      if (re.test(rest)) {
+        main.push(slug);
+      }
+    }
+    for (const [slug, re] of [
+      ["chicken", FLAVOURING_CHICKEN],
+      ["meat", FLAVOURING_MEAT],
+      ["fish", FLAVOURING_FISH],
+    ] as const) {
+      if (re.test(text)) {
+        flavouring.push(slug);
+      }
+    }
+  }
+  return {
+    main,
+    flavouring,
+    dairyOrEgg:
+      !plant && !DAIRY_FREE_LINE.test(line) && DAIRY_OR_EGG.test(text),
+    substitute:
+      meatFree ||
+      quoted.some((q) => [FISH, CHICKEN, MEAT].some((re) => re.test(q))),
+  };
+};
+
 /** Categories from what the recipe contains. */
 export function classifyCategories(
   name: string,
   ingredients: string[]
 ): CategorySlug[] {
-  const all = [name, ...ingredients].join("\n");
-  const main = withoutFlavourings(all);
-  const found: CategorySlug[] = [];
-  if (FISH.test(main)) {
-    found.push("fish");
+  // A recipe that calls itself vegan is trusted over "butter" or "mayo"
+  // written without the plant word.
+  if (/\b(?:vegan|plant[- ]based)\b/i.test(name)) {
+    return ["vegan"];
   }
-  if (CHICKEN.test(main)) {
-    found.push("chicken");
-  }
-  if (MEAT.test(main)) {
-    found.push("meat");
-  }
+  const lines = ingredients.map(readLine);
+  // A dish named after what it imitates ("Fennel sausage ragù" made with
+  // soya mince) is read from its ingredients alone.
+  const read = lines.some((l) => l.substitute)
+    ? lines
+    : [readLine(name), ...lines];
+  const has = (slug: CategorySlug, key: "main" | "flavouring") =>
+    read.some((l) => l[key].includes(slug));
+  const found = (["fish", "chicken", "meat"] as const).filter((c) =>
+    has(c, "main")
+  );
   if (found.length > 0) {
     return found;
   }
-  if (FLAVOURING_CHICKEN.test(all)) {
-    return ["chicken"];
+  const flavouring = (["chicken", "meat", "fish"] as const).find((c) =>
+    has(c, "flavouring")
+  );
+  if (flavouring) {
+    return [flavouring];
   }
-  if (FLAVOURING_MEAT.test(all)) {
-    return ["meat"];
-  }
-  if (FLAVOURING_FISH.test(all)) {
-    return ["fish"];
-  }
-  // A recipe that calls itself vegan is trusted over "butter" or "mayo"
-  // written without the plant word.
-  if (/\bvegan\b/i.test(name) || !DAIRY_OR_EGG.test(all)) {
-    return ["vegan"];
-  }
-  return ["vegetarian"];
+  return read.some((l) => l.dairyOrEgg) ? ["vegetarian"] : ["vegan"];
 }
 
 const BREAKFAST = words([

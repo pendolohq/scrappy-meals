@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SLOT_TYPES } from "./slots";
 import {
   categoryFilter,
   classifyCategories,
@@ -10,6 +11,7 @@ import {
   RECIPE_CATEGORIES,
   RECIPE_TAGS,
   slotFromTags,
+  tagForSlot,
 } from "./taxonomy";
 
 describe("agreed list", () => {
@@ -45,6 +47,15 @@ describe("slotFromTags", () => {
     expect(slotFromTags(["lunch", "dinner"])).toBeNull();
     expect(slotFromTags(["dessert"])).toBeNull();
     expect(slotFromTags([])).toBeNull();
+  });
+});
+
+describe("tagForSlot", () => {
+  it("names each slot's meal tag, the way back from slotFromTags", () => {
+    for (const slot of SLOT_TYPES) {
+      expect(slotFromTags([tagForSlot(slot)])).toBe(slot);
+    }
+    expect(tagForSlot("dinner")).toBe("dinner");
   });
 });
 
@@ -221,5 +232,66 @@ describe("meat words that aren't meat", () => {
     expect(
       classifyCategories("Vegetable risotto", ["1 l fish stock", "rice"])
     ).toEqual(["fish"]);
+  });
+});
+
+describe("plant-based recipes", () => {
+  it.each([
+    ["Vegan mayo after the food", ["3 tablespoons mayonnaise vegan"]],
+    ["Plant-based after the food", ["30 grams mayonnaise plant-based"]],
+    ["Sour cream", ["sour cream plant-based"]],
+    ["Cream cheese", ["2 dollop cream cheese plant-based"]],
+    ["Brand yoghurt", ["greek yogurt Greek style, Alpro"]],
+    ["Brand pancetta", ["100 g Happy Pancetta"]],
+    ["Tempeh bacon", ["Happy Bacon Tempeh Crumb"]],
+    ["Tempeh pancetta", ["Tempeh Pancetta"]],
+    ["Quoted chicken", ["Hot Chilli 'Chicken' Tenders"]],
+    ["Quoted meatballs", ["Tempeh “Meatballs”"]],
+    ["Beef tomato", ["1 tomato beef, diced"]],
+    ["Vegan worcestershire", ["1 tbsp vegan worcestershire sauce"]],
+    ["Vegan fish sauce", ["2 tbsp vegan fish sauce"]],
+    ["Chicken-style stock", ["500 ml chicken-style stock"]],
+    ["Vegetarian chicken stock", ["1 vegetarian chicken stock cube"]],
+  ] as const)("%s", (name, ingredients) => {
+    expect(classifyCategories(name, [...ingredients])).toEqual(["vegan"]);
+  });
+
+  it("reads a dish named after the meat it imitates from its ingredients", () => {
+    expect(
+      classifyCategories("Fennel Sausage Ragù", [
+        "250 g soya mince",
+        "1 fennel bulb",
+      ])
+    ).toEqual(["vegan"]);
+    expect(
+      classifyCategories("Hot Chilli 'Chicken' Tenders", ["1 block tofu"])
+    ).toEqual(["vegan"]);
+  });
+
+  it("keeps a plant word to its own line", () => {
+    expect(
+      classifyCategories("Toast", ["1 tbsp mayonnaise vegan", "2 eggs"])
+    ).toEqual(["vegetarian"]);
+    expect(
+      classifyCategories("Stew", ["200 g tofu", "300 g beef shin"])
+    ).toEqual(["meat"]);
+  });
+
+  it("still reads the real thing", () => {
+    expect(classifyCategories("Salad", ["2 beef tomatoes", "feta"])).toEqual([
+      "vegetarian",
+    ]);
+    expect(classifyCategories("Carbonara", ["100 g pancetta"])).toEqual([
+      "meat",
+    ]);
+    expect(classifyCategories("Toast", ["mayonnaise", "lettuce"])).toEqual([
+      "vegetarian",
+    ]);
+  });
+
+  it("trusts a recipe that calls itself plant-based", () => {
+    expect(
+      classifyCategories("Plant-based carbonara", ["100 g pancetta", "cream"])
+    ).toEqual(["vegan"]);
   });
 });

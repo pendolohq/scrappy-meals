@@ -70,6 +70,10 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   const planDay = page.locator(`section[aria-label="${formatDay(today())}"]`);
   await planDay.getByRole("button", { name: "Add lunch" }).click();
   const picker = page.getByRole("dialog");
+  // It opens on lunches, and the search narrows them.
+  await expect(
+    picker.getByRole("button", { name: "Lunch", pressed: true })
+  ).toBeVisible();
   await picker.getByLabel("Search recipes").fill(recipe.name);
   await picker.getByRole("button", { name: new RegExp(recipe.name) }).click();
   await expect(
