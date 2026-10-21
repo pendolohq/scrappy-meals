@@ -2,6 +2,13 @@ import "server-only";
 
 import { getDb } from "./db/client";
 import type { ReviewInput } from "./domain/review-input";
+import {
+  type CategorySlug,
+  type Organizer,
+  RECIPE_CATEGORIES,
+  RECIPE_TAGS,
+  type TagSlug,
+} from "./domain/taxonomy";
 import { RetryableError, UserFacingError } from "./errors";
 import { isMealieUnavailable } from "./mealie/client";
 import {
@@ -44,9 +51,14 @@ type RawIngredient = {
   substitutions?: unknown[] | null;
 };
 
+type RawOrganizer = { id?: string | null; name: string; slug?: string | null };
+
 type RawRecipe = {
   id?: string | null;
   name: string;
+  totalTimeSeconds?: number | null;
+  tags?: RawOrganizer[] | null;
+  recipeCategory?: RawOrganizer[] | null;
   // Mealie sets this to a file key once a photo is uploaded.
   image?: unknown;
   recipeServings?: number | null;
@@ -95,6 +107,14 @@ export type ReviewDraft = {
   /** Mealie's recipe id when it has a photo, for /api/recipe-images/[id]. */
   photoId: string | null;
   importState: ImportState;
+  /** Mealie's total time in whole minutes; null when there is none. */
+  totalMinutes: number | null;
+  /** Slugs of the agreed tags and categories the recipe has. */
+  tags: TagSlug[];
+  categories: CategorySlug[];
+  /** Ones outside the agreed list, added in Mealie: kept as they are. */
+  otherTags: Organizer[];
+  otherCategories: Organizer[];
   nutrition: Record<MacroKey, number | null>;
   /** Text Mealie has for a macro that can't be read as a number ("10-12"). */
   unreadableNutrition: Partial<Record<MacroKey, string>>;
@@ -226,6 +246,8 @@ export async function loadReview(
         mealieBase && group ? mealieRecipeUrl(mealieBase, group, slug) : null,
       photoId: recipe.id && recipe.image ? recipe.id : null,
       importState: readImportState(recipe.extras),
+      totalMinutes: minutesOf(recipe.totalTimeSeconds),
+      ...splitOrganizers(recipe),
       nutrition: {
         kcal: perServing.kcal ?? null,
         protein: perServing.protein ?? null,
@@ -238,6 +260,55 @@ export async function loadReview(
     };
   });
 }
+
+const minutesOf = (seconds: number | null | undefined) =>
+  seconds ? Math.max(1, Math.round(seconds / 60)) : null;
+
+// Mealie matches organizers by name, case-insensitively.
+const isAgreed = (agreed: readonly Organizer[], o: RawOrganizer) =>
+  agreed.some((a) => a.name.toLowerCase() === o.name.trim().toLowerCase());
+
+const agreedSlugs = <T extends string>(
+  agreed: readonly { name: string; slug: T }[],
+  found: RawOrganizer[]
+): T[] =>
+  agreed.filter((a) => found.some((o) => isAgreed([a], o))).map((a) => a.slug);
+
+function splitOrganizers(recipe: RawRecipe) {
+  const tags = recipe.tags ?? [];
+  const categories = recipe.recipeCategory ?? [];
+  const other = (agreed: readonly Organizer[], found: RawOrganizer[]) =>
+    found
+      .filter((o) => !isAgreed(agreed, o))
+      .map((o) => ({ name: o.name, slug: o.slug ?? "" }));
+  return {
+    tags: agreedSlugs(RECIPE_TAGS, tags),
+    categories: agreedSlugs(RECIPE_CATEGORIES, categories),
+    otherTags: other(RECIPE_TAGS, tags),
+    otherCategories: other(RECIPE_CATEGORIES, categories),
+  };
+}
+
+/**
+ * The agreed ones the review picked, plus whatever the recipe has from
+ * outside the list (by id, so Mealie keeps the very same tag).
+ */
+const organizersToSave = (
+  agreed: readonly Organizer[],
+  picked: string[],
+  stored: RawOrganizer[]
+) => [
+  ...agreed
+    .filter((a) => picked.includes(a.slug))
+    .map((a) => ({ name: a.name, slug: a.slug })),
+  ...stored
+    .filter((o) => !isAgreed(agreed, o))
+    .map((o) => ({
+      ...(o.id ? { id: o.id } : {}),
+      name: o.name,
+      slug: o.slug ?? null,
+    })),
+];
 
 const keyOf = (name: string) => name.trim().toLowerCase();
 
@@ -388,8 +459,25 @@ export async function saveReview(
     }
     const anyMacro = Object.values(input.nutrition).some((v) => v !== null);
 
+    // Like nutrition, an unchanged time is left as Mealie has it, seconds
+    // and all.
+    const time =
+      input.totalMinutes === minutesOf(recipe.totalTimeSeconds)
+        ? {}
+        : {
+            totalTimeSeconds:
+              input.totalMinutes === null ? null : input.totalMinutes * 60,
+          };
+
     await d.patch(slug, {
       recipeServings: input.servings,
+      ...time,
+      tags: organizersToSave(RECIPE_TAGS, input.tags, recipe.tags ?? []),
+      recipeCategory: organizersToSave(
+        RECIPE_CATEGORIES,
+        input.categories,
+        recipe.recipeCategory ?? []
+      ),
       nutrition,
       recipeIngredient,
       extras: withImportState(recipe.extras, {

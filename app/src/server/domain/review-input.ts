@@ -1,10 +1,20 @@
 import { z } from "zod";
 
+import { RECIPE_CATEGORIES, RECIPE_TAGS } from "./taxonomy";
+
+const slugs = <T extends string>(list: readonly { slug: T }[]) =>
+  z.array(z.enum(list.map((o) => o.slug) as [T, ...T[]])).max(list.length);
+
 const macro = z.number().min(0).nullable();
 
 /** What the review form submits; the action adds the recipe's slug. */
 export const reviewInputSchema = z.object({
   servings: z.number().positive().max(1000),
+  /** Whole minutes; null leaves the recipe without a total time. */
+  totalMinutes: z.int().min(1).max(10_000).nullable(),
+  /** The agreed tags and categories the recipe should carry. */
+  tags: slugs(RECIPE_TAGS),
+  categories: slugs(RECIPE_CATEGORIES),
   nutrition: z.object({
     kcal: macro,
     protein: macro,

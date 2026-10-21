@@ -5,21 +5,14 @@ import { RotateCcw } from "lucide-react";
 
 import { setPortionAction } from "@/app/(app)/week/actions";
 import { Stepper } from "@/components/plan/stepper";
+import { IngredientsCard } from "@/components/recipe/ingredients-card";
+import { Method } from "@/components/recipe/method";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
-import {
-  MAX_COOKING_FOR,
-  MIN_COOKING_FOR,
-  plannedServings,
-  scaleIngredients,
-  stepServings,
-} from "@/server/domain/ingredients";
+import { plannedServings, scaleIngredients } from "@/server/domain/ingredients";
 import type { Ingredient, RecipeStep } from "@/server/mealie/recipes";
-
-import { IngredientText } from "./ingredient-text";
-import { Method } from "./method";
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">
@@ -85,9 +78,6 @@ export const CookingPanel = ({
       }
     });
 
-  const stepCookingFor = (next: number) =>
-    setCookingFor(stepServings(servings, next > servings ? 1 : -1));
-
   return (
     <>
       <Card as="section" aria-labelledby="portions">
@@ -126,29 +116,13 @@ export const CookingPanel = ({
       </Card>
 
       {recipe && (
-        <Card as="section" aria-labelledby="ingredients">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div id="ingredients">
-              <SectionTitle>Ingredients</SectionTitle>
-            </div>
-            {recipe.servings && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted">Cooking for</span>
-                <Stepper
-                  label="Cooking for"
-                  value={servings}
-                  onChange={stepCookingFor}
-                  min={MIN_COOKING_FOR}
-                  max={MAX_COOKING_FOR}
-                  step={1}
-                  suffix=""
-                  testId="cooking-for"
-                />
-              </div>
-            )}
-          </div>
-          {recipe.servings ? (
-            <p className="mt-1 flex min-h-tap flex-wrap items-center gap-x-2 text-xs text-muted">
+        <IngredientsCard
+          recipeServings={recipe.servings}
+          lines={lines}
+          cookingFor={servings}
+          onCookingFor={setCookingFor}
+          caption={
+            <>
               <span>
                 {cookingFor !== null
                   ? "Only this list changes, not the plan."
@@ -166,34 +140,9 @@ export const CookingPanel = ({
                   Reset to plan ({formatPortion(fromPlan)})
                 </Button>
               )}
-            </p>
-          ) : (
-            <p className="mt-2 rounded-control bg-danger-soft px-3 py-2 text-sm">
-              No servings count in Mealie, so amounts are for the whole recipe.
-              Set servings in Mealie to scale them.
-            </p>
-          )}
-          {lines.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">No ingredients in Mealie.</p>
-          ) : (
-            <ul className="mt-2 space-y-1" data-testid="ingredients">
-              {lines.map((line, i) => (
-                <li key={i}>
-                  {line.title && (
-                    <h3 className="pt-3 pb-1 font-serif font-semibold">
-                      {line.title}
-                    </h3>
-                  )}
-                  {(line.scaled || line.text) && (
-                    <p className="py-1">
-                      <IngredientText line={line} qtyTestId="qty" />
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+            </>
+          }
+        />
       )}
 
       {recipe && recipe.instructions.length > 0 && (

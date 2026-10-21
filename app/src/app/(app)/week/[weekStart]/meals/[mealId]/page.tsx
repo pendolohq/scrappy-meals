@@ -1,65 +1,28 @@
 import { Suspense } from "react";
-import { ChevronLeft, ExternalLink } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 
 import { RecipeFlags } from "@/components/plan/recipe-flags";
-import { buttonClass } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { EditInMealie } from "@/components/recipe/edit-in-mealie";
+import {
+  NutritionGrid,
+  RecipeFacts,
+  RecipeNotes,
+} from "@/components/recipe/recipe-details";
 import { RecipeImage } from "@/components/ui/recipe-image";
-import { formatAmount, formatDay, formatPortion } from "@/lib/format";
+import { formatDay, formatPortion } from "@/lib/format";
 import { getDb } from "@/server/db/client";
 import { slotLabel } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
-import { recipeLinkInMealie } from "@/server/mealie/links";
-import { MACRO_KEYS, type MacroKey } from "@/server/mealie/nutrition";
 import { getMeal } from "@/server/plan";
 import { requireUser } from "@/server/session";
 
 import { canonicalWeek } from "../../../week-route";
 
 import { CookingPanel } from "./cooking-panel";
-
-const MACRO_LABEL: Record<MacroKey, string> = {
-  kcal: "kcal",
-  protein: "Protein",
-  carbs: "Carbs",
-  fat: "Fat",
-  fibre: "Fibre",
-};
-
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">
-    {children}
-  </h2>
-);
-
-/**
- * The recipe's page in Mealie, for people with a Mealie account. Its URL
- * needs the group's slug, so it streams in after the page: a Mealie that's
- * down doesn't hold up the recipe, it only leaves out the link.
- */
-const EditInMealie = async ({ slug }: { slug: string }) => {
-  const href = await recipeLinkInMealie(slug);
-  if (!href) {
-    return null;
-  }
-  return (
-    <p className="text-center">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={buttonClass({ variant: "secondary", size: "sm" })}
-      >
-        Edit in Mealie
-        <ExternalLink className="size-3.5" aria-hidden />
-      </a>
-    </p>
-  );
-};
 
 export default async function MealPage({
   params,
@@ -124,29 +87,13 @@ export default async function MealPage({
           </p>
         )}
         {recipe && (
-          <dl
-            className="grid grid-cols-5 gap-2 rounded-control bg-sunken/70 p-3 text-center tabular-nums"
-            aria-label="Nutrition per serving"
-            data-testid="nutrition"
-          >
-            {MACRO_KEYS.map((key) => {
-              const value = recipe.nutrition.perServing[key];
-              return (
-                <div key={key} className="min-w-0">
-                  <dt className="truncate text-xs text-muted">
-                    {MACRO_LABEL[key]}
-                  </dt>
-                  <dd className="font-semibold">
-                    {value === undefined
-                      ? "–"
-                      : `${formatAmount(value)}${key === "kcal" ? "" : " g"}`}
-                  </dd>
-                </div>
-              );
-            })}
-            <p className="col-span-5 text-xs text-muted">Per serving</p>
-          </dl>
+          <RecipeFacts
+            totalMinutes={recipe.totalMinutes}
+            categories={recipe.categories}
+            tags={recipe.tags}
+          />
         )}
+        {recipe && <NutritionGrid nutrition={recipe.nutrition} />}
       </header>
 
       <CookingPanel
@@ -164,21 +111,7 @@ export default async function MealPage({
         }
       />
 
-      {notes.length > 0 && (
-        <Card as="section">
-          <SectionTitle>Notes</SectionTitle>
-          <div className="space-y-3">
-            {notes.map((note, i) => (
-              <div key={i}>
-                {note.title && <h3 className="font-semibold">{note.title}</h3>}
-                {note.text && (
-                  <p className="whitespace-pre-line">{note.text}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      <RecipeNotes notes={notes} />
 
       {recipe && (
         <Suspense fallback={null}>

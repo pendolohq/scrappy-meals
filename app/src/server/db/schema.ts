@@ -21,6 +21,7 @@ import {
   MAX_SNACK_SLOTS,
   SLOT_TYPES,
 } from "../domain/slots";
+import type { Organizer } from "../domain/taxonomy";
 import type { ImportState } from "../mealie/import-state";
 import type { RecipeNutrition } from "../mealie/nutrition";
 import type { Ingredient, RecipeNote, RecipeStep } from "../mealie/recipes";
@@ -220,6 +221,10 @@ export const recipeCache = pgTable(
     instructions: jsonb("instructions").$type<RecipeStep[]>(),
     notes: jsonb("notes").$type<RecipeNote[]>(),
     sourceUrl: text("source_url"),
+    // Null on rows cached before the recipe page showed them.
+    tags: jsonb("tags").$type<Organizer[]>(),
+    categories: jsonb("categories").$type<Organizer[]>(),
+    totalMinutes: integer("total_minutes"),
     // Rows cached before imports existed refresh within the hour; until then
     // they read as plain Mealie recipes.
     reviewState: text("review_state")

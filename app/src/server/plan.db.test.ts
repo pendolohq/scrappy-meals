@@ -32,6 +32,9 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
   ingredients: [],
   instructions: [],
   notes: [],
+  tags: [],
+  categories: [],
+  totalMinutes: null,
   nutrition: {
     perServing: { kcal, protein: 20, carbs: 40, fat: 15, fibre: 6 },
     missing: [],
