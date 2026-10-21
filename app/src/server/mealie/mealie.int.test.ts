@@ -446,7 +446,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         {
           extras: {
             note: decoyCode,
-            scrappyProduct: bareCode.replace(/\d$/, "0"),
+            scrappyProduct: barcodeFor(digits(4)),
           },
         },
         { client }
