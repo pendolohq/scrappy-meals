@@ -50,8 +50,8 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
    image (listed in `.github/image-paths`; a unit test keeps the list complete) also build and
    smoke-test it; PRs that touch the compose file, Caddyfile or backups validate them and run a
    backup and restore round trip. Nothing is published.
-2. **Merge to `main`:** the same checks, then the image is published as
-   `ghcr.io/<owner>/scrappy-meals:main` and `:sha-<commit>`. The server doesn't pick these up.
+2. **Merge to `main`:** the same checks, and the image is always built and smoke-tested. Still
+   nothing is published.
 3. **Release:** tagging `vX.Y.Z` runs CI again and publishes `:X.Y.Z`, `:X.Y` and `:latest`.
 4. **Deploy:** on the server, check out the tag, pull, and `docker compose up -d --wait`
    ([deploy.md](deploy.md) §7 has the exact commands). `APP_TAG` in `.env` picks the image
