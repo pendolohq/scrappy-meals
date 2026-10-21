@@ -117,6 +117,51 @@ services:
     restart: unless-stopped
     logging: *logging
 
+  # Monitoring (Beszel): CPU, memory, disk and network for the server and each
+  # container. The agent exits until it has the hub's key: docs/deploy.md,
+  # "Monitoring".
+  beszel:
+    image: henrygd/beszel:0.21.0@sha256:6b39a8b64f9b15d00a25e7683e31a93c46161182a54f62713525107064e10599
+    environment:
+      APP_URL: http://localhost:8090
+      TZ: ${TZ:-UTC}
+    # Loopback only: the dashboard is reached through an SSH tunnel, never Caddy.
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - beszel-data:/beszel_data
+      - beszel-socket:/beszel_socket
+    healthcheck:
+      test: ["CMD", "/beszel", "health", "--url", "http://localhost:8090"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 128m
+    restart: unless-stopped
+    logging: *logging
+
+  beszel-agent:
+    image: henrygd/beszel-agent:0.21.0@sha256:f27b1aa2c68404bc5b9e1a2ab36653bd9b4ee14f6299862f09cd5051a4134767
+    # Host networking so it sees the server's own network interfaces. It
+    # listens on a socket shared with the hub, so it opens no port.
+    network_mode: host
+    environment:
+      LISTEN: /beszel_socket/beszel.sock
+      HUB_URL: http://localhost:8090
+      KEY: ${BESZEL_AGENT_KEY:-}
+      TOKEN: ${BESZEL_AGENT_TOKEN:-}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - beszel-agent-data:/var/lib/beszel-agent
+      - beszel-socket:/beszel_socket
+      # For per-container stats. Read-only doesn't limit the Docker API: this
+      # is root-equivalent access to the server.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    mem_limit: 64m
+    restart: unless-stopped
+    logging: *logging
+
   # Nightly backup, run from host cron: docker compose run --rm backup
   # Write-only S3 credentials; cannot read or delete existing backups.
   backup:
@@ -154,3 +199,6 @@ volumes:
   mealie-data: {}
   caddy-data: {}
   caddy-config: {}
+  beszel-data: {}
+  beszel-agent-data: {}
+  beszel-socket: {}

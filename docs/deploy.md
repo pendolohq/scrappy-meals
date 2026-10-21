@@ -26,7 +26,8 @@ usermod -aG docker deploy
 
 Optional but recommended on 4 GB: a 2 GB swap file, so a memory spike (e.g.
 Mealie importing a big recipe) slows things down instead of killing a
-container.
+container. To see what is actually using the memory over time, set up
+monitoring (section 8).
 
 ```sh
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
@@ -148,6 +149,9 @@ Recipes work best in the planner when they have:
   shopping list. Unparsed lines still appear, as written.
 
 ## 5. The planner
+
+Set up monitoring first (section 8, "Monitoring"): its agent needs a key from
+the hub, and without it the next command fails.
 
 ```sh
 docker compose up -d
@@ -280,6 +284,48 @@ docker compose logs --since 1h app mealie
 
 Pointing an uptime monitor (e.g. healthchecks.io, Uptime Kuma) at
 `/api/health` catches outages; it returns 503 when the database is down.
+
+### Monitoring
+
+[Beszel](https://beszel.dev) keeps a history of CPU, memory, swap, disk and
+network, for the server and for each container, and can alert on them (e.g.
+memory above 90%, disk nearly full). It answers "what is using the memory"
+better than Hetzner's graphs, which can't see inside the VM. It's two services:
+`beszel` (the hub: dashboard and history) and `beszel-agent` (collects the
+numbers). Idle, they use about 15 MB together; their limits are 128 MB and
+64 MB.
+
+The agent exits until it has the hub's key. On a new server, or one set up
+before monitoring existed, do the steps below before the next
+`docker compose up -d --wait`, which otherwise fails on the agent.
+
+The dashboard is never published: it listens on the server's loopback only.
+The agent mounts the Docker socket to read container stats, which is
+root-equivalent access to the server, so keep the image pinned and the
+dashboard behind the tunnel.
+
+```sh
+cd /opt/scrappy-meals
+docker compose up -d beszel                # the hub only, for now
+```
+
+From your own machine, tunnel to it and open `http://localhost:8090`:
+
+```sh
+ssh -L 8090:localhost:8090 deploy@<server>
+```
+
+1. Create the admin account (the first visit asks for it).
+2. **Add System**: any name, and as the host `/beszel_socket/beszel.sock`
+   (the agent talks to the hub over a socket, not a port). Copy the **Key** and
+   **Token** it shows into `BESZEL_AGENT_KEY` and `BESZEL_AGENT_TOKEN` in
+   `.env`.
+3. `docker compose up -d --wait`. The system turns green within a minute.
+4. Optional: alerts under the system's bell icon, notifications (email, ntfy,
+   …) under Settings.
+
+The history lives in the `beszel-data` volume. It isn't backed up: losing it
+loses only past graphs.
 
 ## 9. Rebuilding from scratch
 
