@@ -72,15 +72,52 @@ describe("buildShopItems", () => {
     ]);
   });
 
-  it("leaves hidden lines out, free text included", () => {
+  it("leaves removed lines out, free text included", () => {
     const items = buildShopItems(
       plan(
         [line("lentils", "lentils", [grams(150)]), line("rice", "rice", [])],
         [freeText("parsley")]
       ),
-      { ...none, hidden: ["lentils", "soup|parsley"] }
+      {
+        ...none,
+        hidden: [
+          { lineKey: "lentils", amounts: [{ quantity: 150, unit: "g" }] },
+          { lineKey: "soup|parsley", amounts: [{ quantity: 1, unit: null }] },
+        ],
+      }
     );
     expect(items.map((i) => i.id)).toEqual(["rice"]);
+  });
+
+  it("brings a removed line back, unticked, when the plan needs more of it", () => {
+    const [item] = buildShopItems(
+      plan([line("onions", "onions", [grams(700)])]),
+      {
+        ...none,
+        hidden: [
+          { lineKey: "onions", amounts: [{ quantity: 200, unit: "g" }] },
+        ],
+      }
+    );
+    expect(item).toMatchObject({
+      checked: false,
+      amount: "500 g more",
+      detail: "700 g in all",
+    });
+  });
+
+  it("shows a line that came back after a removal as ticked once it's bought", () => {
+    const [item] = buildShopItems(
+      plan([line("onions", "onions", [grams(700)])]),
+      {
+        ...none,
+        ticks: [{ lineKey: "onions", amounts: [{ quantity: 700, unit: "g" }] }],
+        hidden: [
+          { lineKey: "onions", amounts: [{ quantity: 200, unit: "g" }] },
+        ],
+      }
+    );
+    expect(item).toMatchObject({ checked: true, amount: "700 g" });
   });
 
   it("shows a ticked line as checked when the plan still needs what was bought", () => {
@@ -141,7 +178,7 @@ describe("buildShopItems", () => {
         ...none,
         ticks: [
           { lineKey: "salt", amounts: [] },
-          { lineKey: "soup|parsley", amounts: [] },
+          { lineKey: "soup|parsley", amounts: [{ quantity: 1, unit: null }] },
         ],
       }
     );
@@ -149,6 +186,27 @@ describe("buildShopItems", () => {
       ["salt", true],
       ["soup|parsley", true],
     ]);
+  });
+
+  it("reopens a ticked free-text line when more meals need it", () => {
+    const [item] = buildShopItems(
+      plan([], [{ ...freeText("2 lemons, juiced"), times: 2 }]),
+      {
+        ...none,
+        ticks: [
+          {
+            lineKey: "soup|2 lemons, juiced",
+            amounts: [{ quantity: 1, unit: null }],
+          },
+        ],
+      }
+    );
+    expect(item).toMatchObject({
+      text: "2 lemons, juiced (×2)",
+      checked: false,
+      amount: "×1 more",
+      amounts: [{ quantity: 2, unit: null }],
+    });
   });
 
   it("doesn't show a ticked line that left the plan", () => {
@@ -172,7 +230,7 @@ describe("buildShopItems", () => {
       detail: "Lentil soup",
       aisle: "Other",
       checked: false,
-      amounts: [],
+      amounts: [{ quantity: 1, unit: null }],
     });
   });
 

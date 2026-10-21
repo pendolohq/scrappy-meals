@@ -53,6 +53,7 @@ const send = (weekStart: string, c: QueuedChange): Promise<SendResult> => {
     weekStart,
     source: c.source,
     itemId: c.itemId,
+    amounts: c.amounts,
   });
 };
 
@@ -249,13 +250,15 @@ const ShopRow = ({
   onChange: (c: QueuedChange) => void;
 }) => {
   const remove = () => {
-    // Removing can't be undone, so it asks first.
+    // Removing can't be undone (a plan line only comes back when the plan
+    // needs more of it), so it asks first.
     if (window.confirm(`Remove "${item.text}" from the list?`)) {
       onChange({
         id: crypto.randomUUID(),
         kind: "remove",
         source: item.source,
         itemId: item.id,
+        amounts: item.amounts,
       });
     }
   };

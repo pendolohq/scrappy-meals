@@ -279,6 +279,10 @@ export const shoppingHidden = pgTable(
   {
     weekStart: date("week_start", { mode: "string" }).notNull(),
     lineKey: text("line_key").notNull(),
+    amounts: jsonb("amounts")
+      .$type<{ quantity: number; unit: string | null }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     hiddenAt: timestamp("hidden_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

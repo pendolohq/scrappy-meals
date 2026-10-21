@@ -60,7 +60,10 @@ export type WeekIngredients = {
 type Sums = {
   foodName: string;
   label: string | null;
-  /** Keyed "g", "ml", or the unit id ("" for no unit). */
+  /**
+   * Keyed "g", "ml", or `u:` and the unit's label: ticks match amounts by the
+   * label the device showed, so two units with one label must be one amount.
+   */
   totals: Map<string, { sum: number; unit: string | null }>;
   recipes: { id: string; name: string }[];
 };
@@ -193,7 +196,7 @@ function addAmount(food: Sums, ing: Ingredient, quantity: number) {
       amount = measured.amount;
     }
   } else {
-    key = ing.unit?.id ?? "";
+    key = `u:${unitLabel(ing.unit) ?? ""}`;
   }
   const total = food.totals.get(key) ?? {
     sum: 0,
@@ -219,6 +222,24 @@ export const formatAmounts = (amounts: ShoppingAmount[]) =>
 
 /** What a tick records: an amount as the device showed it. */
 export type TickedAmount = { quantity: number; unit: string | null };
+
+/**
+ * What two records of a line cover together: the larger quantity per unit.
+ * A device that loaded the page before the plan grew sends the smaller
+ * amounts, and must not undo a tick made since.
+ */
+export function coverMax(a: TickedAmount[], b: TickedAmount[]): TickedAmount[] {
+  const out = a.map((t) => ({ ...t }));
+  for (const t of b) {
+    const same = out.find((o) => o.unit === t.unit);
+    if (!same) {
+      out.push({ ...t });
+    } else if (t.quantity > same.quantity) {
+      same.quantity = t.quantity;
+    }
+  }
+  return out;
+}
 
 /**
  * What a line needs beyond what was ticked, per unit. Units that were ticked

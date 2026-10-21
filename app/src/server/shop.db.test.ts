@@ -137,7 +137,7 @@ describe.skipIf(!testDbUrl)("shop list (Postgres)", () => {
     expect((await line("f-lentils"))?.checked).toBe(false);
   });
 
-  it("ticking again overwrites the snapshot with the new amounts", async () => {
+  it("a tick at the larger amounts covers the line, and a replayed smaller one doesn't undo it", async () => {
     const user = await planned();
     const base = {
       weekStart: WEEK,
@@ -158,6 +158,13 @@ describe.skipIf(!testDbUrl)("shop list (Postgres)", () => {
       amounts: [{ quantity: 400, unit: "g" }],
     });
     expect(await count("shopping_ticks")).toBe(1);
+    expect((await line("f-lentils"))?.checked).toBe(true);
+
+    // A device that loaded the page before the plan grew sends its tick late.
+    await checkShopLine(db, {
+      ...base,
+      amounts: [{ quantity: 100, unit: "g" }],
+    });
     expect((await line("f-lentils"))?.checked).toBe(true);
   });
 
@@ -216,12 +223,39 @@ describe.skipIf(!testDbUrl)("shop list (Postgres)", () => {
 
   it("hides a line for the week, also when hidden twice or no longer on the plan", async () => {
     const user = await planned();
-    const hide = { weekStart: WEEK, userId: user.id, lineKey: "f-salt" };
+    const hide = {
+      weekStart: WEEK,
+      userId: user.id,
+      lineKey: "f-salt",
+      amounts: [],
+    };
     await hideShopLine(db, hide);
     await hideShopLine(db, hide);
     await hideShopLine(db, { ...hide, lineKey: "gone" });
     expect(await count("shopping_hidden")).toBe(2);
     expect((await list()).map((i) => i.id)).toEqual(["f-lentils", parsley]);
+  });
+
+  it("brings a removed line back with what the plan needs beyond the removal", async () => {
+    const user = await planned();
+    const hide = { weekStart: WEEK, userId: user.id, lineKey: "f-lentils" };
+    await hideShopLine(db, {
+      ...hide,
+      amounts: [{ quantity: 150, unit: "g" }],
+    });
+    expect(await line("f-lentils")).toMatchObject({
+      checked: false,
+      amount: "250 g more",
+    });
+    await hideShopLine(db, {
+      ...hide,
+      amounts: [{ quantity: 400, unit: "g" }],
+    });
+    await hideShopLine(db, {
+      ...hide,
+      amounts: [{ quantity: 150, unit: "g" }],
+    });
+    expect(await line("f-lentils")).toBeUndefined();
   });
 
   it("adds an extra after the plan's lines, and a replayed add with the same id changes nothing", async () => {

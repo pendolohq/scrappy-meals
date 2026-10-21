@@ -50,6 +50,13 @@
       "when": 1792587797714,
       "tag": "0006_shopping-in-postgres",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792595779764,
+      "tag": "0007_shopping-hidden-amounts",
+      "breakpoints": true
     }
   ]
 }

@@ -16,11 +16,15 @@ import {
   removeShopExtra,
 } from "@/server/shop";
 
-// A plan line's key is a food id or `recipeId|text`. Ticks don't recompute the
-// week's plan to check it: the row is keyed by week and key and only ever
-// shown for a line on that week's plan, so an unknown key affects nothing,
-// and recomputing the plan would slow every tick down.
-const lineKey = z.string().min(1).max(2000);
+// A plan line's key is a food id or `recipeId|text`, both Mealie uuids. Ticks
+// don't recompute the week's plan to check it: the row is keyed by week and
+// key and only ever shown for a line on that week's plan, so an unknown key
+// affects nothing, and recomputing the plan would slow every tick down. The
+// length only stops runaway input: a recipe's free text can run long.
+const lineKey = z
+  .string()
+  .max(10_000)
+  .regex(/^[0-9a-f-]{36}(\|[\s\S]+)?$/);
 const extraId = z.uuid();
 const amounts = z
   .array(
@@ -106,7 +110,7 @@ export const removeShopItemAction = userAction(
     .object({ weekStart: weekStartSchema })
     .and(
       z.discriminatedUnion("source", [
-        z.object({ source: z.literal("plan"), itemId: lineKey }),
+        z.object({ source: z.literal("plan"), itemId: lineKey, amounts }),
         z.object({ source: z.literal("extra"), itemId: extraId }),
       ])
     ),
@@ -118,6 +122,7 @@ export const removeShopItemAction = userAction(
             weekStart: data.weekStart,
             userId: user.id,
             lineKey: data.itemId,
+            amounts: data.amounts,
           })
         : removeShopExtra(db, { weekStart: data.weekStart, id: data.itemId })
     );

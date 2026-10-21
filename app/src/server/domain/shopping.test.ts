@@ -4,6 +4,7 @@ import type { Ingredient } from "../mealie/recipes";
 
 import {
   buildShoppingList,
+  coverMax,
   formatAmounts,
   type MealForShopping,
   type ShoppingAmount,
@@ -261,6 +262,23 @@ describe("buildShoppingList", () => {
     ]);
   });
 
+  it("adds up two units that read the same, since ticks match on what the line shows", () => {
+    const clove = unit("u-clove", "clove");
+    const clove2 = unit("u-clove-2", "clove");
+    const garlic = { id: "f-garlic", name: "garlic" };
+    const list = buildShoppingList([
+      meal(recipe("a", [ing({ quantity: 2, food: garlic, unit: clove })]), {
+        a: 1,
+      }),
+      meal(recipe("b", [ing({ quantity: 3, food: garlic, unit: clove2 })]), {
+        a: 1,
+      }),
+    ]);
+    expect(list.lines[0].amounts).toEqual([
+      { quantity: 5, unit: "clove", standard: null },
+    ]);
+  });
+
   it("skips meals nobody eats", () => {
     expect(buildShoppingList([meal(soup, { a: 0, b: 0 })]).lines).toEqual([]);
   });
@@ -369,5 +387,29 @@ describe("stillNeeded", () => {
 
   it("is the full amounts when nothing was ticked per unit", () => {
     expect(stillNeeded([grams(500)], [])).toEqual([grams(500)]);
+  });
+});
+
+describe("coverMax", () => {
+  it("keeps the larger quantity per unit, and units only one side has", () => {
+    expect(
+      coverMax(
+        [
+          { quantity: 300, unit: "g" },
+          { quantity: 1, unit: "bunch" },
+        ],
+        [
+          { quantity: 150, unit: "g" },
+          { quantity: 2, unit: null },
+        ]
+      )
+    ).toEqual([
+      { quantity: 300, unit: "g" },
+      { quantity: 1, unit: "bunch" },
+      { quantity: 2, unit: null },
+    ]);
+    expect(
+      coverMax([{ quantity: 150, unit: "g" }], [{ quantity: 300, unit: "g" }])
+    ).toEqual([{ quantity: 300, unit: "g" }]);
   });
 });

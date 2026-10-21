@@ -51,6 +51,7 @@ const remove = (
   kind: "remove",
   source,
   itemId,
+  amounts: [],
 });
 
 describe("dropFailed", () => {

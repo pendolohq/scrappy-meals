@@ -16,7 +16,10 @@ export type ShopItemView = {
   detail: string | null;
   aisle: Aisle;
   checked: boolean;
-  /** What a tick records: the line's current amounts. Empty for extras and free text. */
+  /**
+   * What a tick or removal records: the line's current amounts, or for free
+   * text how many meals need it. Empty for extras.
+   */
   amounts: TickedAmount[];
   position: number;
   /** Changed on this device but not yet saved. */
@@ -39,7 +42,12 @@ export type QueuedChange = { id: string } & (
       amounts: TickedAmount[];
     }
   | { kind: "add"; itemId: string; text: string }
-  | { kind: "remove"; source: "plan" | "extra"; itemId: string }
+  | {
+      kind: "remove";
+      source: "plan" | "extra";
+      itemId: string;
+      amounts: TickedAmount[];
+    }
 );
 
 /**

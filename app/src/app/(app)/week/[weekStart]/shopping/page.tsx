@@ -1,4 +1,5 @@
 import { TriangleAlert } from "lucide-react";
+import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { WeekHeader } from "@/components/week-header";
@@ -18,7 +19,9 @@ export default async function ShoppingPage({
   await requireUser();
   const weekStart = canonicalWeek((await params).weekStart, "shopping");
 
-  const { plan, items } = await weekShopList(getDb(), weekStart);
+  const { plan, items } = await weekShopList(getDb(), weekStart, {
+    defer: after,
+  });
 
   return (
     <div className="space-y-5 pb-8">
