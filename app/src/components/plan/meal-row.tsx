@@ -104,11 +104,12 @@ export const MealRow = ({
           <Pill>Unplanned</Pill>
         ) : (
           canLog && (
-            <div className="w-52 max-w-full">
+            <div className="w-full sm:w-52">
               <AdherenceButtons
                 mealId={meal.id}
                 mealName={name}
                 log={meal.adherence[currentUserId]}
+                fill
               />
             </div>
           )

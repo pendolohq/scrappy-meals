@@ -538,10 +538,10 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       const none = { tags: [], categories: [], quick: false };
       const all = async (filters: Parameters<typeof discoverRecipes>[0]) => {
         const slugs: string[] = [];
-        for (let page = 1, pages = 1; page <= pages; page += 1) {
+        for (let page: number | null = 1; page !== null;) {
           const result = await discoverRecipes(filters, { client, page });
-          pages = result.totalPages;
           slugs.push(...result.items.map((r) => r.slug));
+          page = result.nextPage;
         }
         return slugs;
       };

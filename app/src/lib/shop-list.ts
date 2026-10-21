@@ -1,6 +1,8 @@
 // The shop checklist's state, kept pure so it can be tested and shared by the
 // page and the offline queue.
 
+import { type Aisle, aisleOf, aisleOrder } from "@/server/domain/aisles";
+
 export type ShopItemView = {
   id: string;
   text: string;
@@ -128,11 +130,9 @@ export async function flushQueue(io: {
 
 export type ShopGroup = { label: string; items: ShopItemView[] };
 
-const OTHER = "Other";
-
 /**
- * Unticked items grouped by Mealie label (the aisle), labels A–Z with
- * unlabelled items last; ticked items in one list at the end.
+ * Unticked items grouped by aisle (from their Mealie label), in the order the
+ * shop is walked; ticked items in one list at the end.
  */
 export function groupItems(items: ShopItemView[]): {
   groups: ShopGroup[];
@@ -140,21 +140,15 @@ export function groupItems(items: ShopItemView[]): {
 } {
   const byPosition = (a: ShopItemView, b: ShopItemView) =>
     a.position - b.position || a.text.localeCompare(b.text);
-  const groups = new Map<string, ShopItemView[]>();
+  const groups = new Map<Aisle, ShopItemView[]>();
   for (const item of items.filter((i) => !i.checked)) {
-    const label = item.label ?? OTHER;
-    groups.set(label, [...(groups.get(label) ?? []), item]);
+    const aisle = aisleOf(item.label);
+    groups.set(aisle, [...(groups.get(aisle) ?? []), item]);
   }
   return {
     groups: [...groups.entries()]
-      .map(([label, list]) => ({ label, items: list.toSorted(byPosition) }))
-      .toSorted((a, b) =>
-        a.label === OTHER
-          ? 1
-          : b.label === OTHER
-            ? -1
-            : a.label.localeCompare(b.label)
-      ),
+      .toSorted(([a], [b]) => aisleOrder(a) - aisleOrder(b))
+      .map(([label, list]) => ({ label, items: list.toSorted(byPosition) })),
     done: items.filter((i) => i.checked).toSorted(byPosition),
   };
 }

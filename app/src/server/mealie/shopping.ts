@@ -127,6 +127,46 @@ export async function deleteShoppingItems(
   );
 }
 
+const BASE_UNIT = {
+  gram: { name: "gram", abbreviation: "g" },
+  milliliter: { name: "millilitre", abbreviation: "ml" },
+} as const;
+
+/**
+ * Mealie's unit of exactly one gram or millilitre, for lines summed in those.
+ * Created when Mealie has none, with its standard set so it converts too.
+ */
+export async function findOrCreateBaseUnit(
+  standard: keyof typeof BASE_UNIT,
+  opts: { client?: MealieClient } = {}
+): Promise<string> {
+  const client = opts.client ?? mealie();
+  const { abbreviation, name } = BASE_UNIT[standard];
+  const units = unwrap(
+    await client.GET("/api/units", { params: { query: { perPage: -1 } } })
+  ).items.filter(
+    (u) => u.standardUnit === standard && u.standardQuantity === 1
+  );
+  // Prefer the plain "g" over a unit that only happens to weigh one gram.
+  const found =
+    units.find((u) => u.abbreviation === abbreviation) ?? units[0] ?? null;
+  if (found) {
+    return found.id;
+  }
+  const created = unwrap(
+    await client.POST("/api/units", {
+      body: {
+        name,
+        abbreviation,
+        useAbbreviation: true,
+        standardQuantity: 1,
+        standardUnit: standard,
+      },
+    })
+  );
+  return created.id;
+}
+
 /** One item as Mealie stores it, so it can be written back whole. */
 export type StoredShoppingItem = MealieItemOut;
 

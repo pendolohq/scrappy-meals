@@ -17,10 +17,13 @@ export const AdherenceButtons = ({
   mealId,
   mealName,
   log,
+  fill = false,
 }: {
   mealId: string;
   mealName: string;
   log: Log;
+  /** Span the whole width on phones, where the buttons are the main target. */
+  fill?: boolean;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -63,7 +66,10 @@ export const AdherenceButtons = ({
     // Four 44px buttons need 11rem; a narrower column gets two rows.
     <div className="@container space-y-1">
       <fieldset
-        className="mx-auto grid w-full max-w-52 min-w-0 grid-cols-2 rounded-button border border-border bg-card p-0.5 @[11rem]:grid-cols-4"
+        className={cx(
+          "mx-auto grid w-full min-w-0 grid-cols-2 rounded-button border border-border bg-card p-0.5 @[11rem]:grid-cols-4",
+          fill ? "sm:max-w-52" : "max-w-52"
+        )}
         aria-label={`How did ${mealName} go?`}
       >
         {ADHERENCE_STATUSES.map((s) => {
