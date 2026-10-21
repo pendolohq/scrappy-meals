@@ -214,10 +214,9 @@ jobs:
       - name: Backup and restore round trip
         run: scripts/test-backup-restore.sh
 
-  # Pull requests: build and smoke-test only, never push.
-  # main:          publish :main and :sha-<commit>. Never :latest.
-  # v* tags:       publish :X.Y.Z, :X.Y and :latest. Only a release moves :latest,
-  #                which is what the server runs by default (APP_TAG).
+  # Pull requests and main: build and smoke-test only, never push.
+  # v* tags:                 publish :X.Y.Z, :X.Y and :latest. Only a release moves
+  #                          :latest, which is what the server runs by default (APP_TAG).
   image:
     needs: [changes, check, e2e, secrets]
     if: needs.changes.outputs.image == 'true'
@@ -237,8 +236,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           flavor: latest=false
           tags: |
-            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             # Not for prereleases (v1.0.0-rc.1): a server on APP_TAG=latest would pick them up.
@@ -277,7 +274,7 @@ jobs:
         if: failure()
         run: docker logs app || true
       - name: Log in to GHCR
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -285,7 +282,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       # Push the image that was just smoke-tested, not a rebuild of it.
       - name: Push app image
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |

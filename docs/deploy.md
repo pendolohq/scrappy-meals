@@ -194,14 +194,15 @@ you need it.
 
 ## 7. Releasing and updating
 
-Merging to `main` does **not** change what the server runs. CI publishes these
-image tags:
+Merging to `main` does **not** change what the server runs. CI publishes images
+only for release tags:
 
 | Event | Tags | Used by |
 | --- | --- | --- |
 | Pull request | none (built and smoke-tested only when the PR touches the image) | |
-| Push to `main` | `:main`, `:sha-<commit>` | trying a build before releasing it |
+| Push to `main` | none (always built and smoke-tested) | |
 | Tag `vX.Y.Z` | `:X.Y.Z`, `:X.Y`, `:latest` | the server |
+| Tag `vX.Y.Z-rc.N` | `:X.Y.Z-rc.N` | trying a build before releasing it |
 
 **To release**, tag a commit on `main` that has green CI, then push the tag (or
 publish a GitHub release, which creates the tag):
@@ -232,7 +233,8 @@ it is restarted.
 - `APP_TAG=0.2.0`: pinned (recommended). Upgrading means changing it on
   purpose; rolling back means setting the previous version.
 - `APP_TAG=latest`: always the newest release, never an unreleased `main`.
-- `APP_TAG=sha-<commit>` or `main`: only for trying a build.
+- `APP_TAG=0.3.0-rc.1`: a prerelease, only for trying a build. `latest` never
+  points at one.
 
 The app applies database migrations itself on start. Migrations only move
 forward, so rolling back past a release that added one needs the backup from
