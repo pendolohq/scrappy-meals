@@ -20,7 +20,6 @@ import {
   type QueuedChange,
   type SendResult,
   type ShopItemView,
-  TEMP_PREFIX,
 } from "@/lib/shop-list";
 import {
   readQueue,
@@ -41,56 +40,58 @@ const send = (weekStart: string, c: QueuedChange): Promise<SendResult> => {
   if (c.kind === "check") {
     return checkShopItemAction({
       weekStart,
+      source: c.source,
       itemId: c.itemId,
       checked: c.checked,
+      amounts: c.amounts,
     });
   }
   if (c.kind === "add") {
-    return addShopItemAction({ weekStart, text: c.text });
+    return addShopItemAction({ weekStart, itemId: c.itemId, text: c.text });
   }
-  return removeShopItemAction({ weekStart, itemId: c.itemId });
+  return removeShopItemAction({
+    weekStart,
+    source: c.source,
+    itemId: c.itemId,
+  });
 };
 
-/** Lists whose queue is being sent; one run per list at a time. */
+/** Weeks whose queue is being sent; one run per week at a time. */
 const running = new Set<string>();
 
 const flush = async (
-  listId: string,
   weekStart: string,
   setWaiting: (message: string | null) => void,
   setFailed: (update: (failed: string[]) => string[]) => void
 ) => {
-  if (running.has(listId) || !navigator.onLine) {
+  if (running.has(weekStart) || !navigator.onLine) {
     return;
   }
-  running.add(listId);
+  running.add(weekStart);
   try {
     await flushQueue({
-      read: () => readQueue(listId),
-      write: (queue) => writeQueue(listId, queue),
-      // The action's response also carries the refreshed list.
+      read: () => readQueue(weekStart),
+      write: (queue) => writeQueue(weekStart, queue),
       send: (c) => send(weekStart, c),
       onSaved: () => setWaiting(null),
       onRetry: setWaiting,
       onDrop: (message) => setFailed((failed) => [...failed, message]),
     });
   } finally {
-    running.delete(listId);
+    running.delete(weekStart);
   }
 };
 
 export const ShopChecklist = ({
   weekStart,
-  listId,
   items,
 }: {
   weekStart: string;
-  listId: string;
   items: ShopItemView[];
 }) => {
   const queue = useSyncExternalStore(
     subscribeQueue,
-    () => readQueue(listId),
+    () => readQueue(weekStart),
     serverQueue
   );
   // Why the queue is waiting (cleared once a change saves), and changes that
@@ -102,9 +103,9 @@ export const ShopChecklist = ({
   // Saves what an earlier visit left queued, and retries when the device
   // comes back online or every few seconds while something is waiting.
   useEffect(() => {
-    const run = () => void flush(listId, weekStart, setWaiting, setFailed);
+    const run = () => void flush(weekStart, setWaiting, setFailed);
     const retry = () => {
-      if (readQueue(listId).length > 0) {
+      if (readQueue(weekStart).length > 0) {
         run();
       }
     };
@@ -115,11 +116,11 @@ export const ShopChecklist = ({
       clearInterval(timer);
       window.removeEventListener("online", run);
     };
-  }, [listId, weekStart]);
+  }, [weekStart]);
 
   const change = (c: QueuedChange) => {
-    writeQueue(listId, [...readQueue(listId), c]);
-    void flush(listId, weekStart, setWaiting, setFailed);
+    writeQueue(weekStart, [...readQueue(weekStart), c]);
+    void flush(weekStart, setWaiting, setFailed);
   };
 
   const add = (e: FormEvent) => {
@@ -131,13 +132,14 @@ export const ShopChecklist = ({
     change({
       id: crypto.randomUUID(),
       kind: "add",
-      tempId: `${TEMP_PREFIX}${crypto.randomUUID()}`,
+      itemId: crypto.randomUUID(),
       text: value,
     });
     setText("");
   };
 
-  const { groups, done } = groupItems(applyQueue(items, queue));
+  const shown = applyQueue(items, queue);
+  const { groups, done } = groupItems(shown);
 
   return (
     <div className="space-y-4">
@@ -189,7 +191,17 @@ export const ShopChecklist = ({
         </p>
       )}
 
-      {groups.length === 0 && (
+      {shown.length === 0 && (
+        <Card className="py-10 text-center">
+          <p className="font-serif text-heading font-semibold">
+            Nothing to buy yet
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Nothing on the list for this week.
+          </p>
+        </Card>
+      )}
+      {shown.length > 0 && groups.length === 0 && (
         <Card className="py-8 text-center">
           <p className="font-serif text-heading font-semibold">
             Everything&apos;s in the basket.
@@ -237,9 +249,14 @@ const ShopRow = ({
   onChange: (c: QueuedChange) => void;
 }) => {
   const remove = () => {
-    // Removing deletes the line in Mealie, so it asks first.
+    // Removing can't be undone, so it asks first.
     if (window.confirm(`Remove "${item.text}" from the list?`)) {
-      onChange({ id: crypto.randomUUID(), kind: "remove", itemId: item.id });
+      onChange({
+        id: crypto.randomUUID(),
+        kind: "remove",
+        source: item.source,
+        itemId: item.id,
+      });
     }
   };
   return (
@@ -254,8 +271,10 @@ const ShopRow = ({
               onChange({
                 id: crypto.randomUUID(),
                 kind: "check",
+                source: item.source,
                 itemId: item.id,
                 checked: e.target.checked,
+                amounts: item.amounts,
               })
             }
             className="peer size-6 cursor-pointer appearance-none rounded-full border-2 border-border-strong bg-card transition checked:border-accent checked:bg-accent"
@@ -266,14 +285,32 @@ const ShopRow = ({
             aria-hidden
           />
         </span>
-        <span
-          className={cx(
-            "min-w-0 flex-1",
-            item.checked ? "text-muted line-through" : "font-medium"
+        <span className="min-w-0 flex-1">
+          <span
+            className={cx(
+              "block",
+              item.checked ? "text-muted line-through" : "font-medium"
+            )}
+          >
+            {item.text}
+          </span>
+          {item.detail && (
+            <span className="mt-0.5 block truncate text-xs text-muted">
+              {item.detail}
+            </span>
           )}
-        >
-          {item.text}
         </span>
+        {item.amount && (
+          <span
+            className={cx(
+              "shrink-0 text-right font-semibold tabular-nums",
+              item.checked ? "text-muted" : "text-accent-ink"
+            )}
+            data-testid="qty"
+          >
+            {item.amount}
+          </span>
+        )}
         {item.pending && (
           <span
             className="size-2 shrink-0 rounded-full bg-highlight"

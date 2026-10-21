@@ -6,6 +6,8 @@ import {
   buildShoppingList,
   formatAmounts,
   type MealForShopping,
+  type ShoppingAmount,
+  stillNeeded,
   type WeekIngredients,
 } from "./shopping";
 
@@ -100,6 +102,7 @@ describe("buildShoppingList", () => {
     ).toEqual(["Soup", "Dal"]);
     expect(list.freeText).toEqual([
       {
+        key: "soup|a handful of parsley",
         text: "a handful of parsley",
         recipeId: "soup",
         recipeName: "Soup",
@@ -229,20 +232,14 @@ describe("buildShoppingList", () => {
     expect(list.lines).toMatchObject([{ aisle: "Fruit & veg" }]);
   });
 
-  it("sends grams with the recipes' own one-gram unit, or names the standard", () => {
+  it("sums weights in grams", () => {
     const rice = { id: "f-rice", name: "rice" };
-    const byKilo = buildShoppingList([
+    const list = buildShoppingList([
       meal(recipe("a", [ing({ quantity: 1, food: rice, unit: kg })]), { a: 1 }),
+      meal(recipe("b", [ing({ quantity: 5, food: rice, unit: g })]), { a: 1 }),
     ]);
-    expect(byKilo.lines[0].amounts).toEqual([
-      { quantity: 1000, unit: "g", unitId: null, standard: "gram" },
-    ]);
-    const both = buildShoppingList([
-      meal(recipe("a", [ing({ quantity: 1, food: rice, unit: kg })]), { a: 1 }),
-      meal(recipe("b", [ing({ quantity: 5, food: salt, unit: g })]), { a: 1 }),
-    ]);
-    expect(both.lines.find((l) => l.foodName === "rice")?.amounts).toEqual([
-      { quantity: 1000, unit: "g", unitId: "u-g", standard: "gram" },
+    expect(list.lines[0].amounts).toEqual([
+      { quantity: 1010, unit: "g", standard: "gram" },
     ]);
   });
 
@@ -260,7 +257,7 @@ describe("buildShoppingList", () => {
       ),
     ]);
     expect(list.lines[0].amounts).toEqual([
-      { quantity: 2, unit: "u-x", unitId: "u-x", standard: null },
+      { quantity: 2, unit: "u-x", standard: null },
     ]);
   });
 
@@ -282,6 +279,7 @@ describe("buildShoppingList", () => {
     expect(list.unscaled).toEqual(["Toast"]);
     expect(list.freeText).toEqual([
       {
+        key: "toast|2 slices bread (whole recipe)",
         text: "2 slices bread (whole recipe)",
         times: 1,
         recipeId: "toast",
@@ -306,5 +304,70 @@ describe("buildShoppingList", () => {
 
   it("reports recipes that are gone from Mealie", () => {
     expect(buildShoppingList([meal(null, { a: 1 })]).missing).toEqual(["gone"]);
+  });
+});
+
+describe("stillNeeded", () => {
+  const amt = (
+    quantity: number,
+    unitLabel: string | null,
+    over: Partial<ShoppingAmount> = {}
+  ): ShoppingAmount => ({
+    quantity,
+    unit: unitLabel,
+    standard: null,
+    ...over,
+  });
+  const grams = (quantity: number) => amt(quantity, "g", { standard: "gram" });
+
+  it("is what's above the ticked amount, per unit", () => {
+    expect(stillNeeded([grams(500)], [{ quantity: 200, unit: "g" }])).toEqual([
+      grams(300),
+    ]);
+  });
+
+  it("is empty when the tick still covers everything", () => {
+    expect(stillNeeded([grams(500)], [{ quantity: 500, unit: "g" }])).toEqual(
+      []
+    );
+    expect(stillNeeded([grams(300)], [{ quantity: 500, unit: "g" }])).toEqual(
+      []
+    );
+  });
+
+  it("keeps a unit that wasn't ticked in full, and ignores ticked units that are gone", () => {
+    const bunchAmt = amt(1, "bunch");
+    expect(
+      stillNeeded(
+        [grams(500), bunchAmt],
+        [
+          { quantity: 500, unit: "g" },
+          { quantity: 2, unit: "ml" },
+        ]
+      )
+    ).toEqual([bunchAmt]);
+  });
+
+  it("matches counts (no unit) on null", () => {
+    expect(stillNeeded([amt(3, null)], [{ quantity: 1, unit: null }])).toEqual([
+      amt(2, null),
+    ]);
+  });
+
+  it("rounds a measured remainder up like a measured total", () => {
+    // 500 - 123.4 = 376.6, over 100 so up to the next 10.
+    expect(stillNeeded([grams(500)], [{ quantity: 123.4, unit: "g" }])).toEqual(
+      [grams(380)]
+    );
+  });
+
+  it("rounds a counted remainder up to a whole one", () => {
+    expect(
+      stillNeeded([amt(2.5, null)], [{ quantity: 1, unit: null }])
+    ).toEqual([amt(2, null)]);
+  });
+
+  it("is the full amounts when nothing was ticked per unit", () => {
+    expect(stillNeeded([grams(500)], [])).toEqual([grams(500)]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isBaseUnit, measure, roundCount, roundMeasured } from "./units";
+import { measure, roundCount, roundMeasured } from "./units";
 
 const unit = (
   standardQuantity: number | null,
@@ -34,16 +34,6 @@ describe("measure", () => {
     // Rows cached before units carried a standard.
     expect(measure(1, { id: "u", name: "g", abbreviation: "g" })).toBeNull();
     expect(measure(1, null)).toBeNull();
-  });
-});
-
-describe("isBaseUnit", () => {
-  it("is a unit of exactly one gram or millilitre", () => {
-    expect(isBaseUnit(unit(1, "gram"), "g")).toBe(true);
-    expect(isBaseUnit(unit(1, "milliliter"), "ml")).toBe(true);
-    expect(isBaseUnit(unit(1, "kilogram"), "g")).toBe(false);
-    expect(isBaseUnit(unit(1000, "gram"), "g")).toBe(false);
-    expect(isBaseUnit(unit(1, "gram"), "ml")).toBe(false);
   });
 });
 

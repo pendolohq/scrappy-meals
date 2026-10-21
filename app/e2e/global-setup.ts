@@ -9,8 +9,6 @@ import path from "node:path";
 
 import { createDb } from "../src/server/db/client";
 import { runMigrations } from "../src/server/db/migrate";
-import { today, weekStartOf } from "../src/server/domain/week";
-import { shoppingListName } from "../src/server/shopping";
 import { createUser } from "../src/server/users";
 
 export const STATE_FILE = path.join(__dirname, ".state.json");
@@ -36,7 +34,7 @@ export default async function globalSetup() {
   await runMigrations(url, path.join(__dirname, "../drizzle"));
   const { db, pool } = createDb(url, { max: 1 });
   await db.execute(
-    sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes, household_settings CASCADE`
+    sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_ticks, shopping_hidden, shopping_extras, household_settings CASCADE`
   );
   for (const u of Object.values(USERS)) {
     await createUser(db, u);
@@ -65,17 +63,6 @@ export default async function globalSetup() {
     }
     return res.json();
   };
-
-  // The planner database starts empty, but Mealie may still hold this week's
-  // list from an earlier run; the push would reuse it, ticks and all.
-  const listName = shoppingListName(weekStartOf(today()));
-  const lists = await api(
-    "GET",
-    `/api/households/shopping/lists?perPage=100&queryFilter=${encodeURIComponent(`name = "${listName}"`)}`
-  );
-  for (const list of lists.items) {
-    await api("DELETE", `/api/households/shopping/lists/${list.id}`);
-  }
 
   const run = Date.now().toString(36);
   const food = await api("POST", "/api/foods", { name: `e2e lentils ${run}` });

@@ -9,7 +9,7 @@ import { currentUser, type SessionUser } from "./session";
 export const SIGNED_OUT = "You are signed out. Reload the page.";
 
 /**
- * `retry` marks errors worth trying again later (signed out, Mealie down), as
+ * `retry` marks errors worth trying again later (signed out, Mealie or the database down), as
  * opposed to ones that never succeed (invalid input, item gone).
  */
 export type ActionResult<R extends object = object> =

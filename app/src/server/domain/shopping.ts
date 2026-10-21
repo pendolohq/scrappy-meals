@@ -2,7 +2,7 @@ import type { Ingredient } from "../mealie/recipes";
 
 import { type Aisle, aisleOf, aisleOrder } from "./aisles";
 import { plannedServings, servingsScale, unitLabel } from "./ingredients";
-import { isBaseUnit, measure, roundCount, roundMeasured } from "./units";
+import { measure, roundCount, roundMeasured } from "./units";
 
 export type MealForShopping = {
   /** Null when the recipe is gone from Mealie. */
@@ -22,12 +22,7 @@ export type ShoppingAmount = {
   quantity: number;
   /** "g", "ml", the unit's label, or null for a count ("2" onions). */
   unit: string | null;
-  /**
-   * Mealie's unit to send it with; null for a count, or for grams or
-   * millilitres when no planned recipe uses a unit of exactly one.
-   */
-  unitId: string | null;
-  /** Grams and millilitres are Mealie's standard units, found by those names. */
+  /** Grams and millilitres, which amounts in any weight or volume unit are summed into. */
   standard: "gram" | "milliliter" | null;
 };
 
@@ -43,6 +38,8 @@ export type ShoppingLine = {
 };
 
 export type FreeTextLine = {
+  /** `${recipeId}|${text}`: the same line from two recipes is two lines. */
+  key: string;
   text: string;
   recipeId: string;
   recipeName: string;
@@ -64,10 +61,7 @@ type Sums = {
   foodName: string;
   label: string | null;
   /** Keyed "g", "ml", or the unit id ("" for no unit). */
-  totals: Map<
-    string,
-    { sum: number; unit: string | null; unitId: string | null }
-  >;
+  totals: Map<string, { sum: number; unit: string | null }>;
   recipes: { id: string; name: string }[];
 };
 
@@ -84,8 +78,6 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   const freeText = new Map<string, FreeTextLine>();
   const unscaled = new Set<string>();
   const missing = new Set<string>();
-  // Mealie's own gram and millilitre units, as the recipes name them.
-  const baseUnits: Record<"g" | "ml", string | null> = { g: null, ml: null };
 
   for (const meal of meals) {
     const eaten = plannedServings(meal.baseServings, meal.portions);
@@ -124,6 +116,7 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
           existing.times += 1;
         } else {
           freeText.set(key, {
+            key,
             text: line,
             recipeId: recipe.id,
             recipeName: recipe.name,
@@ -141,7 +134,7 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       // Rows cached before labels were kept have none; any recipe's will do.
       food.label ??= ing.food.label ?? null;
       if (ing.quantity !== null) {
-        addAmount(food, ing, ing.quantity * scale, baseUnits);
+        addAmount(food, ing, ing.quantity * scale);
       }
       if (!food.recipes.some((r) => r.id === recipe.id)) {
         food.recipes.push(source);
@@ -161,14 +154,12 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
           return {
             quantity: roundMeasured(t.sum),
             unit: key,
-            unitId: baseUnits[key],
             standard: key === "g" ? "gram" : "milliliter",
           };
         }
         return {
           quantity: roundCount(t.sum),
           unit: t.unit,
-          unitId: t.unitId,
           standard: null,
         };
       })
@@ -188,19 +179,11 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   };
 }
 
-function addAmount(
-  food: Sums,
-  ing: Ingredient,
-  quantity: number,
-  baseUnits: Record<"g" | "ml", string | null>
-) {
+function addAmount(food: Sums, ing: Ingredient, quantity: number) {
   const measured = ing.unit ? measure(quantity, ing.unit) : null;
   let key: string;
   let amount = quantity;
   if (measured) {
-    baseUnits[measured.per] ??= isBaseUnit(ing.unit, measured.per)
-      ? ing.unit!.id
-      : null;
     const density = ing.food?.gramsPerMl;
     if (measured.per === "ml" && density) {
       key = "g";
@@ -215,7 +198,6 @@ function addAmount(
   const total = food.totals.get(key) ?? {
     sum: 0,
     unit: measured ? null : unitLabel(ing.unit),
-    unitId: measured ? null : (ing.unit?.id ?? null),
   };
   total.sum += amount;
   food.totals.set(key, total);
@@ -231,6 +213,33 @@ const amountOrder = (a: ShoppingAmount) =>
         ? 2
         : 3;
 
-/** "200 g", "2", "100 g + 1 bunch": how a line's amounts read, in the preview and in Mealie. */
+/** "200 g", "2", "100 g + 1 bunch": how a line's amounts read on the list. */
 export const formatAmounts = (amounts: ShoppingAmount[]) =>
   amounts.map((a) => `${a.quantity}${a.unit ? ` ${a.unit}` : ""}`).join(" + ");
+
+/** What a tick records: an amount as the device showed it. */
+export type TickedAmount = { quantity: number; unit: string | null };
+
+/**
+ * What a line needs beyond what was ticked, per unit. Units that were ticked
+ * but are gone, or that shrank, don't count; empty when the tick covers the lot.
+ */
+export function stillNeeded(
+  current: ShoppingAmount[],
+  ticked: TickedAmount[]
+): ShoppingAmount[] {
+  return current.flatMap((a) => {
+    // Matched on the label the device showed: renaming a unit in Mealie
+    // brings a ticked line back, which beats hiding an amount still to buy.
+    const bought = ticked.find((t) => t.unit === a.unit)?.quantity ?? 0;
+    const rest = a.quantity - bought;
+    // A float residue (0.1 + 0.2) must not count as something left to buy.
+    if (rest < 0.005) {
+      return [];
+    }
+    const measured = a.standard !== null;
+    return [
+      { ...a, quantity: measured ? roundMeasured(rest) : roundCount(rest) },
+    ];
+  });
+}

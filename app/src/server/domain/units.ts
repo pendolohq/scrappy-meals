@@ -45,11 +45,6 @@ export function measure(
   };
 }
 
-/** Whether a unit is exactly one gram or one millilitre. */
-export const isBaseUnit = (unit: Ingredient["unit"], per: "g" | "ml") =>
-  unit?.standardQuantity === 1 &&
-  unit.standardUnit === (per === "g" ? "gram" : "milliliter");
-
 // Two decimals first, so 0.1 + 0.2 counts as 0.3 and not as just over it.
 const ceil = (n: number) => Math.ceil(Math.round(n * 100) / 100);
 
