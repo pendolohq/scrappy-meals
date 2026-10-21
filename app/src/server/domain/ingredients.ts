@@ -1,8 +1,8 @@
 import type { Ingredient } from "../mealie/recipes";
 
 /**
- * Amounts are kept to two decimals, on the shopping list and the recipe page
- * alike, so both show the same number for the same servings.
+ * Recipe amounts are kept to two decimals. The shopping list rounds its own
+ * totals up instead (`roundMeasured`, `roundCount`), once they're summed.
  */
 export const roundQuantity = (n: number) => Math.round(n * 100) / 100;
 
@@ -65,9 +65,9 @@ export type IngredientLine = {
 };
 
 /**
- * A recipe's ingredients for `servings` servings. Scaled the way the shopping
- * list scales them (`buildShoppingList`), so at the planned servings both
- * show the same amounts.
+ * A recipe's ingredients for `servings` servings, scaled as the shopping list
+ * scales them (`buildShoppingList`) but kept in the recipe's own units: a
+ * cook measures "2 tbsp", a shopper buys grams.
  */
 export function scaleIngredients(
   ingredients: Ingredient[],

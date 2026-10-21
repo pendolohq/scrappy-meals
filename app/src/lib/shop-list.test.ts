@@ -172,18 +172,20 @@ describe("replaceTempId", () => {
 });
 
 describe("groupItems", () => {
-  it("groups unticked items by label, A–Z with unlabelled last, and lists ticked ones apart", () => {
+  it("groups unticked items by aisle, in the shop's order, and lists ticked ones apart", () => {
     const { groups, done } = groupItems([
-      item("milk", { label: "Dairy", position: 2 }),
+      item("milk", { label: "Dairy Products", position: 2 }),
       item("salt"),
-      item("apples", { label: "Produce", position: 1 }),
-      item("butter", { label: "Dairy", position: 1 }),
+      item("tea", { label: "a label of our own" }),
+      item("apples", { label: "Fresh Produce", position: 1 }),
+      item("butter", { label: "Dairy Products", position: 1 }),
+      item("tofu", { label: "Health Foods", position: 3 }),
       item("bread", { checked: true, position: 3 }),
     ]);
     expect(groups.map((g) => [g.label, g.items.map((i) => i.id)])).toEqual([
-      ["Dairy", ["butter", "milk"]],
-      ["Produce", ["apples"]],
-      ["Other", ["salt"]],
+      ["Fruit & veg", ["apples"]],
+      ["Dairy, eggs & tofu", ["butter", "milk", "tofu"]],
+      ["Other", ["salt", "tea"]],
     ]);
     expect(done.map((i) => i.id)).toEqual(["bread"]);
   });

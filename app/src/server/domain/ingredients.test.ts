@@ -10,7 +10,6 @@ import {
   stepServings,
   unitLabel,
 } from "./ingredients";
-import { buildShoppingList } from "./shopping";
 
 const gram = { id: "u-g", name: "gram", abbreviation: "g" };
 const ing = (over: Partial<Ingredient> = {}): Ingredient => ({
@@ -151,30 +150,6 @@ describe("scaleIngredients", () => {
       ["To serve", ""],
       [null, "a squeeze of lemon"],
     ]);
-  });
-
-  it("matches the shopping list at the planned servings", () => {
-    const portions = { a: 1, b: 0.5 };
-    const recipe = {
-      id: "r1",
-      name: "Soup",
-      servings: 4,
-      ingredients: [lentils, onions],
-    };
-    const shopping = buildShoppingList([
-      { recipe, slug: "soup", baseServings: 1, portions },
-    ]);
-    const page = scaleIngredients(
-      recipe.ingredients,
-      recipe.servings,
-      plannedServings(1, portions)
-    );
-    expect(page.map((l) => [l.scaled?.quantity, l.scaled?.unit])).toEqual(
-      ["red lentils", "onion"].map((food) => {
-        const line = shopping.lines.find((l) => l.foodName === food);
-        return [line?.quantity, line?.unit];
-      })
-    );
   });
 });
 

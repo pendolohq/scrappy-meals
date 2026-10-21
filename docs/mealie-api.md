@@ -221,10 +221,11 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
 - **Cached** in `recipe_cache` with the rest of the recipe, so the page opens
   while Mealie is down. Rows cached before instructions were kept have
   `instructions` null and are fetched on the page's first visit.
-- **Scaling:** ingredients are scaled to "cooking for" in the browser with
-  the same rounding and units as the shopping list
-  (`src/server/domain/ingredients.ts`), so at the planned servings both show
-  the same amounts. "Cooking for" is never saved; portions are.
+- **Scaling:** ingredients are scaled to "cooking for" in the browser
+  (`src/server/domain/ingredients.ts`), in the recipe's own units and to two
+  decimals. Converting to grams and rounding up are for the shopping list
+  only: a cook measures "2 tbsp", a shopper buys grams. "Cooking for" is never
+  saved; portions are.
 - **"Edit in Mealie"** links to `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`
   (`src/server/mealie/links.ts`). The link streams in after the page, so a
   Mealie that is down only leaves it out.
@@ -243,8 +244,9 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
 ## Shopping lists
 
 - `create-bulk` takes `foodId` / `unitId` directly; Mealie fills in `display`.
-- **Mealie merges server-side:** an item with the same food and unit as an
-  existing unchecked item on the list increases that item's quantity, and comes
+- **Mealie merges server-side:** an item with the same food and unit (or both
+  without a unit) as an existing unchecked item on the list increases that
+  item's quantity and joins the notes, and comes
   back in `updatedItems`, not `createdItems`. Free-text items (no food) are not
   merged. The planner pushes to its own list per week, but a line someone added
   by hand with the same food and unit gets merged too. The planner only owns
@@ -252,6 +254,37 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
   the push reports these merges and the page asks to check their quantities.
 - `recipeReferences: [{ recipeId }]` links an item to the recipes it came from;
   Mealie shows these on the item.
+
+## Building the week's list
+
+`buildShoppingList` (`src/server/domain/shopping.ts`) makes one line per
+Mealie food, whatever units the recipes use:
+
+- **Units convert through Mealie's own data.** Each unit has
+  `standardQuantity` of a `standardUnit` (`tablespoon` is 0.5 `fluid_ounce`,
+  `kilogram` is 1 `kilogram`); Mealie fills these in for the units it knows,
+  including ones created by name ("gram", abbreviation "g"). Weights add up in
+  grams, volumes in millilitres. Units without a standard (bunch, clove,
+  pinch, can) add up per unit.
+- **Density, per food:** a food's `scrappyGramsPerMl` extra (a string such
+  as `"0.53"`, set with `PUT /api/foods/{id}` since Mealie's editor doesn't
+  show extras) turns its volumes into grams. Without it, volumes stay in ml; nothing is guessed.
+- **Rounding happens once, on the totals:** grams and ml up to whole ones
+  until 100, then up to the next 10; everything else up to a whole one
+  (three half onions are 2 onions).
+- **Amounts that don't add up** stay on one line: `parsley 100 g + 1 bunch`.
+  A Mealie item has one unit, so such a line goes in as the food with the
+  amounts in its note.
+- **Aisles** come from the food's Mealie label, mapped onto a short ordered
+  list (`src/server/domain/aisles.ts`): Mealie's seeded labels ("Fresh
+  Produce", "Health Foods", …) and labels named like an aisle. Unlabelled foods
+  and other labels go under "Other", so a new food needs a label in Mealie to
+  find its aisle. The preview and the checklist use the same mapping.
+- Near-duplicate foods ("onion", "onions") are separate lines: combine them
+  on Mealie's Foods page (or add an alias) rather than matching names in code.
+- Rows in `recipe_cache` from before labels and unit standards were kept
+  have neither, so they don't convert and sit under "Other" until the
+  recipe is fetched again (at most an hour).
 
 ## How the planner pushes a week
 
@@ -263,6 +296,8 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
   the list was deleted in Mealie, a new one is created.
 - Parsed lines go in with `foodId`/`unitId` and a recipe reference; unparsed
   lines go in as notes ("a squeeze of lemon (×2) · Red Lentil Soup").
+  Grams and millilitres go in with a unit of exactly one gram or millilitre
+  (a recipe's own, else Mealie's, else one is created with its standard set).
 - Links to the list use `MEALIE_PUBLIC_URL` (`https://recipes.<domain>` in
   compose) + `/shopping-lists/<id>`.
 
@@ -275,8 +310,8 @@ only copy of the list. The old `/shop` URL redirects there.
 
 - **Reading:** the page reads the list's items straight from Mealie on every
   load (and every 15 s while open), ticks and hand-added lines included.
-  Items are grouped by their Mealie label (the item's, else its food's), as
-  aisles; unlabelled items go under "Other".
+  Items are grouped into aisles by their Mealie label (the item's, else its
+  food's), in the preview's order; unlabelled items go under "Other".
 - **Ticking:** `PUT /items/{id}` **replaces the whole item**: fields left out
   fall back to defaults (quantity 1, empty note, no recipe references). So a
   tick writes back the item it just read (to check ownership, below) with
