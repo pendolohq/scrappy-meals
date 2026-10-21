@@ -225,6 +225,10 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
 - **"Edit in Mealie"** links to `MEALIE_PUBLIC_URL` + `/g/<group slug>/r/<slug>`
   (`src/server/mealie/links.ts`). The link streams in after the page, so a
   Mealie that is down only leaves it out.
+- **"Write a recipe in Mealie"**, under the import form on `/recipes/new`,
+  links the same way to `/g/<group slug>/r/create/new`, Mealie's "Create
+  recipe" page, for recipes with no page to import. The planner has no
+  editor of its own for steps and ingredients.
 
 ## Servings and ingredients
 
