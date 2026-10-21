@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendRecipes,
   discoverHref,
+  MAX_DISCOVER_PAGE,
+  nextDiscoverPage,
   orderTagChips,
   parseDiscoverParams,
   toggleCategory,
@@ -47,6 +50,48 @@ describe("parseDiscoverParams", () => {
       quick: false,
       page: 1,
     });
+  });
+
+  it("caps the page, since every page up to it is fetched at once", () => {
+    expect(parseDiscoverParams({ page: "999999" }, known).page).toBe(
+      MAX_DISCOVER_PAGE
+    );
+  });
+});
+
+describe("nextDiscoverPage", () => {
+  it("is the page after the ones loaded while recipes remain", () => {
+    expect(nextDiscoverPage(1, 49, 48)).toBe(2);
+    expect(nextDiscoverPage(3, 190, 48)).toBe(4);
+  });
+
+  it("is null once everything is loaded", () => {
+    expect(nextDiscoverPage(1, 48, 48)).toBeNull();
+    expect(nextDiscoverPage(4, 190, 48)).toBeNull();
+    expect(nextDiscoverPage(1, 0, 48)).toBeNull();
+    // Opened at ?page=9 with fewer recipes than that.
+    expect(nextDiscoverPage(9, 190, 48)).toBeNull();
+  });
+});
+
+describe("appendRecipes", () => {
+  const r = (slug: string) => ({ slug });
+
+  it("adds the next page after the ones shown", () => {
+    expect(appendRecipes([r("a"), r("b")], [r("c"), r("d")])).toEqual([
+      r("a"),
+      r("b"),
+      r("c"),
+      r("d"),
+    ]);
+  });
+
+  it("keeps a recipe that shifted onto the next page only once", () => {
+    expect(appendRecipes([r("a"), r("b")], [r("b"), r("c")])).toEqual([
+      r("a"),
+      r("b"),
+      r("c"),
+    ]);
   });
 });
 

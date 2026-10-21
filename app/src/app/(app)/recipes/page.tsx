@@ -4,10 +4,8 @@ import Link from "next/link";
 import { buttonClass } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { pillClass } from "@/components/ui/pill";
-import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import {
-  type DiscoverState,
   discoverHref,
   orderCategoryChips,
   orderTagChips,
@@ -16,9 +14,11 @@ import {
   toggleQuick,
   toggleTag,
 } from "@/server/domain/discover";
-import { formatMinutes, QUICK_MAX_MINUTES } from "@/server/domain/taxonomy";
+import { QUICK_MAX_MINUTES } from "@/server/domain/taxonomy";
 import { discoverRecipes, listOrganizers } from "@/server/mealie/recipes";
 import { requireUser } from "@/server/session";
+
+import { RecipeGrid } from "./recipe-grid";
 
 const Chip = ({
   href,
@@ -79,21 +79,20 @@ export default async function DiscoverPage({
     tags: organizers.tags.map((t) => t.slug),
     categories: organizers.categories.map((c) => c.slug),
   });
-  let result = await discoverRecipes(state, { page: state.page });
-  if (state.page > result.totalPages && result.total > 0) {
-    // A page past the end (an old link after recipes were removed): show
-    // the last one.
-    state.page = result.totalPages;
-    result = await discoverRecipes(state, { page: state.page });
-  }
+  // `?page=n` (an old link, from before the grid loaded more as you scroll)
+  // shows pages 1 to n, so nothing above it is missing.
+  const result = await discoverRecipes(state, {
+    page: state.page,
+    fromStart: true,
+  });
   const tags = orderTagChips(organizers.tags, state.tags);
   const categories = orderCategoryChips(
     organizers.categories,
     state.categories
   );
+  const href = discoverHref(state);
   const filtered =
     state.tags.length > 0 || state.categories.length > 0 || state.quick;
-  const page = (n: number): DiscoverState => ({ ...state, page: n });
 
   return (
     <section className="space-y-6 pb-8">
@@ -161,65 +160,16 @@ export default async function DiscoverPage({
             : "No recipes in Mealie yet."}
         </p>
       ) : (
-        <ul
-          className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3"
-          data-testid="discover-results"
-        >
-          {result.items.map((r) => (
-            <li key={r.slug}>
-              <Link
-                href={`/recipes/${r.slug}`}
-                className="group block space-y-2 rounded-card"
-              >
-                <RecipeImage
-                  mealieId={r.imagePath && r.id ? r.id : null}
-                  className="aspect-[4/3] w-full transition group-hover:brightness-95"
-                  rounded="rounded-card"
-                />
-                <span className="line-clamp-2 font-serif font-semibold group-hover:underline">
-                  {r.name}
-                </span>
-                {r.totalMinutes && (
-                  <span className="flex items-center gap-1 text-xs text-muted">
-                    <Clock className="size-3" aria-hidden />
-                    {formatMinutes(r.totalMinutes)}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {result.totalPages > 1 && (
-        <nav
-          aria-label="Pages"
-          className="flex items-center justify-between gap-3"
-        >
-          {state.page > 1 ? (
-            <Link
-              href={discoverHref(page(state.page - 1))}
-              className={buttonClass({ variant: "secondary", size: "sm" })}
-            >
-              Previous
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-sm text-muted">
-            Page {state.page} of {result.totalPages}
-          </span>
-          {state.page < result.totalPages ? (
-            <Link
-              href={discoverHref(page(state.page + 1))}
-              className={buttonClass({ variant: "secondary", size: "sm" })}
-            >
-              Next
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
+        <RecipeGrid
+          key={href}
+          href={href}
+          filters={{
+            tags: state.tags,
+            categories: state.categories,
+            quick: state.quick,
+          }}
+          initial={{ items: result.items, nextPage: result.nextPage }}
+        />
       )}
     </section>
   );

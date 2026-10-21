@@ -1,6 +1,7 @@
 import "server-only";
 
 import { parseDecimal } from "../domain/decimal";
+import { nextDiscoverPage } from "../domain/discover";
 import {
   categoryFilter,
   type Organizer,
@@ -132,13 +133,20 @@ export const DISCOVER_PAGE_SIZE = 48;
  * Recipes matching the filters, by name. Every filter runs in Mealie: tags
  * and categories by slug, "quick" as a filter on the total time in seconds.
  * Callers pass only slugs that exist: Mealie drops a filter whose slugs it
- * doesn't know rather than matching nothing.
+ * doesn't know rather than matching nothing. With `fromStart`, it returns
+ * pages 1 to `page` together, as a page opened at `?page=n` shows them.
  */
 export async function discoverRecipes(
   filters: DiscoverFilters,
-  opts: { page?: number; client?: MealieClient } = {}
-): Promise<{ items: RecipeListItem[]; total: number; totalPages: number }> {
+  opts: { page?: number; fromStart?: boolean; client?: MealieClient } = {}
+): Promise<{
+  items: RecipeListItem[];
+  total: number;
+  /** The page "Load more" fetches next; null when there are no more. */
+  nextPage: number | null;
+}> {
   const client = opts.client ?? mealie();
+  const page = opts.page ?? 1;
   const categories = categoryFilter(filters.categories);
   const result = unwrap(
     await client.GET("/api/recipes", {
@@ -153,16 +161,17 @@ export async function discoverRecipes(
             : undefined,
           orderBy: "name",
           orderDirection: "asc",
-          page: opts.page ?? 1,
-          perPage: DISCOVER_PAGE_SIZE,
+          page: opts.fromStart ? 1 : page,
+          perPage: DISCOVER_PAGE_SIZE * (opts.fromStart ? page : 1),
         },
       },
     })
   );
+  const total = result.total ?? result.items.length;
   return {
     items: result.items.map(toListItem),
-    total: result.total ?? result.items.length,
-    totalPages: result.total_pages ?? 1,
+    total,
+    nextPage: nextDiscoverPage(page, total, DISCOVER_PAGE_SIZE),
   };
 }
 
