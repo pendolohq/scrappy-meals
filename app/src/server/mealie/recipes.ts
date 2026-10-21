@@ -90,34 +90,6 @@ export type Recipe = RecipeListItem & {
   categories: Organizer[];
 };
 
-export type RecipePage = { items: RecipeListItem[] };
-
-export async function searchRecipes(
-  query: string,
-  opts: { perPage?: number; client?: MealieClient } = {}
-): Promise<RecipePage> {
-  const client = opts.client ?? mealie();
-  const search = query.trim();
-  const page = unwrap(
-    await client.GET("/api/recipes", {
-      params: {
-        query: {
-          search: search || undefined,
-          // Mealie ranks by relevance when searching; otherwise list alphabetically.
-          ...(search
-            ? {}
-            : { orderBy: "name", orderDirection: "asc" as const }),
-          page: 1,
-          perPage: opts.perPage ?? 20,
-        },
-      },
-    })
-  );
-  return {
-    items: page.items.map(toListItem),
-  };
-}
-
 export type DiscoverFilters = {
   /** Tag slugs; a recipe needs all of them. */
   tags: string[];
@@ -125,13 +97,16 @@ export type DiscoverFilters = {
   categories: string[];
   /** Total time of 30 minutes or less. */
   quick: boolean;
+  /** Words in the name (or description, ingredients…, as Mealie searches). */
+  search?: string;
 };
 
 export const DISCOVER_PAGE_SIZE = 48;
 
 /**
- * Recipes matching the filters, by name. Every filter runs in Mealie: tags
- * and categories by slug, "quick" as a filter on the total time in seconds.
+ * Recipes matching the filters, by name, or by relevance when searching for
+ * words. Every filter runs in Mealie: tags and categories by slug, "quick"
+ * as a filter on the total time in seconds.
  * Callers pass only slugs that exist: Mealie drops a filter whose slugs it
  * doesn't know rather than matching nothing. With `fromStart`, it returns
  * pages 1 to `page` together, as a page opened at `?page=n` shows them.
@@ -148,6 +123,7 @@ export async function discoverRecipes(
   const client = opts.client ?? mealie();
   const page = opts.page ?? 1;
   const categories = categoryFilter(filters.categories);
+  const search = filters.search?.trim();
   const result = unwrap(
     await client.GET("/api/recipes", {
       params: {
@@ -159,8 +135,11 @@ export async function discoverRecipes(
           queryFilter: filters.quick
             ? `totalTimeSeconds > 0 AND totalTimeSeconds <= ${QUICK_MAX_MINUTES * 60}`
             : undefined,
-          orderBy: "name",
-          orderDirection: "asc",
+          search: search || undefined,
+          // Mealie ranks by relevance when searching; otherwise by name.
+          ...(search
+            ? {}
+            : { orderBy: "name", orderDirection: "asc" as const }),
           page: opts.fromStart ? 1 : page,
           perPage: DISCOVER_PAGE_SIZE * (opts.fromStart ? page : 1),
         },
