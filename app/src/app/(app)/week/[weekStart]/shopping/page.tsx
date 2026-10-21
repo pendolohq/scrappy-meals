@@ -4,10 +4,10 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { Card, cardClass } from "@/components/ui/card";
 import { WeekHeader } from "@/components/week-header";
 import { cx } from "@/lib/cx";
-import { formatQuantity } from "@/lib/format";
 import type { ShopItemView } from "@/lib/shop-list";
 import { getDb } from "@/server/db/client";
-import type { WeekIngredients } from "@/server/domain/shopping";
+import { AISLES } from "@/server/domain/aisles";
+import { formatAmounts, type WeekIngredients } from "@/server/domain/shopping";
 import { isMealieUnavailable } from "@/server/mealie/client";
 import { requireUser } from "@/server/session";
 import { type ShopList, weekShopList } from "@/server/shop";
@@ -40,32 +40,40 @@ const Preview = ({ list }: { list: WeekIngredients }) => {
   }
   return (
     <>
-      <Card as="section">
-        <SectionTitle>
-          {list.lines.length} item{list.lines.length === 1 ? "" : "s"}
-        </SectionTitle>
-        <ul className="divide-y divide-border/70" data-testid="lines">
-          {list.lines.map((l) => (
-            <li
-              key={l.key}
-              className="flex items-baseline justify-between gap-4 py-3"
-            >
-              <span className="min-w-0">
-                <span className="font-medium">{l.foodName}</span>
-                <span className="mt-0.5 block truncate text-xs text-muted">
-                  {l.recipes.map((r) => r.name).join(", ")}
-                </span>
-              </span>
-              <span
-                className="shrink-0 font-semibold text-accent-ink tabular-nums"
-                data-testid="qty"
-              >
-                {l.quantity === null ? "–" : formatQuantity(l.quantity, l.unit)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <div className="space-y-5" data-testid="lines">
+        {AISLES.map((aisle) => {
+          const lines = list.lines.filter((l) => l.aisle === aisle);
+          if (lines.length === 0) {
+            return null;
+          }
+          return (
+            <Card as="section" key={aisle}>
+              <SectionTitle>{aisle}</SectionTitle>
+              <ul className="divide-y divide-border/70">
+                {lines.map((l) => (
+                  <li
+                    key={l.key}
+                    className="flex items-baseline justify-between gap-4 py-3"
+                  >
+                    <span className="min-w-0">
+                      <span className="font-medium">{l.foodName}</span>
+                      <span className="mt-0.5 block truncate text-xs text-muted">
+                        {l.recipes.map((r) => r.name).join(", ")}
+                      </span>
+                    </span>
+                    <span
+                      className="shrink-0 text-right font-semibold text-accent-ink tabular-nums"
+                      data-testid="qty"
+                    >
+                      {l.amounts.length === 0 ? "–" : formatAmounts(l.amounts)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          );
+        })}
+      </div>
 
       {list.freeText.length > 0 && (
         <Card as="section">

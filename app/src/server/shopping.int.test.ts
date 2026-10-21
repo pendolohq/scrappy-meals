@@ -12,6 +12,7 @@ import { getRecipe } from "./mealie/recipes";
 import {
   addShoppingItems,
   createShoppingList,
+  findOrCreateBaseUnit,
   getShoppingListItems,
 } from "./mealie/shopping";
 import { addMeal, setPortion } from "./plan";
@@ -143,8 +144,8 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       await setPortion(db, lunch, b.id, 0.5); // 1 + 0.5 = 1.5 of 4 servings
 
       const preview = await weekShoppingList(db, WEEK, opts);
-      expect(preview.lines.map((l) => [l.foodId, l.unit, l.quantity])).toEqual([
-        [ids.lentils, "g", 150],
+      expect(preview.lines.map((l) => [l.foodId, l.amounts])).toMatchObject([
+        [ids.lentils, [{ quantity: 150, unit: "g", unitId: ids.gram }]],
       ]);
       expect(preview.freeText.map((f) => f.text)).toEqual([
         "a handful of parsley",
@@ -346,6 +347,82 @@ describe.skipIf(!baseUrl || !testDbUrl)(
       await expect(
         checkShopItem(db, WEEK, coffee.id, true, opts)
       ).rejects.toThrow("no longer on the list");
+    });
+
+    it("sends amounts that don't add up as one item, and finds Mealie's own gram", async () => {
+      const WEEK = uniqueWeek();
+      const opts = { client: admin };
+      const bunch = unwrap(
+        await admin.POST("/api/units", { body: { name: `it-bunch-${run}` } })
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/units/{item_id}", {
+          params: { path: { item_id: bunch.id } },
+        })
+      );
+      const slug = unwrap(
+        await admin.POST("/api/recipes", {
+          body: { name: `IT Mixed Amounts ${run}` },
+        })
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      );
+      unwrap(
+        await admin.PATCH("/api/recipes/{slug}", {
+          params: { path: { slug } },
+          body: {
+            recipeServings: 1,
+            recipeIngredient: [
+              {
+                quantity: 100,
+                food: { id: ids.lentils, name: `it-lentils-${run}` },
+                unit: { id: ids.gram, name: `it-gram-${run}` },
+                note: "",
+              },
+              {
+                quantity: 0.5,
+                food: { id: ids.lentils, name: `it-lentils-${run}` },
+                unit: { id: bunch.id, name: bunch.name },
+                note: "",
+              },
+            ],
+          },
+        })
+      );
+      const a = await createUser(db, {
+        name: "A",
+        email: "a@example.test",
+        password: "correct horse battery",
+      });
+      await addMeal(
+        db,
+        { date: WEEK, slot: "dinner", slug, createdBy: a.id },
+        { fetch: fromMealie }
+      );
+
+      const pushed = await pushShoppingList(db, WEEK, opts);
+      cleanup.push(() =>
+        admin.DELETE("/api/households/shopping/lists/{item_id}", {
+          params: { path: { item_id: pushed.listId } },
+        })
+      );
+      const items = await getShoppingListItems(pushed.listId, opts);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        foodId: ids.lentils,
+        unitId: null,
+        quantity: 0,
+        note: `100 g + 1 it-bunch-${run}`,
+      });
+
+      const gram = await findOrCreateBaseUnit("gram", opts);
+      const unit = unwrap(
+        await admin.GET("/api/units/{item_id}", {
+          params: { path: { item_id: gram } },
+        })
+      );
+      expect(unit).toMatchObject({ standardQuantity: 1, standardUnit: "gram" });
     });
 
     it("has no shop list before the week is sent", async () => {

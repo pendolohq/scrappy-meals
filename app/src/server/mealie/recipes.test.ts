@@ -90,4 +90,40 @@ describe("toRecipe", () => {
       [],
     ]);
   });
+
+  it("keeps what the shopping list needs: the food's label and density, the unit's size", () => {
+    const food = (extras: Record<string, unknown>) => ({
+      id: "00000000-0000-4000-8000-0000000000f1",
+      name: "flour",
+      label: { id: "l1", name: "Baking", groupId: "g1" },
+      extras,
+    });
+    const recipe = toRecipe({
+      ...base,
+      recipeIngredient: [
+        {
+          quantity: 1,
+          note: "",
+          food: food({ scrappyGramsPerMl: "0,53" }),
+          unit: {
+            id: "00000000-0000-4000-8000-0000000000c1",
+            name: "cup",
+            standardQuantity: 1,
+            standardUnit: "cup",
+          },
+        },
+        { quantity: 1, note: "", food: food({ scrappyGramsPerMl: "lots" }) },
+        { quantity: 1, note: "", food: food({}) },
+      ],
+    });
+    expect(recipe.ingredients.map((i) => i.food)).toMatchObject([
+      { label: "Baking", gramsPerMl: 0.53 },
+      { label: "Baking", gramsPerMl: null },
+      { label: "Baking", gramsPerMl: null },
+    ]);
+    expect(recipe.ingredients[0].unit).toMatchObject({
+      standardQuantity: 1,
+      standardUnit: "cup",
+    });
+  });
 });

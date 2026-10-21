@@ -1,5 +1,6 @@
 import "server-only";
 
+import { parseDecimal } from "../domain/decimal";
 import {
   categoryFilter,
   type Organizer,
@@ -31,8 +32,25 @@ export type RecipeListItem = {
 export type Ingredient = {
   /** Null when Mealie has no amount (unparsed line, or "to taste"). */
   quantity: number | null;
-  food: { id: string; name: string } | null;
-  unit: { id: string; name: string; abbreviation: string } | null;
+  food: {
+    id: string;
+    name: string;
+    /** Mealie's label for the food, which places it in a shop aisle. */
+    label?: string | null;
+    /**
+     * Grams per millilitre, from the food's `scrappyGramsPerMl` extra, so the
+     * shopping list can turn its volumes into grams.
+     */
+    gramsPerMl?: number | null;
+  } | null;
+  unit: {
+    id: string;
+    name: string;
+    abbreviation: string;
+    /** One unit is `standardQuantity` of Mealie's `standardUnit` ("gram", "cup"). */
+    standardQuantity?: number | null;
+    standardUnit?: string | null;
+  } | null;
   note: string;
   /** Mealie's rendered line, e.g. "2 cups flour, sifted". */
   display: string;
@@ -238,10 +256,28 @@ function toListItem(r: MealieSummary | MealieRecipe): RecipeListItem {
   };
 }
 
+const DENSITY_EXTRA = "scrappyGramsPerMl";
+
+/** Set by hand in Mealie, so anything but a plausible number counts as unset. */
+function readDensity(value: unknown): number | null {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? parseDecimal(value, "refuse")
+        : null;
+  return n !== null && n > 0 && n < 25 ? n : null;
+}
+
 function toIngredient(i: MealieIngredient): Ingredient {
   const food =
     i.food && "id" in i.food && i.food.id
-      ? { id: i.food.id, name: i.food.name }
+      ? {
+          id: i.food.id,
+          name: i.food.name,
+          label: "label" in i.food ? (i.food.label?.name ?? null) : null,
+          gramsPerMl: readDensity(i.food.extras?.[DENSITY_EXTRA]),
+        }
       : null;
   const unit =
     i.unit && "id" in i.unit && i.unit.id
@@ -249,6 +285,8 @@ function toIngredient(i: MealieIngredient): Ingredient {
           id: i.unit.id,
           name: i.unit.name,
           abbreviation: i.unit.abbreviation ?? "",
+          standardQuantity: i.unit.standardQuantity ?? null,
+          standardUnit: i.unit.standardUnit ?? null,
         }
       : null;
   return {

@@ -1,11 +1,8 @@
 import type { Ingredient } from "../mealie/recipes";
 
-import {
-  plannedServings,
-  roundQuantity,
-  servingsScale,
-  unitLabel,
-} from "./ingredients";
+import { type Aisle, aisleOf, aisleOrder } from "./aisles";
+import { plannedServings, servingsScale, unitLabel } from "./ingredients";
+import { isBaseUnit, measure, roundCount, roundMeasured } from "./units";
 
 export type MealForShopping = {
   /** Null when the recipe is gone from Mealie. */
@@ -20,15 +17,28 @@ export type MealForShopping = {
   portions: Record<string, number>;
 };
 
+/** One amount on a line; a line holds one per kind of amount that won't add up with the others. */
+export type ShoppingAmount = {
+  quantity: number;
+  /** "g", "ml", the unit's label, or null for a count ("2" onions). */
+  unit: string | null;
+  /**
+   * Mealie's unit to send it with; null for a count, or for grams or
+   * millilitres when no planned recipe uses a unit of exactly one.
+   */
+  unitId: string | null;
+  /** Grams and millilitres are Mealie's standard units, found by those names. */
+  standard: "gram" | "milliliter" | null;
+};
+
 export type ShoppingLine = {
-  /** `${foodId}|${unitId ?? ""}`: lines merge only on the same food AND unit. */
+  /** The food's id: a food is one line, whatever units the recipes use. */
   key: string;
   foodId: string;
   foodName: string;
-  unitId: string | null;
-  unit: string | null;
-  /** Null when no recipe gave an amount ("salt to taste"). */
-  quantity: number | null;
+  aisle: Aisle;
+  /** Empty when no recipe gave an amount ("salt to taste"). */
+  amounts: ShoppingAmount[];
   recipes: { id: string; name: string }[];
 };
 
@@ -50,17 +60,32 @@ export type WeekIngredients = {
   missing: string[];
 };
 
+type Sums = {
+  foodName: string;
+  label: string | null;
+  /** Keyed "g", "ml", or the unit id ("" for no unit). */
+  totals: Map<
+    string,
+    { sum: number; unit: string | null; unitId: string | null }
+  >;
+  recipes: { id: string; name: string }[];
+};
+
 /**
  * Builds the week's shopping list. Each recipe is scaled by the servings
  * everyone eats (base servings x sum of portions) over the recipe's own
- * servings count; amounts are then summed per food and unit. There is no unit
- * conversion: "200 g flour" and "1 cup flour" stay separate lines.
+ * servings count. Amounts are then summed per food: weights in grams, volumes
+ * in millilitres (grams when the food has a density), anything else per unit.
+ * Totals are rounded up only once summed, so three half onions are two onions,
+ * not three.
  */
 export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
-  const lines = new Map<string, ShoppingLine>();
+  const foods = new Map<string, Sums>();
   const freeText = new Map<string, FreeTextLine>();
   const unscaled = new Set<string>();
   const missing = new Set<string>();
+  // Mealie's own gram and millilitre units, as the recipes name them.
+  const baseUnits: Record<"g" | "ml", string | null> = { g: null, ml: null };
 
   for (const meal of meals) {
     const eaten = plannedServings(meal.baseServings, meal.portions);
@@ -107,36 +132,105 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
         }
         continue;
       }
-      const key = `${ing.food.id}|${ing.unit?.id ?? ""}`;
-      const line = lines.get(key) ?? {
-        key,
-        foodId: ing.food.id,
+      const food: Sums = foods.get(ing.food.id) ?? {
         foodName: ing.food.name,
-        unitId: ing.unit?.id ?? null,
-        unit: unitLabel(ing.unit),
-        quantity: null,
+        label: null,
+        totals: new Map(),
         recipes: [],
       };
+      // Rows cached before labels were kept have none; any recipe's will do.
+      food.label ??= ing.food.label ?? null;
       if (ing.quantity !== null) {
-        line.quantity = roundQuantity(
-          (line.quantity ?? 0) + ing.quantity * scale
-        );
+        addAmount(food, ing, ing.quantity * scale, baseUnits);
       }
-      if (!line.recipes.some((r) => r.id === recipe.id)) {
-        line.recipes.push(source);
+      if (!food.recipes.some((r) => r.id === recipe.id)) {
+        food.recipes.push(source);
       }
-      lines.set(key, line);
+      foods.set(ing.food.id, food);
     }
   }
 
+  const lines = [...foods.entries()].map(([foodId, food]): ShoppingLine => ({
+    key: foodId,
+    foodId,
+    foodName: food.foodName,
+    aisle: aisleOf(food.label),
+    amounts: [...food.totals.entries()]
+      .map(([key, t]): ShoppingAmount => {
+        if (key === "g" || key === "ml") {
+          return {
+            quantity: roundMeasured(t.sum),
+            unit: key,
+            unitId: baseUnits[key],
+            standard: key === "g" ? "gram" : "milliliter",
+          };
+        }
+        return {
+          quantity: roundCount(t.sum),
+          unit: t.unit,
+          unitId: t.unitId,
+          standard: null,
+        };
+      })
+      .toSorted((a, b) => amountOrder(a) - amountOrder(b)),
+    recipes: food.recipes,
+  }));
+
   return {
-    lines: [...lines.values()].sort(
+    lines: lines.toSorted(
       (a, b) =>
-        a.foodName.localeCompare(b.foodName) ||
-        (a.unit ?? "").localeCompare(b.unit ?? "")
+        aisleOrder(a.aisle) - aisleOrder(b.aisle) ||
+        a.foodName.localeCompare(b.foodName)
     ),
     freeText: [...freeText.values()],
     unscaled: [...unscaled],
     missing: [...missing],
   };
 }
+
+function addAmount(
+  food: Sums,
+  ing: Ingredient,
+  quantity: number,
+  baseUnits: Record<"g" | "ml", string | null>
+) {
+  const measured = ing.unit ? measure(quantity, ing.unit) : null;
+  let key: string;
+  let amount = quantity;
+  if (measured) {
+    baseUnits[measured.per] ??= isBaseUnit(ing.unit, measured.per)
+      ? ing.unit!.id
+      : null;
+    const density = ing.food?.gramsPerMl;
+    if (measured.per === "ml" && density) {
+      key = "g";
+      amount = measured.amount * density;
+    } else {
+      key = measured.per;
+      amount = measured.amount;
+    }
+  } else {
+    key = ing.unit?.id ?? "";
+  }
+  const total = food.totals.get(key) ?? {
+    sum: 0,
+    unit: measured ? null : unitLabel(ing.unit),
+    unitId: measured ? null : (ing.unit?.id ?? null),
+  };
+  total.sum += amount;
+  food.totals.set(key, total);
+}
+
+/** Grams, then millilitres, then counts, then other units. */
+const amountOrder = (a: ShoppingAmount) =>
+  a.standard === "gram"
+    ? 0
+    : a.standard === "milliliter"
+      ? 1
+      : a.unit === null
+        ? 2
+        : 3;
+
+/** "200 g", "2", "100 g + 1 bunch": how a line's amounts read, in the preview and in Mealie. */
+export const formatAmounts = (amounts: ShoppingAmount[]) =>
+  amounts.map((a) => `${a.quantity}${a.unit ? ` ${a.unit}` : ""}`).join(" + ");

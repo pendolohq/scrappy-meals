@@ -6,13 +6,18 @@ import "server-only";
 
 import type { Db } from "./db/client";
 import { shoppingPushes } from "./db/schema";
-import { buildShoppingList, type WeekIngredients } from "./domain/shopping";
+import {
+  buildShoppingList,
+  formatAmounts,
+  type WeekIngredients,
+} from "./domain/shopping";
 import { type MealieClient, MealieError } from "./mealie/client";
 import { getRecipe } from "./mealie/recipes";
 import {
   addShoppingItems,
   createShoppingList,
   deleteShoppingItems,
+  findOrCreateBaseUnit,
   findShoppingListByName,
   getShoppingListItems,
   type NewShoppingItem,
@@ -71,11 +76,60 @@ export type PushResult = {
   replaced: number;
   /**
    * Lines Mealie merged into an unticked item already on the list (same food
-   * and unit), most likely one added by hand. The planner doesn't own those,
+   * and unit, or no unit), most likely one added by hand. The planner doesn't own those,
    * so pushing again adds its share once more.
    */
   merged: number;
 };
+
+/** The week's lines as Mealie items: foods by id and unit, the rest as notes. */
+async function toItems(
+  list: WeekIngredients,
+  mealie: { client?: MealieClient }
+): Promise<NewShoppingItem[]> {
+  const baseUnits = new Map<string, Promise<string>>();
+  const baseUnit = (standard: "gram" | "milliliter") => {
+    const id =
+      baseUnits.get(standard) ?? findOrCreateBaseUnit(standard, mealie);
+    baseUnits.set(standard, id);
+    return id;
+  };
+  const lines = await Promise.all(
+    list.lines.map(async (l): Promise<NewShoppingItem> => {
+      const recipeIds = l.recipes.map((r) => r.id);
+      const [only, ...more] = l.amounts;
+      if (!only) {
+        return { quantity: 0, foodId: l.foodId, recipeIds };
+      }
+      // A Mealie item has one unit, so amounts that don't add up go in the
+      // note: "parsley 1 bunch + 100 g".
+      if (more.length > 0) {
+        return {
+          quantity: 0,
+          foodId: l.foodId,
+          note: formatAmounts(l.amounts),
+          recipeIds,
+        };
+      }
+      return {
+        quantity: only.quantity,
+        foodId: l.foodId,
+        unitId:
+          only.unitId ?? (only.standard ? await baseUnit(only.standard) : null),
+        recipeIds,
+      };
+    })
+  );
+
+  return [
+    ...lines,
+    ...list.freeText.map((f) => ({
+      quantity: 0,
+      note: `${f.text}${f.times > 1 ? ` (×${f.times})` : ""} · ${f.recipeName}`,
+      recipeIds: [f.recipeId],
+    })),
+  ];
+}
 
 /**
  * Writes the week's list to its own Mealie shopping list. Pushing again
@@ -87,9 +141,13 @@ export async function pushShoppingList(
   weekStart: string,
   opts: Opts = {}
 ): Promise<PushResult> {
-  const list = await weekShoppingList(db, weekStart, opts);
-  const name = shoppingListName(weekStart);
   const mealie = { client: opts.client };
+  // Before anything is deleted, so a failure here leaves last week's push whole.
+  const items = await toItems(
+    await weekShoppingList(db, weekStart, opts),
+    mealie
+  );
+  const name = shoppingListName(weekStart);
 
   const previous = await lastPush(db, weekStart);
   let listId: string | null = null;
@@ -117,19 +175,6 @@ export async function pushShoppingList(
     (await findShoppingListByName(name, mealie)) ??
     (await createShoppingList(name, mealie));
 
-  const items: NewShoppingItem[] = [
-    ...list.lines.map((l) => ({
-      quantity: l.quantity ?? 0,
-      foodId: l.foodId,
-      unitId: l.unitId,
-      recipeIds: l.recipes.map((r) => r.id),
-    })),
-    ...list.freeText.map((f) => ({
-      quantity: 0,
-      note: `${f.text}${f.times > 1 ? ` (×${f.times})` : ""} · ${f.recipeName}`,
-      recipeIds: [f.recipeId],
-    })),
-  ];
   const { created, updated } = await addShoppingItems(listId, items, mealie);
 
   const row = {
