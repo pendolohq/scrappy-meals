@@ -199,9 +199,9 @@ I usually have". Entering grams is needed: half the products have no serving on 
 
 Planned products (not unplanned ones: those are already eaten) go on the week's list as
 themselves: "Grenade Carb Killa ×3". `buildShoppingList` gets a branch for meals whose recipe
-has a barcode, adding a free-text line with `ceil(servings eaten)` summed over the week. They are
-free text in Mealie, so they don't merge with ingredients. That's the right call: a bar isn't
-flour.
+is a product: one line per product, keyed `<recipe id>|product`, in a Products aisle, counting
+`ceil(servings eaten)` over the week, or packs when a pack holds two or more servings
+("FAGE Total 0% fat ×1 (450 g)"). They never merge with ingredients: a bar isn't flour.
 
 ### 7. Offline
 
@@ -306,7 +306,7 @@ existing review page cover that.
 
 ### PR 4: follow-ups
 
-- [x] Shopping: planned products as "Name ×N" free-text lines; unit test in
+- [x] Shopping: planned products as "Name ×N" lines of the week's list; unit test in
       `domain/shopping.test.ts`.
 - [x] "Log what you had" from the Swapped prompt.
 - [x] Product photo from OFF on the recipe.
