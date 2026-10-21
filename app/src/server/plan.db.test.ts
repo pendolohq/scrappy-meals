@@ -10,12 +10,17 @@ import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
+  copyWeek,
   getMeal,
   getWeekPlan,
   hasMeals,
+  moveMeal,
   PlanError,
   removeMeal,
+  removeMeals,
+  setAdherence,
   setBaseServings,
+  setFasting,
   setPortion,
 } from "./plan";
 import { loadRecipes, type RecipeFetcher } from "./recipe-cache";
@@ -62,6 +67,34 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
     });
     return { a, b };
   }
+
+  /** Plans a recipe, as Add does. */
+  const plan = (
+    by: string,
+    date: string,
+    slot: SlotType,
+    slug: string,
+    snackIndex = 0
+  ) => addMeal(db, { date, slot, snackIndex, slug, createdBy: by }, { fetch });
+  /** A week's meals, where each sits and what it is. */
+  const placed = async (weekStart: string) =>
+    (await getWeekPlan(db, weekStart, { fetch })).days.flatMap((d) =>
+      d.meals.map((m) => ({
+        date: m.date,
+        slot: m.slot,
+        snackIndex: m.snackIndex,
+        position: m.position,
+        slug: m.slug,
+      }))
+    );
+
+  /** Where a meal is planned now. */
+  const at = async (id: string) => {
+    const meal = await getMeal(db, id, { fetch });
+    return (
+      meal && { date: meal.date, slot: meal.slot, snackIndex: meal.snackIndex }
+    );
+  };
 
   it("adds meals with a portion of 1 per member and orders them by position", async () => {
     const { a, b } = await twoUsers();
@@ -566,6 +599,262 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
         instructions: null,
       });
       expect(meal?.portions[a.id]).toBe(1);
+    });
+  });
+
+  describe("copyWeek", () => {
+    const lastWeek = "2026-10-12";
+    const thisWeek = "2026-10-19";
+    it("copies every meal into the same weekday and slot, with portions and servings but no logs", async () => {
+      const { a, b } = await twoUsers();
+      const monday = await plan(a.id, "2026-10-12", "dinner", "stew");
+      await plan(a.id, "2026-10-12", "dinner", "salad");
+      await plan(b.id, "2026-10-18", "snack", "nuts", 1);
+      await setPortion(db, monday, b.id, 0.5);
+      await setBaseServings(db, monday, 2);
+      await setAdherence(db, monday, a.id, "stuck");
+
+      const result = await copyWeek(db, lastWeek, thisWeek, b.id);
+
+      expect(result).toMatchObject({ skipped: 0 });
+      expect(result.copied).toHaveLength(3);
+      expect(await placed(thisWeek)).toEqual([
+        {
+          date: "2026-10-19",
+          slot: "dinner",
+          snackIndex: 0,
+          position: 0,
+          slug: "stew",
+        },
+        {
+          date: "2026-10-19",
+          slot: "dinner",
+          snackIndex: 0,
+          position: 1,
+          slug: "salad",
+        },
+        {
+          date: "2026-10-25",
+          slot: "snack",
+          snackIndex: 1,
+          position: 0,
+          slug: "nuts",
+        },
+      ]);
+      const [copy] = (await getWeekPlan(db, thisWeek, { fetch })).days[0].meals;
+      expect(copy).toMatchObject({
+        baseServings: 2,
+        portions: { [a.id]: 1, [b.id]: 0.5 },
+        adherence: {},
+      });
+      // Last week is untouched.
+      expect(await placed(lastWeek)).toHaveLength(3);
+    });
+
+    it("skips slots that already have a meal and counts what it skipped", async () => {
+      const { a } = await twoUsers();
+      await plan(a.id, "2026-10-12", "lunch", "soup");
+      await plan(a.id, "2026-10-12", "lunch", "bread");
+      await plan(a.id, "2026-10-12", "dinner", "stew");
+      await plan(a.id, "2026-10-19", "lunch", "pizza");
+
+      const result = await copyWeek(db, lastWeek, thisWeek, a.id);
+
+      expect(result).toMatchObject({ skipped: 2 });
+      expect(result.copied).toHaveLength(1);
+      expect(await placed(thisWeek)).toEqual([
+        {
+          date: "2026-10-19",
+          slot: "lunch",
+          snackIndex: 0,
+          position: 0,
+          slug: "pizza",
+        },
+        {
+          date: "2026-10-19",
+          slot: "dinner",
+          snackIndex: 0,
+          position: 0,
+          slug: "stew",
+        },
+      ]);
+    });
+
+    it("never copies twice: a second copy skips everything", async () => {
+      const { a } = await twoUsers();
+      await plan(a.id, "2026-10-14", "breakfast", "oats");
+      await copyWeek(db, lastWeek, thisWeek, a.id);
+      expect(await copyWeek(db, lastWeek, thisWeek, a.id)).toEqual({
+        copied: [],
+        skipped: 1,
+      });
+      expect(await placed(thisWeek)).toHaveLength(1);
+    });
+
+    it("keeps a snack's index past the household's count", async () => {
+      const { a } = await twoUsers();
+      await setSnackSlots(db, 4);
+      await plan(a.id, "2026-10-13", "snack", "dates", 3);
+      await setSnackSlots(db, 2);
+
+      await copyWeek(db, lastWeek, thisWeek, a.id);
+
+      expect(await placed(thisWeek)).toEqual([
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 3,
+          position: 0,
+          slug: "dates",
+        },
+      ]);
+    });
+
+    it("zeroes the portion of anyone fasting on the new day", async () => {
+      const { a, b } = await twoUsers();
+      await plan(a.id, "2026-10-15", "lunch", "soup");
+      await setFasting(db, b.id, "2026-10-22", true);
+
+      await copyWeek(db, lastWeek, thisWeek, a.id);
+
+      const [copy] = (await getWeekPlan(db, thisWeek, { fetch })).days[3].meals;
+      expect(copy.portions).toEqual({ [a.id]: 1, [b.id]: 0 });
+    });
+
+    it("can be undone by removing the copied meals", async () => {
+      const { a } = await twoUsers();
+      await plan(a.id, "2026-10-12", "dinner", "stew");
+      await plan(a.id, "2026-10-19", "lunch", "pizza");
+      const { copied } = await copyWeek(db, lastWeek, thisWeek, a.id);
+
+      await removeMeals(db, copied);
+
+      expect((await placed(thisWeek)).map((m) => m.slug)).toEqual(["pizza"]);
+    });
+  });
+
+  describe("moveMeal", () => {
+    it("moves a meal to another slot on the same day, keeping its portions, servings and logs", async () => {
+      const { a, b } = await twoUsers();
+      const id = await addMeal(
+        db,
+        { date: "2026-10-20", slot: "lunch", slug: "soup", createdBy: a.id },
+        { fetch }
+      );
+      await setPortion(db, id, b.id, 2);
+      await setBaseServings(db, id, 1.5);
+      await setAdherence(db, id, a.id, "swapped", "Toast");
+
+      expect(
+        await moveMeal(db, id, { date: "2026-10-20", slot: "dinner" })
+      ).toBe("2026-10-20");
+
+      const [meal] = (await getWeekPlan(db, "2026-10-19", { fetch })).days[1]
+        .meals;
+      expect(meal).toMatchObject({
+        id,
+        slot: "dinner",
+        position: 0,
+        baseServings: 1.5,
+        portions: { [a.id]: 1, [b.id]: 2 },
+        adherence: { [a.id]: { status: "swapped", note: "Toast" } },
+      });
+    });
+
+    it("moves a meal to another day, and to another week", async () => {
+      const { a } = await twoUsers();
+      const id = await addMeal(
+        db,
+        {
+          date: "2026-10-20",
+          slot: "snack",
+          snackIndex: 1,
+          slug: "nuts",
+          createdBy: a.id,
+        },
+        { fetch }
+      );
+      await moveMeal(db, id, {
+        date: "2026-10-23",
+        slot: "snack",
+        snackIndex: 1,
+      });
+      expect(await at(id)).toEqual({
+        date: "2026-10-23",
+        slot: "snack",
+        snackIndex: 1,
+      });
+
+      expect(
+        await moveMeal(db, id, { date: "2026-10-27", slot: "breakfast" })
+      ).toBe("2026-10-23");
+      expect(await at(id)).toEqual({
+        date: "2026-10-27",
+        slot: "breakfast",
+        snackIndex: 0,
+      });
+      expect(await hasMeals(db, "2026-10-19")).toBe(false);
+    });
+
+    it("puts a meal moved into a filled slot after the meals already there", async () => {
+      const { a } = await twoUsers();
+      const add = (slot: SlotType, slug: string) =>
+        addMeal(
+          db,
+          { date: "2026-10-21", slot, slug, createdBy: a.id },
+          { fetch }
+        );
+      await add("dinner", "stew");
+      await add("dinner", "salad");
+      const id = await add("lunch", "soup");
+
+      await moveMeal(db, id, { date: "2026-10-21", slot: "dinner" });
+
+      const day = (await getWeekPlan(db, "2026-10-19", { fetch })).days[2];
+      expect(day.meals.map((m) => [m.slug, m.slot, m.position])).toEqual([
+        ["stew", "dinner", 0],
+        ["salad", "dinner", 1],
+        ["soup", "dinner", 2],
+      ]);
+    });
+
+    it("leaves a meal moved onto its own slot where it is", async () => {
+      const { a } = await twoUsers();
+      const add = () =>
+        addMeal(
+          db,
+          { date: "2026-10-21", slot: "dinner", slug: "stew", createdBy: a.id },
+          { fetch }
+        );
+      const first = await add();
+      await add();
+
+      await moveMeal(db, first, { date: "2026-10-21", slot: "dinner" });
+
+      const day = (await getWeekPlan(db, "2026-10-19", { fetch })).days[2];
+      expect(day.meals.map((m) => [m.id === first, m.position])).toEqual([
+        [true, 0],
+        [false, 1],
+      ]);
+    });
+
+    it("refuses a snack slot turned off in settings, a snack index on a meal slot, and a missing meal", async () => {
+      const { a } = await twoUsers();
+      const id = await addMeal(
+        db,
+        { date: "2026-10-20", slot: "lunch", slug: "soup", createdBy: a.id },
+        { fetch }
+      );
+      await expect(
+        moveMeal(db, id, { date: "2026-10-20", slot: "snack", snackIndex: 3 })
+      ).rejects.toThrow("turned off in settings");
+      await expect(
+        moveMeal(db, id, { date: "2026-10-20", slot: "dinner", snackIndex: 1 })
+      ).rejects.toThrow("Only snacks");
+      await removeMeal(db, id);
+      await expect(
+        moveMeal(db, id, { date: "2026-10-21", slot: "dinner" })
+      ).rejects.toThrow("no longer exists");
     });
   });
 });

@@ -226,6 +226,7 @@ export const WeekGrid = ({
                               key={meal.id}
                               meal={meal}
                               members={plan.members}
+                              snackSlots={plan.snackSlots}
                               compact
                             />
                           ) : (

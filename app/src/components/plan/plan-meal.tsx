@@ -1,10 +1,11 @@
 "use client";
 
 import { useId, useOptimistic, useState, useTransition } from "react";
-import { Ellipsis, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Ellipsis, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import {
+  moveMealAction,
   removeMealAction,
   setPortionAction,
   setServingsAction,
@@ -18,27 +19,32 @@ import { formatPortion } from "@/lib/format";
 import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal } from "@/server/plan";
 
+import { MoveMeal } from "./move-meal";
 import { RecipeFlags } from "./recipe-flags";
 import { Stepper } from "./stepper";
 
 /**
  * A meal on the Plan page, with everyone's portions as a line of text; the
- * steppers, servings and Remove sit behind the options button, as on the
- * Week page. `compact` is the desktop grid's cell: no photo, the name links
+ * steppers, servings, Move and Remove sit behind the options button, as on
+ * the Week page (which has no Move). `compact` is the desktop grid's cell: no photo, the name links
  * to the meal, and the options float over the grid.
  */
 export const PlanMeal = ({
   meal,
   members,
+  snackSlots,
   compact = false,
 }: {
   meal: PlannedMeal;
   members: Member[];
+  /** How many snack slots the household uses, for the Move picker. */
+  snackSlots: number;
   compact?: boolean;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [open, setOpen] = useState(false);
+  const [moving, setMoving] = useState(false);
   const servingsId = useId();
   const [portions, setOptimisticPortion] = useOptimistic(
     meal.portions,
@@ -106,36 +112,68 @@ export const PlanMeal = ({
           "absolute top-full right-0 z-10 mt-1 w-64 border border-border shadow-card"
       )}
     >
-      {steppers}
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={servingsId} className="text-muted">
-          Servings per 1×
-        </label>
-        <Input
-          id={servingsId}
-          type="number"
-          min="0.25"
-          max="100"
-          step="0.25"
-          defaultValue={meal.baseServings}
-          className="w-20 tabular-nums"
-          onBlur={(e) => {
-            const baseServings = Number(e.currentTarget.value);
-            if (baseServings > 0 && baseServings !== meal.baseServings) {
-              act(() => setServingsAction({ mealId: meal.id, baseServings }));
-            }
-          }}
+      {moving ? (
+        <MoveMeal
+          meal={meal}
+          snackSlots={snackSlots}
+          onCancel={() => setMoving(false)}
+          onMove={(to) =>
+            act(async () => {
+              const res = await moveMealAction({ mealId: meal.id, ...to });
+              if (!res.error) {
+                setMoving(false);
+              }
+              return res;
+            })
+          }
         />
-      </div>
-      <Button
-        variant="danger"
-        size="sm"
-        block
-        onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
-      >
-        <Trash2 className="size-4" aria-hidden />
-        Remove
-      </Button>
+      ) : (
+        <>
+          {steppers}
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor={servingsId} className="text-muted">
+              Servings per 1×
+            </label>
+            <Input
+              id={servingsId}
+              type="number"
+              min="0.25"
+              max="100"
+              step="0.25"
+              defaultValue={meal.baseServings}
+              className="w-20 tabular-nums"
+              onBlur={(e) => {
+                const baseServings = Number(e.currentTarget.value);
+                if (baseServings > 0 && baseServings !== meal.baseServings) {
+                  act(() =>
+                    setServingsAction({ mealId: meal.id, baseServings })
+                  );
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => setMoving(true)}
+            >
+              <ArrowRightLeft className="size-4" aria-hidden />
+              Move
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="flex-1"
+              onClick={() => act(() => removeMealAction({ mealId: meal.id }))}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              Remove
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 
