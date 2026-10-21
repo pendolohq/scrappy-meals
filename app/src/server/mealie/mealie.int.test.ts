@@ -28,13 +28,6 @@ import {
   listOrganizers,
   searchRecipes,
 } from "./recipes";
-import {
-  addShoppingItems,
-  createShoppingList,
-  deleteShoppingItems,
-  findShoppingListByName,
-  getShoppingListItems,
-} from "./shopping";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
 const run = randomUUID().slice(0, 8);
@@ -239,61 +232,6 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     );
     expect(after.slug).not.toBe(slug);
     expect(await getRecipe(slug, { client })).toBeNull();
-  });
-
-  it("creates, fills, finds and empties a shopping list", async () => {
-    const name = `IT Week ${run}`;
-    const listId = await createShoppingList(name, { client });
-    cleanup.push(() =>
-      admin.DELETE("/api/households/shopping/lists/{item_id}", {
-        params: { path: { item_id: listId } },
-      })
-    );
-
-    expect(await findShoppingListByName(name, { client })).toEqual(listId);
-    expect(
-      await findShoppingListByName(`IT Missing ${run}`, { client })
-    ).toBeNull();
-
-    const recipe = (await getRecipe(ids.fullSlug, { client }))!;
-    const first = await addShoppingItems(
-      listId,
-      [
-        {
-          quantity: 450,
-          foodId: ids.food,
-          unitId: ids.unit,
-          recipeIds: [recipe.id],
-        },
-        { quantity: 1, note: "salt" },
-      ],
-      { client }
-    );
-    expect(first.created).toHaveLength(2);
-    expect(first.created.find((i) => i.foodId === ids.food)).toMatchObject({
-      quantity: 450,
-      unitId: ids.unit,
-    });
-
-    // Same food + unit again: Mealie merges into the existing line.
-    const second = await addShoppingItems(
-      listId,
-      [{ quantity: 50, foodId: ids.food, unitId: ids.unit }],
-      { client }
-    );
-    const merged = [...second.created, ...second.updated].find(
-      (i) => i.foodId === ids.food
-    )!;
-    expect(merged.quantity).toBe(500);
-
-    const items = await getShoppingListItems(listId, { client });
-    expect(items).toHaveLength(2);
-
-    await deleteShoppingItems(
-      items.map((i) => i.id),
-      { client }
-    );
-    expect(await getShoppingListItems(listId, { client })).toEqual([]);
   });
 
   describe("discovering", () => {

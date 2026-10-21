@@ -1,4 +1,4 @@
-// Queued shop-list changes per Mealie list, kept in localStorage so they
+// Queued shop-list changes per week, kept in localStorage so they
 // survive a reload or a dead phone signal. Shaped for useSyncExternalStore.
 import type { QueuedChange } from "./shop-list";
 
@@ -7,9 +7,9 @@ const PREFIX = "shop-queue:";
 const cache = new Map<string, QueuedChange[]>();
 const listeners = new Set<() => void>();
 
-function load(listId: string): QueuedChange[] {
+function load(key: string): QueuedChange[] {
   try {
-    return JSON.parse(localStorage.getItem(PREFIX + listId) ?? "[]");
+    return JSON.parse(localStorage.getItem(PREFIX + key) ?? "[]");
   } catch {
     return EMPTY;
   }
@@ -21,11 +21,11 @@ const notify = () => {
   }
 };
 
-export function readQueue(listId: string): QueuedChange[] {
-  let queue = cache.get(listId);
+export function readQueue(key: string): QueuedChange[] {
+  let queue = cache.get(key);
   if (!queue) {
-    queue = load(listId);
-    cache.set(listId, queue);
+    queue = load(key);
+    cache.set(key, queue);
   }
   return queue;
 }
@@ -33,13 +33,13 @@ export function readQueue(listId: string): QueuedChange[] {
 /** On the server nothing is queued; the browser fills it in after hydration. */
 export const serverQueue = (): QueuedChange[] => EMPTY;
 
-export function writeQueue(listId: string, queue: QueuedChange[]): void {
-  cache.set(listId, queue);
+export function writeQueue(key: string, queue: QueuedChange[]): void {
+  cache.set(key, queue);
   try {
     if (queue.length === 0) {
-      localStorage.removeItem(PREFIX + listId);
+      localStorage.removeItem(PREFIX + key);
     } else {
-      localStorage.setItem(PREFIX + listId, JSON.stringify(queue));
+      localStorage.setItem(PREFIX + key, JSON.stringify(queue));
     }
   } catch {
     // Private mode or full storage: changes still save while online.

@@ -6,37 +6,52 @@ import {
   flushQueue,
   groupItems,
   type QueuedChange,
-  replaceTempId,
   type SendResult,
   type ShopItemView,
 } from "./shop-list";
 
 const item = (id: string, over: Partial<ShopItemView> = {}): ShopItemView => ({
   id,
+  source: "plan",
   text: id,
+  amount: null,
+  detail: null,
+  aisle: "Other",
   checked: false,
-  label: null,
+  amounts: [],
   position: 0,
   ...over,
 });
 
 let n = 0;
-const check = (itemId: string, checked = true): QueuedChange => ({
+const check = (
+  itemId: string,
+  checked = true,
+  source: "plan" | "extra" = "plan",
+  amounts: { quantity: number; unit: string | null }[] = []
+): QueuedChange => ({
   id: `c${++n}`,
   kind: "check",
+  source,
   itemId,
   checked,
+  amounts,
 });
-const add = (tempId: string, text = tempId): QueuedChange => ({
+const add = (itemId: string, text = itemId): QueuedChange => ({
   id: `c${++n}`,
   kind: "add",
-  tempId,
+  itemId,
   text,
 });
-const remove = (itemId: string): QueuedChange => ({
+const remove = (
+  itemId: string,
+  source: "plan" | "extra" = "plan"
+): QueuedChange => ({
   id: `c${++n}`,
   kind: "remove",
+  source,
   itemId,
+  amounts: [],
 });
 
 describe("dropFailed", () => {
@@ -46,11 +61,12 @@ describe("dropFailed", () => {
     expect(dropFailed([a, b], a)).toEqual([b]);
   });
 
-  it("drops later changes to an item whose add failed", () => {
-    const failed = add("local-1");
-    const tick = check("local-1");
+  it("drops later changes to an extra whose add failed", () => {
+    const failed = add("x1");
+    const tick = check("x1", true, "extra");
+    const removal = remove("x1", "extra");
     const other = check("b");
-    expect(dropFailed([failed, tick, other], failed)).toEqual([other]);
+    expect(dropFailed([failed, tick, removal, other], failed)).toEqual([other]);
   });
 });
 
@@ -80,13 +96,13 @@ describe("flushQueue", () => {
   it("stops at a retryable error and keeps the queue", async () => {
     const q = [check("a"), check("b")];
     const { state, io } = setup(q, async () => ({
-      error: "Mealie didn't answer",
+      error: "The database didn't answer",
       retry: true,
     }));
     await flushQueue(io);
     expect(state.queue).toEqual(q);
     expect(state.sent).toHaveLength(1);
-    expect(io.onRetry).toHaveBeenCalledWith("Mealie didn't answer");
+    expect(io.onRetry).toHaveBeenCalledWith("The database didn't answer");
   });
 
   it("stops when the request itself fails (offline)", async () => {
@@ -99,27 +115,26 @@ describe("flushQueue", () => {
   });
 
   it("drops a change that can never succeed, with its dependants, and carries on", async () => {
-    const failed = add("local-1");
-    const tick = check("local-1");
+    const failed = add("x1");
+    const tick = check("x1", true, "extra");
     const other = check("b");
     const { state, io } = setup([failed, tick, other], async (c) =>
-      c === failed ? { error: "Mealie refused that change." } : {}
+      c === failed ? { error: "That can't be added." } : {}
     );
     await flushQueue(io);
     expect(state.queue).toEqual([]);
     expect(state.sent).toEqual([failed, other]);
-    expect(io.onDrop).toHaveBeenCalledWith("Mealie refused that change.");
+    expect(io.onDrop).toHaveBeenCalledWith("That can't be added.");
   });
 
-  it("points later changes at the id Mealie gave a queued add", async () => {
-    const a = add("local-1", "coffee");
-    const tick = check("local-1");
-    const { state, io } = setup([a, tick], async (c) =>
-      c.kind === "add" ? { item: { id: "real" } } : {}
-    );
+  it("sends later changes to a queued add unchanged, as the add already carries the id", async () => {
+    const a = add("x1", "coffee");
+    const tick = check("x1", true, "extra");
+    const { state, io } = setup([a, tick], async () => ({}));
     await flushQueue(io);
-    expect(state.sent[1]).toEqual({ ...tick, itemId: "real" });
+    expect(state.sent).toEqual([a, tick]);
     expect(state.queue).toEqual([]);
+    expect(io.onSaved).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a change queued while another is being sent", async () => {
@@ -148,13 +163,46 @@ describe("applyQueue", () => {
     const out = applyQueue(items, [
       check("a"),
       remove("b"),
-      add("local-1", "coffee"),
+      add("x1", "coffee"),
     ]);
     expect(out).toMatchObject([
       { id: "a", checked: true, pending: true },
-      { id: "local-1", text: "coffee", checked: false, pending: true },
+      {
+        id: "x1",
+        source: "extra",
+        text: "coffee",
+        aisle: "Other",
+        checked: false,
+        pending: true,
+      },
     ]);
     expect(items[0].checked).toBe(false); // the input is untouched
+  });
+
+  it("puts an added extra after everything else", () => {
+    const out = applyQueue([item("a", { position: 5 })], [add("x1")]);
+    expect(out[1].position).toBeGreaterThan(out[0].position);
+  });
+
+  it("just marks a partly-bought line checked", () => {
+    const partly = item("lentils", {
+      amount: "300 g more",
+      detail: "500 g in all",
+    });
+    const [out] = applyQueue(
+      [partly],
+      [check("lentils", true, "plan", [{ quantity: 500, unit: "g" }])]
+    );
+    expect(out).toMatchObject({ checked: true, pending: true });
+  });
+
+  it("applies later changes to a queued add", () => {
+    const out = applyQueue(
+      [],
+      [add("x1", "coffee"), check("x1", true, "extra")]
+    );
+    expect(out).toMatchObject([{ id: "x1", checked: true }]);
+    expect(applyQueue([], [add("x1"), remove("x1", "extra")])).toEqual([]);
   });
 
   it("ignores changes to items that are gone", () => {
@@ -162,24 +210,15 @@ describe("applyQueue", () => {
   });
 });
 
-describe("replaceTempId", () => {
-  it("points later changes at the saved item", () => {
-    const tick = check("local-1");
-    expect(replaceTempId([tick], "local-1", "real")).toEqual([
-      { ...tick, itemId: "real" },
-    ]);
-  });
-});
-
 describe("groupItems", () => {
-  it("groups unticked items by aisle, in the shop's order, and lists ticked ones apart", () => {
+  it("groups unticked items by their aisle, in the shop's order, and lists ticked ones apart", () => {
     const { groups, done } = groupItems([
-      item("milk", { label: "Dairy Products", position: 2 }),
+      item("milk", { aisle: "Dairy, eggs & tofu", position: 2 }),
       item("salt"),
-      item("tea", { label: "a label of our own" }),
-      item("apples", { label: "Fresh Produce", position: 1 }),
-      item("butter", { label: "Dairy Products", position: 1 }),
-      item("tofu", { label: "Health Foods", position: 3 }),
+      item("tea", { source: "extra" }),
+      item("apples", { aisle: "Fruit & veg", position: 1 }),
+      item("butter", { aisle: "Dairy, eggs & tofu", position: 1 }),
+      item("tofu", { aisle: "Dairy, eggs & tofu", position: 3 }),
       item("bread", { checked: true, position: 3 }),
     ]);
     expect(groups.map((g) => [g.label, g.items.map((i) => i.id)])).toEqual([

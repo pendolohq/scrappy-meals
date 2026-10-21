@@ -47,8 +47,22 @@
     {
       "idx": 6,
       "version": "7",
-      "when": 1792587922332,
-      "tag": "0006_products",
+      "when": 1792587797714,
+      "tag": "0006_shopping-in-postgres",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792595779764,
+      "tag": "0007_shopping-hidden-amounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792597448520,
+      "tag": "0008_products",
       "breakpoints": true
     }
   ]

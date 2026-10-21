@@ -1,0 +1,1 @@
+ALTER TABLE "shopping_hidden" ADD COLUMN "amounts" jsonb DEFAULT '[]'::jsonb NOT NULL;

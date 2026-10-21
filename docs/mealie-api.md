@@ -10,7 +10,7 @@ What the planner relies on, checked against a running instance
   Fields that have a server default are optional in the types.
 - Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`,
   `MealieUnavailableError`; `mealieImporter()` waits 60 s), `recipes.ts`,
-  `import.ts`, `shopping.ts`, `nutrition.ts`. Everything that holds the token
+  `import.ts`, `nutrition.ts`. Everything that holds the token
   imports `server-only`, so it can't end up in a client bundle.
 - Auth: `Authorization: Bearer <token>`. Create a long-lived token in Mealie
   under Profile → API Tokens (`POST /api/users/api-tokens`).
@@ -32,13 +32,6 @@ until every place names the same version (`mealie-version.test.ts`).
 | Tags / categories | `GET /api/organizers/tags\|categories?perPage=-1` (`recipeCount` per organizer) |
 | Recipe detail | `GET /api/recipes/{slug}` (404 if unknown; also takes the recipe's id, which survives a rename); `recipeInstructions`, `notes` for the recipe page |
 | Recipe image | `GET /api/media/recipes/{id}/images/min-original.webp` (proxied by the app at `/api/recipe-images/{id}`, signed-in users only) |
-| Find list by name | `GET /api/households/shopping/lists?queryFilter=name = "..."` |
-| Create list | `POST /api/households/shopping/lists` |
-| List items | `GET /api/households/shopping/lists/{id}` (`listItems`) |
-| Add items | `POST /api/households/shopping/items/create-bulk` → `createdItems` / `updatedItems` |
-| Remove items | `DELETE /api/households/shopping/items?ids=...&ids=...` |
-| Read one item | `GET /api/households/shopping/items/{id}` |
-| Tick / untick | `PUT /api/households/shopping/items/{id}` (whole item, see below) |
 | Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
 | Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
 | AI enabled? | `GET /api/groups/self` → `aiProviderSettings.aiEnabled`, `.imageProviderEnabled` (see below) |
@@ -208,9 +201,11 @@ shows the same URL small, next to the name.
 
 **Shopping list.** A planned product (not an unplanned one) is not an ingredient
 line: `buildShoppingList` sums the servings eaten per product and writes one
-note item, "Name ×N", with a `recipeReferences` link to the product recipe. When
-the pack holds two or more servings it counts packs and says so: "Name ×1
-(450 g)". Re-sending the week replaces these with the rest.
+line in the week's list, "Name ×N", keyed `<recipe id>|product`. When the pack
+holds two or more servings it counts packs and says so: "Name ×1 (450 g)". The
+checklist shows them in a "Products" group, and ticks and removals work as for
+other lines; the pack size is the line's unit, so a changed pack brings a
+ticked line back.
 
 **Finding one by barcode.** `queryFilter=extras.value = "<barcode>"` matches
 recipes with *any* extra of that value. Filtering on
@@ -295,20 +290,6 @@ make it obvious (exactly one of breakfast, lunch, dinner, snack).
   The wrapper turns quantity 0 into `null` ("no amount").
 - `title` on an ingredient is a section heading shown above it.
 
-## Shopping lists
-
-- `create-bulk` takes `foodId` / `unitId` directly; Mealie fills in `display`.
-- **Mealie merges server-side:** an item with the same food and unit (or both
-  without a unit) as an existing unchecked item on the list increases that
-  item's quantity and joins the notes, and comes
-  back in `updatedItems`, not `createdItems`. Free-text items (no food) are not
-  merged. The planner pushes to its own list per week, but a line someone added
-  by hand with the same food and unit gets merged too. The planner only owns
-  the items it created, so such a merged item keeps growing with every push;
-  the push reports these merges and the page asks to check their quantities.
-- `recipeReferences: [{ recipeId }]` links an item to the recipes it came from;
-  Mealie shows these on the item.
-
 ## Building the week's list
 
 `buildShoppingList` (`src/server/domain/shopping.ts`) makes one line per
@@ -327,65 +308,43 @@ Mealie food, whatever units the recipes use:
   until 100, then up to the next 10; everything else up to a whole one
   (three half onions are 2 onions).
 - **Amounts that don't add up** stay on one line: `parsley 100 g + 1 bunch`.
-  A Mealie item has one unit, so such a line goes in as the food with the
-  amounts in its note.
 - **Aisles** come from the food's Mealie label, mapped onto a short ordered
   list (`src/server/domain/aisles.ts`): Mealie's seeded labels ("Fresh
   Produce", "Health Foods", …) and labels named like an aisle. Unlabelled foods
   and other labels go under "Other", so a new food needs a label in Mealie to
-  find its aisle. The preview and the checklist use the same mapping.
+  find its aisle. The checklist groups by it.
 - Near-duplicate foods ("onion", "onions") are separate lines: combine them
   on Mealie's Foods page (or add an alias) rather than matching names in code.
 - Rows in `recipe_cache` from before labels and unit standards were kept
   have neither, so they don't convert and sit under "Other" until the
   recipe is fetched again (at most an hour).
 
-## How the planner pushes a week
-
-- One Mealie list per week, named `Scrappy Meals · week of <d Mon yyyy>`.
-  Its id and the ids of the items the planner created are kept in
-  `shopping_pushes`.
-- Pushing again deletes those items (ticked or not) and adds the new set, so
-  the list always matches the plan. Items added by hand in Mealie stay. If
-  the list was deleted in Mealie, a new one is created.
-- Parsed lines go in with `foodId`/`unitId` and a recipe reference; unparsed
-  lines go in as notes ("a squeeze of lemon (×2) · Red Lentil Soup").
-  Grams and millilitres go in with a unit of exactly one gram or millilitre
-  (a recipe's own, else Mealie's, else one is created with its standard set).
-- Links to the list use `MEALIE_PUBLIC_URL` (`https://recipes.<domain>` in
-  compose) + `/shopping-lists/<id>`.
-
 ## Shopping from the planner
 
-`/week/<monday>/shopping` previews what the plan needs until the week is sent;
-after that it is a checklist over the week's Mealie list (the preview folds
-away under it), so nobody needs Mealie's own UI in the shop. Mealie stays the
-only copy of the list. The old `/shop` URL redirects there.
+Mealie holds the recipes; the shopping list lives in the
+planner's Postgres, so `/week/<monday>/shopping` is a checklist straight
+away and works with Mealie down (the lines come from `recipe_cache`, like the
+rest of the plan). The old `/shop` URL redirects there.
 
-- **Reading:** the page reads the list's items straight from Mealie on every
-  load (and every 15 s while open), ticks and hand-added lines included.
-  Items are grouped into aisles by their Mealie label (the item's, else its
-  food's), in the preview's order; unlabelled items go under "Other".
-- **Ticking:** `PUT /items/{id}` **replaces the whole item**: fields left out
-  fall back to defaults (quantity 1, empty note, no recipe references). So a
-  tick writes back the item it just read (to check ownership, below) with
-  only `checked` changed (`setShoppingItemChecked`). Ticks set a value, never
-  toggle, so a replayed tick is harmless. Unticking may merge the item into a
-  matching unticked one; the page reloads the list after every change anyway.
-- **Ownership:** item ids come from the browser, so every change first checks
-  that the item is on the list recorded for that week in `shopping_pushes`;
-  anything else is refused.
-- **Adding:** a quick-added line is a note item (quantity 0). It isn't
-  recorded as the planner's, so sending the week again keeps it.
-- **Re-sending** the week still replaces the planner's own items, ticks
-  included; hand-added lines stay.
+- **Tables:** `shopping_ticks` (week, line key, the amounts shown when ticked,
+  who), `shopping_hidden` (plan lines removed for a week, permanently) and
+  `shopping_extras` (hand-added lines; the uuid is made in the browser, so a
+  replayed add is a no-op). Ticks are shared by the household, keyed by week.
+- **Line keys:** the food id for a food line, `recipeId|text` for an unparsed
+  line (the same line from two recipes is two lines).
+- **The plan changes after a tick:** a tick stores the amounts it saw. If the
+  line's current amounts exceed them in any unit, the line shows as unticked
+  with "300 g more" (and the full total as detail); units that shrank or
+  went don't count. Ticking again overwrites the snapshot. A line without
+  amounts, or an unparsed one, stays ticked. A ticked line that leaves the
+  plan keeps its row but isn't shown.
+- **Checks:** a plan line's key from the browser isn't checked against the
+  plan (the row is only shown for a line on that week's plan); an extra must
+  belong to the week it's changed on.
 - **Offline and retries:** ticks, adds and removals are queued in the browser
-  (`localStorage`, per list), appended in order and sent one at a time
-  (`flushQueue` in `lib/shop-list.ts`). Anything that can go away on its own
-  (offline, Mealie or the database down, Mealie refusing the token, signed
-  out) keeps the queue and retries every 10 s and when the device is back
-  online; anything else drops that one change and shows why until dismissed.
-  Replays are harmless: ticks set a value and removing a gone item succeeds.
-  An add whose answer was lost can come back as a duplicate line. Signing out
-  clears the queue. Two people changing the same item: the last save wins,
-  for every field, since a tick writes the whole item back.
+  (`localStorage`, per week), appended in order and sent one at a time
+  (`flushQueue` in `lib/shop-list.ts`). A database that is down or being
+  signed out keeps the queue and retries every 10 s and when the device is
+  back online; anything else drops that one change and shows why until
+  dismissed. Replays are harmless: ticks set a value, an add carries its id,
+  and removing a gone item succeeds. Signing out clears the queue.

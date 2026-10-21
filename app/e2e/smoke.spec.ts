@@ -161,15 +161,15 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   await stuck.click();
   await expect(stuck).toHaveAttribute("aria-pressed", "true");
 
-  // Shopping list: 400 g x 1.5/4 = 150 g, then into Mealie.
+  // Shopping list: 400 g x 1.5/4 = 150 g, tickable straight away.
   await page.getByRole("link", { name: "Shopping" }).click();
-  await expect(page.getByTestId("lines")).toContainText(food);
-  await expect(page.getByTestId("qty")).toHaveText("150 g");
-  await page.getByRole("button", { name: "Send to Mealie" }).click();
-  await expect(page.getByRole("status")).toContainText("Added 1 item");
-
-  // The same page turns into the checklist: tick the item off and add a line of our own.
   await expect(page).toHaveURL(/\/shopping$/);
+  await expect(
+    page.getByTestId("shop-item").filter({ hasText: food })
+  ).toContainText("150 g");
+  await expect(page.getByTestId("qty")).toHaveText("150 g");
+
+  // Tick the item off and add a line of our own.
   await page
     .getByTestId("shop-item")
     .filter({ hasText: food })

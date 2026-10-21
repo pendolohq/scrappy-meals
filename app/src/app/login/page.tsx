@@ -96,7 +96,7 @@ export default async function LoginPage({
         </div>
 
         <p className="text-center text-xs text-muted lg:text-left">
-          Recipes and shopping lists live in Mealie.
+          Recipes live in Mealie.
         </p>
       </main>
     </div>

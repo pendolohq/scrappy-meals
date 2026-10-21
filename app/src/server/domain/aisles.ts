@@ -14,6 +14,8 @@ export const AISLES = [
   "Spices, oils & condiments",
   "Frozen",
   "Drinks",
+  // Packaged products planned as themselves; no food label maps here.
+  "Products",
   "Other",
 ] as const;
 
