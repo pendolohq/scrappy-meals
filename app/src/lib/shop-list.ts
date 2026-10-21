@@ -12,7 +12,7 @@ export type ShopItemView = {
   text: string;
   /** "150 g", or "300 g more" when the plan outgrew a tick. */
   amount: string | null;
-  /** The recipes, or "500 g in all" when partly bought. */
+  /** "500 g in all" when partly bought. */
   detail: string | null;
   aisle: Aisle;
   checked: boolean;
