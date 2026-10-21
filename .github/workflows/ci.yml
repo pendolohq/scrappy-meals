@@ -206,7 +206,7 @@ jobs:
         run: |
           sed -E 's/^(POSTGRES_SUPERUSER_PASSWORD|PLANNER_DB_PASSWORD|MEALIE_DB_PASSWORD|AUTH_SECRET)=$/\1=ci/' \
             .env.example > .env
-          docker compose --profile ops --profile monitoring config -q
+          docker compose --profile ops config -q
           docker run --rm -e DOMAIN=example.test -e ACME_EMAIL=ci@example.test \
             -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
             "$(sed -n 's/^ *image: \(caddy:.*\)/\1/p' docker-compose.yml)" caddy validate --config /etc/caddy/Caddyfile

@@ -117,11 +117,11 @@ services:
     restart: unless-stopped
     logging: *logging
 
-  # Optional monitoring (Beszel): CPU, memory, disk and network for the server
-  # and each container. Set up as in docs/deploy.md, "Monitoring".
+  # Monitoring (Beszel): CPU, memory, disk and network for the server and each
+  # container. The agent exits until it has the hub's key: docs/deploy.md,
+  # "Monitoring".
   beszel:
     image: henrygd/beszel:0.21.0@sha256:6b39a8b64f9b15d00a25e7683e31a93c46161182a54f62713525107064e10599
-    profiles: [monitoring]
     environment:
       APP_URL: http://localhost:8090
       TZ: ${TZ:-UTC}
@@ -143,7 +143,6 @@ services:
 
   beszel-agent:
     image: henrygd/beszel-agent:0.21.0@sha256:f27b1aa2c68404bc5b9e1a2ab36653bd9b4ee14f6299862f09cd5051a4134767
-    profiles: [monitoring]
     # Host networking so it sees the server's own network interfaces. It
     # listens on a socket shared with the hub, so it opens no port.
     network_mode: host

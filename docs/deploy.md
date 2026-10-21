@@ -150,6 +150,9 @@ Recipes work best in the planner when they have:
 
 ## 5. The planner
 
+Set up monitoring first (section 8, "Monitoring"): its agent needs a key from
+the hub, and without it the next command fails.
+
 ```sh
 docker compose up -d
 docker compose exec app scrappy user add      # once per person
@@ -282,15 +285,19 @@ docker compose logs --since 1h app mealie
 Pointing an uptime monitor (e.g. healthchecks.io, Uptime Kuma) at
 `/api/health` catches outages; it returns 503 when the database is down.
 
-### Monitoring (optional)
+### Monitoring
 
 [Beszel](https://beszel.dev) keeps a history of CPU, memory, swap, disk and
 network, for the server and for each container, and can alert on them (e.g.
 memory above 90%, disk nearly full). It answers "what is using the memory"
-better than Hetzner's graphs, which can't see inside the VM. It's two services
-under the `monitoring` profile: `beszel` (the hub: dashboard and history) and
-`beszel-agent` (collects the numbers). Idle, they use about 15 MB together;
-their limits are 128 MB and 64 MB.
+better than Hetzner's graphs, which can't see inside the VM. It's two services:
+`beszel` (the hub: dashboard and history) and `beszel-agent` (collects the
+numbers). Idle, they use about 15 MB together; their limits are 128 MB and
+64 MB.
+
+The agent exits until it has the hub's key. On a new server, or one set up
+before monitoring existed, do the steps below before the next
+`docker compose up -d --wait`, which otherwise fails on the agent.
 
 The dashboard is never published: it listens on the server's loopback only.
 The agent mounts the Docker socket to read container stats, which is
@@ -312,15 +319,13 @@ ssh -L 8090:localhost:8090 deploy@<server>
 2. **Add System**: any name, and as the host `/beszel_socket/beszel.sock`
    (the agent talks to the hub over a socket, not a port). Copy the **Key** and
    **Token** it shows into `BESZEL_AGENT_KEY` and `BESZEL_AGENT_TOKEN` in
-   `.env`, and set `COMPOSE_PROFILES=monitoring` there so `docker compose up`
-   and the release steps (section 7) keep both running.
+   `.env`.
 3. `docker compose up -d --wait`. The system turns green within a minute.
 4. Optional: alerts under the system's bell icon, notifications (email, ntfy,
    …) under Settings.
 
 The history lives in the `beszel-data` volume. It isn't backed up: losing it
-loses only past graphs. To stop monitoring, remove `COMPOSE_PROFILES` from
-`.env` and run `docker compose --profile monitoring rm -sf beszel beszel-agent`.
+loses only past graphs.
 
 ## 9. Rebuilding from scratch
 

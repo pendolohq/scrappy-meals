@@ -32,7 +32,7 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
 ```
 
 - **Only Caddy publishes ports.** Postgres and Mealie are reachable only on the Compose network.
-  The optional monitoring dashboard (Beszel) listens on the server's loopback only, for an SSH
+  The monitoring dashboard (Beszel) listens on the server's loopback only, for an SSH
   tunnel.
 - **The app (`app/`, Next.js)** stores the plan, portions, fasting days, adherence and users in
   the `planner` database. It reads recipes and nutrition from Mealie and writes shopping lists
