@@ -18,7 +18,32 @@ defaults:
     working-directory: app
 
 jobs:
+  # What needs nothing but the code; kept apart so it reports in seconds.
   check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: app/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: bun install --frozen-lockfile
+      - name: Format (oxfmt)
+        run: bun run format:check
+      - name: Lint (oxlint)
+        run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - name: Migrations match the schema
+        run: |
+          DATABASE_URL=unused bunx drizzle-kit generate --name ci-check
+          git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run bunx drizzle-kit generate" && exit 1)
+          test -z "$(git status --porcelain -- drizzle)" || (echo "::error::uncommitted migration generated" && exit 1)
+
+  # The tests against a real Postgres and a real Mealie.
+  test-services:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -33,6 +58,8 @@ jobs:
     # Mealie isn't a service: services start before the first step, so its
     # ~1 GB image would be pulled while nothing else runs. Started as the first
     # step, it's up by the time the integration tests need it.
+    env:
+      DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
     steps:
       - name: Start Mealie
         working-directory: .
@@ -49,15 +76,7 @@ jobs:
         with:
           node-version: 26
       - run: bun install --frozen-lockfile
-      - name: Format (oxfmt)
-        run: bun run format:check
-      - name: Lint (oxlint)
-        run: bun run lint
-      - run: bun run typecheck
-      - run: bun run test
       - run: bun run test:db
-        env:
-          DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
       - name: Wait for Mealie
         run: |
           for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about && exit 0; sleep 3; done
@@ -65,12 +84,6 @@ jobs:
       - run: bun run test:integration
         env:
           MEALIE_TEST_URL: http://localhost:9000
-          DATABASE_TEST_URL: postgres://postgres@localhost:5432/planner_test
-      - name: Migrations match the schema
-        run: |
-          DATABASE_URL=unused bunx drizzle-kit generate --name ci-check
-          git diff --exit-code -- drizzle || (echo "::error::schema.ts changed without a migration; run bunx drizzle-kit generate" && exit 1)
-          test -z "$(git status --porcelain -- drizzle)" || (echo "::error::uncommitted migration generated" && exit 1)
 
   e2e:
     runs-on: ubuntu-latest
@@ -241,7 +254,7 @@ jobs:
   # v* tags:       publish :X.Y.Z, :X.Y and :latest. Only a release moves :latest,
   #                which is what the server runs by default (APP_TAG).
   image:
-    needs: [changes, check, e2e, secrets]
+    needs: [changes, check, test-services, e2e, secrets]
     if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     permissions:
