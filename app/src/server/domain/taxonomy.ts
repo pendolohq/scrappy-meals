@@ -134,9 +134,10 @@ const CHICKEN = meat(["chicken", "turkey"]);
 
 const MEAT = meat([
   "beef",
-  "steaks?",
-  // Mince on its own is beef; poultry mince says so.
-  "(?<!(?:chicken|turkey) )mince",
+  // "Cauliflower steaks" and "tuna steaks" aren't beef.
+  "(?<!(?:cauliflower|mushroom|celeriac|aubergine|eggplant|cabbage|tuna|salmon|swordfish) )steaks?",
+  // Mince on its own is beef; poultry mince says so. Mince pies are mincemeat.
+  "(?<!(?:chicken|turkey) )mince(?! pies?)",
   "pork",
   "bacon",
   "ham",
@@ -149,7 +150,7 @@ const MEAT = meat([
   "mutton",
   "veal",
   "venison",
-  "duck",
+  "duck(?! eggs?)",
   "meatballs?",
   "pepperoni",
   "brisket",
@@ -159,7 +160,7 @@ const MEAT = meat([
   "guanciale",
   "nduja",
   "oxtail",
-  "goat(?!'?s? cheese)",
+  "goat(?!'?s? (?:cheese|milk|yogh?urt|butter))",
 ]);
 
 // Makes a dish not vegetarian without being what it's about: they only
@@ -171,6 +172,7 @@ const FLAVOURING_FISH = words([
   "worcestershire",
   "dashi",
   "bonito",
+  "(?:fish|seafood|prawn|shrimp) (?:stock|broth|bouillon|cubes?)",
 ]);
 const STOCK = "(?:stock|broth|bouillon|gravy|fat|dripping|drippings|cubes?)";
 const FLAVOURING_CHICKEN = new RegExp(`\\b(?:chicken|turkey) ${STOCK}\\b`, "i");

@@ -35,6 +35,8 @@ const useItems = (currentWeek: string): Item[] => {
   const onPlan = match?.[1] === "plan" || pathname === "/plan";
   const week = match?.[2] ?? currentWeek;
   const sub = match?.[3] ?? "";
+  // Reviewing is the last step of adding a recipe, so it stays under "Add".
+  const adding = pathname === "/recipes/new" || pathname.endsWith("/review");
   return [
     {
       label: "Week",
@@ -64,13 +66,13 @@ const useItems = (currentWeek: string): Item[] => {
       label: "Recipes",
       href: "/recipes",
       icon: BookOpen,
-      active: pathname.startsWith("/recipes") && pathname !== "/recipes/new",
+      active: pathname.startsWith("/recipes") && !adding,
     },
     {
       label: "Add recipe",
       href: "/recipes/new",
       icon: BookPlus,
-      active: pathname === "/recipes/new",
+      active: adding,
     },
     {
       label: "Settings",
