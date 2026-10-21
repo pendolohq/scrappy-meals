@@ -201,3 +201,25 @@ describe("common look-alikes", () => {
     expect(classifyTags("Chicken and leek pie")).toEqual(["dinner"]);
   });
 });
+
+describe("meat words that aren't meat", () => {
+  it.each([
+    ["Cauliflower steaks", ["1 cauliflower", "olive oil"], ["vegan"]],
+    ["Seared tuna", ["2 tuna steaks", "soy sauce"], ["fish"]],
+    ["Mince pies", ["250 g mincemeat", "flour", "butter"], ["vegetarian"]],
+    ["Omelette", ["2 duck eggs", "chives"], ["vegetarian"]],
+    ["Smoothie", ["200 ml goat milk", "1 banana"], ["vegetarian"]],
+    ["Goat curry", ["1 kg goat", "1 onion"], ["meat"]],
+  ] as const)("%s", (name, ingredients, expected) => {
+    expect(classifyCategories(name, [...ingredients])).toEqual(expected);
+  });
+
+  it("treats fish stock as a flavouring, like chicken stock", () => {
+    expect(
+      classifyCategories("Chicken paella", ["chicken thighs", "fish stock"])
+    ).toEqual(["chicken"]);
+    expect(
+      classifyCategories("Vegetable risotto", ["1 l fish stock", "rice"])
+    ).toEqual(["fish"]);
+  });
+});

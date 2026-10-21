@@ -253,8 +253,8 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
         <p id="total-time-hint" className="text-sm text-muted">
           {minutes === null ? (
             <>
-              The source gave no total time. Add one so the <q>Quick</q> filter
-              can find this recipe.
+              No total time yet. Add one so the <q>Quick</q> filter can find
+              this recipe.
             </>
           ) : isQuick(minutes) ? (
             <>Counts as quick ({QUICK_MAX_MINUTES} minutes or less).</>

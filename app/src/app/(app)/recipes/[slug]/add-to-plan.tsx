@@ -167,7 +167,13 @@ export const AddToPlan = ({
                         key={day}
                         type="button"
                         aria-pressed={day === date}
-                        aria-label={formatDay(day)}
+                        // The label replaces the button's text, so "today"
+                        // has to be in it to be heard.
+                        aria-label={
+                          day === today
+                            ? `${formatDay(day)} (today)`
+                            : formatDay(day)
+                        }
                         onClick={() => setDate(day)}
                         className={cx(
                           choiceClass(day === date),
@@ -178,9 +184,6 @@ export const AddToPlan = ({
                           {weekday.slice(0, 3)}
                         </span>
                         <span className="tabular-nums">{n}</span>
-                        {day === today && (
-                          <span className="sr-only"> (today)</span>
-                        )}
                       </button>
                     );
                   })}
