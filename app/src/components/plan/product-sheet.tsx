@@ -13,6 +13,7 @@ import {
   type ProductDraft,
   type ProductInfo,
   type ServingUnit,
+  servingIsKnown,
   servingsFor,
 } from "@/server/domain/product";
 import type { SlotType } from "@/server/domain/slots";
@@ -187,6 +188,50 @@ const AlreadyHad = ({
   </label>
 );
 
+const CONTRIBUTE_KEY = "scrappy:contribute-off";
+
+/** The last choice on this device; on until someone turns it off. */
+const rememberedContribute = (): boolean => {
+  try {
+    return localStorage.getItem(CONTRIBUTE_KEY) !== "no";
+  } catch {
+    return true;
+  }
+};
+
+const rememberContribute = (on: boolean) => {
+  try {
+    localStorage.setItem(CONTRIBUTE_KEY, on ? "yes" : "no");
+  } catch {
+    // Private mode or storage off: the choice just isn't remembered.
+  }
+};
+
+const ContributeToggle = ({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) => (
+  <label className="flex min-h-tap items-center gap-3 text-sm">
+    <input
+      type="checkbox"
+      className="size-5 accent-accent"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+    <span>
+      <span className="font-medium">
+        Also add to Open Food Facts (public, ODbL)
+      </span>{" "}
+      <span className="text-muted">
+        Only the product details go; nothing about who ate it.
+      </span>
+    </span>
+  </label>
+);
+
 const Notice = ({ children }: { children: string }) => (
   <p className="rounded-control bg-highlight-soft px-3 py-2 text-sm text-highlight">
     {children}
@@ -289,6 +334,7 @@ const KnownSheet = ({
 const DraftSheet = ({
   barcode,
   draft,
+  canContribute,
   at,
   future,
   onAdded,
@@ -296,6 +342,8 @@ const DraftSheet = ({
 }: {
   barcode: string;
   draft: ProductDraft | null;
+  /** The app can send it to Open Food Facts, and they'd gain from it. */
+  canContribute: boolean;
   at: Slot;
   future: boolean;
   onAdded: () => void;
@@ -318,6 +366,7 @@ const DraftSheet = ({
   const [picked, setKind] = useState<PortionKind>("one");
   const [grams, setGrams] = useState("");
   const [alreadyHad, setAlreadyHad] = useState(!future);
+  const [contribute, setContribute] = useState(rememberedContribute);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
 
@@ -372,6 +421,10 @@ const DraftSheet = ({
           ...at,
           baseServings,
           alreadyHad: alreadyHad && !future,
+          contribute: canContribute && contribute,
+          servingKnown: servingIsKnown(draft, info.servingGrams),
+          // A pack size is OFF's own or typed by the person.
+          packKnown: info.packGrams !== null,
         })
       );
       if (res.error) {
@@ -511,6 +564,15 @@ const DraftSheet = ({
         future={future}
         onChange={setAlreadyHad}
       />
+      {canContribute && (
+        <ContributeToggle
+          checked={contribute}
+          onChange={(on) => {
+            setContribute(on);
+            rememberContribute(on);
+          }}
+        />
+      )}
 
       {draft && (
         <p className="text-xs text-muted">
@@ -562,10 +624,18 @@ export const ProductSheet = ({
         <DraftSheet
           barcode={lookup.draft.barcode}
           draft={lookup.draft}
+          canContribute={lookup.canContribute}
           {...rest}
         />
       );
     case "not-found":
-      return <DraftSheet barcode={lookup.barcode} draft={null} {...rest} />;
+      return (
+        <DraftSheet
+          barcode={lookup.barcode}
+          draft={null}
+          canContribute={lookup.canContribute}
+          {...rest}
+        />
+      );
   }
 };

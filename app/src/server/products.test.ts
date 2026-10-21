@@ -75,6 +75,7 @@ function lookupDeps(over: Partial<LookupDeps> = {}) {
     getRecipe,
     lookupOff,
     limiter: { hit },
+    canContribute: () => false,
     ...over,
   };
   return { deps, find, getRecipe, lookupOff, hit };
@@ -126,6 +127,7 @@ describe("lookupProduct", () => {
     await expect(lookupProduct("5000159461122", deps)).resolves.toEqual({
       status: "draft",
       draft: draftFromOff("5000159461122", found.product),
+      canContribute: false,
     });
     expect(lookupOff).toHaveBeenCalledWith("5000159461122");
   });
@@ -135,7 +137,39 @@ describe("lookupProduct", () => {
     await expect(lookupProduct("036000291452", deps)).resolves.toEqual({
       status: "not-found",
       barcode: "0036000291452",
+      canContribute: false,
     });
+  });
+
+  it("offers to contribute a product Open Food Facts lacks, only when configured", async () => {
+    const { deps } = lookupDeps({ canContribute: () => true });
+    await expect(lookupProduct("5000159461122", deps)).resolves.toMatchObject({
+      status: "not-found",
+      canContribute: true,
+    });
+
+    const off = async (fixture: "grenade-multipack" | "snickers") => {
+      const found = await lookupOpenFoodFacts(offFixtureCode(fixture), {
+        fetch: async () => new Response(offFixtureText(fixture)),
+      });
+      const { deps: d, lookupOff } = lookupDeps({ canContribute: () => true });
+      lookupOff.mockResolvedValue(found);
+      return lookupProduct(offFixtureCode(fixture), d);
+    };
+    // Grenade has no serving size; Snickers has everything.
+    await expect(off("grenade-multipack")).resolves.toMatchObject({
+      status: "draft",
+      canContribute: true,
+    });
+    await expect(off("snickers")).resolves.toMatchObject({
+      status: "draft",
+      canContribute: false,
+    });
+
+    const { deps: unconfigured } = lookupDeps();
+    await expect(
+      lookupProduct("5000159461122", unconfigured)
+    ).resolves.toMatchObject({ canContribute: false });
   });
 
   it("limits lookups household-wide: one shared key, and no call to Open Food Facts when over", async () => {

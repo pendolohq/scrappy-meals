@@ -85,6 +85,16 @@ which is fine.
   email overall (`createSignInLimits` in `src/server/rate-limit.ts`), so
   guessing someone's password can't lock them out of their own device.
 
+## Outbound writes to Open Food Facts
+
+Contributing a product (`src/server/off-contribute.ts`) is the one place the app
+writes to a third party. It is off unless `OFF_USER_ID` and `OFF_PASSWORD` are
+set, runs only from `saveProductAction` (when ticked) and
+`retryContributionAction`, both `userAction`s, and sends product data only: the
+account's credentials, and an `app_uuid` derived from `AUTH_SECRET` and the
+session's `user.id` (never the id itself). The password is never stored in
+`off_contributions`, logged or put in an error message.
+
 ## Tests
 
 `src/server/access.test.ts` finds every `"use server"` file, route handler and

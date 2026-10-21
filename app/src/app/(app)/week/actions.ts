@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
+import { parseBarcode } from "@/server/domain/barcode";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
+import { contributeProduct } from "@/server/off-contribute";
 import {
   addMeal,
   checkNewMeal,
@@ -111,9 +114,24 @@ export const saveProductAction = userAction(
     snackIndex,
     baseServings,
     alreadyHad: z.boolean(),
+    /** Also send the product to Open Food Facts (when the app is set up to). */
+    contribute: z.boolean().default(false),
+    /** The serving and pack size are from the pack or typed, not guessed. */
+    servingKnown: z.boolean().default(false),
+    packKnown: z.boolean().default(false),
   }),
   async (
-    { date, slot, snackIndex, baseServings, alreadyHad, ...product },
+    {
+      date,
+      slot,
+      snackIndex,
+      baseServings,
+      alreadyHad,
+      contribute,
+      servingKnown,
+      packKnown,
+      ...product
+    },
     user
   ) => {
     const today = await viewerToday();
@@ -129,6 +147,30 @@ export const saveProductAction = userAction(
     await checkNewMeal(getDb(), meal);
     const { slug } = await saveProduct(product);
     await addMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    const barcode = parseBarcode(product.barcode);
+    if (contribute && barcode) {
+      // After the response: a slow or failing Open Food Facts must not delay
+      // or fail a save that already happened. The outcome is kept in the
+      // product's off_contributions row.
+      after(async () => {
+        try {
+          await contributeProduct(
+            getDb(),
+            {
+              barcode,
+              name: product.name,
+              servingGrams: servingKnown ? product.servingGrams : null,
+              servingUnit: product.servingUnit,
+              packGrams: packKnown ? product.packGrams : null,
+              per100: product.per100,
+            },
+            user.id
+          );
+        } catch (err) {
+          console.error("Open Food Facts contribution failed", err);
+        }
+      });
+    }
     refreshWeek(date);
     return { slug };
   }

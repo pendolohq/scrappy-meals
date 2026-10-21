@@ -67,6 +67,8 @@ the database passwords end up inside a `postgres://` URL):
   stamps the backups)
 - `POSTGRES_SUPERUSER_PASSWORD`, `PLANNER_DB_PASSWORD`, `MEALIE_DB_PASSWORD`
 - `AUTH_SECRET`
+- `OFF_USER_ID`, `OFF_PASSWORD` (optional: leave empty unless you set up
+  contributing to Open Food Facts, section 5)
 - `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`
 
 Leave `MEALIE_API_TOKEN` empty for now. Keep comments on their own lines:
@@ -168,6 +170,32 @@ shows the steps for the device it's on. This week's plan, meal pages and
 shopping list, and weeks you've opened, stay readable offline; shopping-list
 ticks wait for a connection, other changes need one. After a release, an open
 app offers a reload into the new version.
+
+### Contributing products to Open Food Facts (optional)
+
+The product sheet can send a scanned product back to
+[Open Food Facts](https://world.openfoodfacts.org) when it lacks the product or
+some of its fields (name, pack and serving size, per-100 g nutrition). It is off
+until both variables are set; the checkbox on the sheet only appears then.
+
+1. Create a **dedicated** Open Food Facts account for the planner (its
+   username, not an email address), not a personal one: the password sits in
+   `.env`.
+2. Fill in Open Food Facts' API usage form for apps (linked from their
+   [API documentation](https://openfoodfacts.github.io/openfoodfacts-server/api/)),
+   naming the planner.
+3. Put the username in `OFF_USER_ID` and the password in `OFF_PASSWORD`, then
+   `docker compose up -d`. Single-quote a password containing `$` in `.env`
+   (`OFF_PASSWORD='pa$$word'`), or Compose reads it as a variable.
+
+What goes out: the barcode, name, pack and serving size (only when they came
+from the pack or were typed, not a guess) and the per-100 g nutrition, and only
+fields Open Food Facts has empty; nothing is overwritten. Nutrition is added
+only to a record with none, or per 100 g to one that is already per 100 g.
+Each person gets a stable anonymous id (derived from `AUTH_SECRET`), so Open
+Food Facts can block one person without blocking the app. Nothing about who ate
+what is sent. A product is sent once; one that failed shows "Not sent to Open
+Food Facts yet" with a Retry button on its recipe page.
 
 ## 6. Backups
 
