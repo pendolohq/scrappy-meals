@@ -1,31 +1,54 @@
 // The shop checklist's state, kept pure so it can be tested and shared by the
 // page and the offline queue.
 
-import { type Aisle, aisleOf, aisleOrder } from "@/server/domain/aisles";
+import { type Aisle, aisleOrder } from "@/server/domain/aisles";
+import type { TickedAmount } from "@/server/domain/shopping";
 
 export type ShopItemView = {
+  /** The line's key for plan lines, a uuid for extras. */
   id: string;
+  source: "plan" | "extra";
+  /** The food, free-text line or extra's text. */
   text: string;
+  /** "150 g", or "300 g more" when the plan outgrew a tick. */
+  amount: string | null;
+  /** The recipes, or "500 g in all" when partly bought. */
+  detail: string | null;
+  aisle: Aisle;
   checked: boolean;
-  label: string | null;
+  /**
+   * What a tick or removal records: the line's current amounts, or for free
+   * text how many meals need it. Empty for extras.
+   */
+  amounts: TickedAmount[];
   position: number;
-  /** Changed on this device but not yet saved to Mealie. */
+  /** Changed on this device but not yet saved. */
   pending?: boolean;
 };
 
 /**
  * A change made on this device, with its own `id`. Changes are only ever
- * appended and sent in order. Ticks set a value instead of toggling and a
- * removal of an item that is already gone succeeds, so a change sent twice
- * (say, after a dropped response) ends up the same.
+ * appended and sent in order. Ticks set a value instead of toggling, an add
+ * carries the id of the extra it creates, and a removal of an item that is
+ * already gone succeeds, so a change sent twice (say, after a dropped
+ * response) ends up the same.
  */
 export type QueuedChange = { id: string } & (
-  | { kind: "check"; itemId: string; checked: boolean }
-  | { kind: "add"; tempId: string; text: string }
-  | { kind: "remove"; itemId: string }
+  | {
+      kind: "check";
+      source: "plan" | "extra";
+      itemId: string;
+      checked: boolean;
+      amounts: TickedAmount[];
+    }
+  | { kind: "add"; itemId: string; text: string }
+  | {
+      kind: "remove";
+      source: "plan" | "extra";
+      itemId: string;
+      amounts: TickedAmount[];
+    }
 );
-
-export const TEMP_PREFIX = "local-";
 
 /**
  * Takes a change that will never succeed off the queue; for an add, also the
@@ -38,7 +61,7 @@ export function dropFailed(
   return queue.filter(
     (c) =>
       c.id !== failed.id &&
-      !(failed.kind === "add" && c.kind !== "add" && c.itemId === failed.tempId)
+      !(failed.kind === "add" && c.kind !== "add" && c.itemId === failed.itemId)
   );
 }
 
@@ -50,11 +73,19 @@ export function applyQueue(
   let out = items.map((i) => ({ ...i }));
   for (const c of queue) {
     if (c.kind === "add") {
+      // The page may already show an add whose change is still being cleared.
+      if (out.some((i) => i.id === c.itemId)) {
+        continue;
+      }
       out.push({
-        id: c.tempId,
+        id: c.itemId,
+        source: "extra",
         text: c.text,
+        amount: null,
+        detail: null,
+        aisle: "Other",
         checked: false,
-        label: null,
+        amounts: [],
         position: Number.MAX_SAFE_INTEGER,
         pending: true,
       });
@@ -69,29 +100,14 @@ export function applyQueue(
   return out;
 }
 
-/** After a queued add is saved, later changes to it use Mealie's id. */
-export function replaceTempId(
-  queue: QueuedChange[],
-  tempId: string,
-  id: string
-): QueuedChange[] {
-  return queue.map((c) =>
-    c.kind !== "add" && c.itemId === tempId ? { ...c, itemId: id } : c
-  );
-}
-
 /** What the server answered for one change. */
-export type SendResult = {
-  error?: string;
-  retry?: true;
-  item?: { id: string };
-};
+export type SendResult = { error?: string; retry?: true };
 
 /**
  * Saves queued changes one at a time, oldest first. A change stays queued
  * until its request settles, then the queue is re-read, since the user may
  * have changed more in the meantime. A failed request or a retryable error
- * (Mealie or the database down, signed out) stops the run and keeps the
+ * (the database down, signed out) stops the run and keeps the
  * queue; any other error drops that change and is reported.
  */
 export async function flushQueue(io: {
@@ -119,20 +135,14 @@ export async function flushQueue(io: {
       continue;
     }
     io.onSaved();
-    const rest = io.read().filter((c) => c.id !== change.id);
-    io.write(
-      change.kind === "add" && result.item
-        ? replaceTempId(rest, change.tempId, result.item.id)
-        : rest
-    );
+    io.write(io.read().filter((c) => c.id !== change.id));
   }
 }
 
 export type ShopGroup = { label: string; items: ShopItemView[] };
 
 /**
- * Unticked items grouped by aisle (from their Mealie label), in the order the
- * shop is walked; ticked items in one list at the end.
+ * Unticked items grouped by aisle, in the order the shop is walked; ticked items in one list at the end.
  */
 export function groupItems(items: ShopItemView[]): {
   groups: ShopGroup[];
@@ -142,7 +152,7 @@ export function groupItems(items: ShopItemView[]): {
     a.position - b.position || a.text.localeCompare(b.text);
   const groups = new Map<Aisle, ShopItemView[]>();
   for (const item of items.filter((i) => !i.checked)) {
-    const aisle = aisleOf(item.label);
+    const aisle = item.aisle;
     groups.set(aisle, [...(groups.get(aisle) ?? []), item]);
   }
   return {

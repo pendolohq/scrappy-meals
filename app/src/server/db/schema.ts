@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -248,17 +249,66 @@ export const recipeCache = pgTable(
   ]
 );
 
-/** Items we created in Mealie per week, so a re-push replaces them instead of duplicating. */
-export const shoppingPushes = pgTable("shopping_pushes", {
-  weekStart: date("week_start", { mode: "string" }).primaryKey(),
-  mealieListId: uuid("mealie_list_id").notNull(),
-  mealieItemIds: uuid("mealie_item_ids")
-    .array()
-    .notNull()
-    .default(sql`'{}'`),
-  pushedAt: timestamp("pushed_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/**
+ * Lines of the week's shopping list that someone ticked. The amounts are what
+ * the device showed, so a plan that grows afterwards shows the line again with
+ * the difference.
+ */
+export const shoppingTicks = pgTable(
+  "shopping_ticks",
+  {
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    lineKey: text("line_key").notNull(),
+    amounts: jsonb("amounts")
+      .$type<{ quantity: number; unit: string | null }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    checkedAt: timestamp("checked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    checkedBy: uuid("checked_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [primaryKey({ columns: [t.weekStart, t.lineKey] })]
+);
+
+/** Plan lines someone removed from a week's list. */
+export const shoppingHidden = pgTable(
+  "shopping_hidden",
+  {
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    lineKey: text("line_key").notNull(),
+    amounts: jsonb("amounts")
+      .$type<{ quantity: number; unit: string | null }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    hiddenBy: uuid("hidden_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [primaryKey({ columns: [t.weekStart, t.lineKey] })]
+);
+
+/** Lines added by hand to a week's list. The id is made in the browser, so a replayed add is a no-op. */
+export const shoppingExtras = pgTable(
+  "shopping_extras",
+  {
+    id: uuid("id").primaryKey(),
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    text: text("text").notNull(),
+    checked: boolean("checked").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("shopping_extras_week_idx").on(t.weekStart)]
+);
 
 export type User = typeof users.$inferSelect;

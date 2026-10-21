@@ -8,7 +8,7 @@ short version; these pages have the details.
 | [development.md](development.md) | run it locally, run the tests, fork or move the repo |
 | [deploy.md](deploy.md) | set up the server, release a version, update or roll back the running app |
 | [security.md](security.md) | add or change a page, server action, route handler, or anything about sign-in |
-| [mealie-api.md](mealie-api.md) | touch the Mealie client, nutrition, shopping lists, or upgrade Mealie |
+| [mealie-api.md](mealie-api.md) | touch the Mealie client, nutrition, the shopping list, or upgrade Mealie |
 | [aws-backup-setup.md](aws-backup-setup.md) | set up the S3 bucket and keys for backups, or restore from one |
 
 ## How the pieces fit
@@ -35,8 +35,8 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
   The monitoring dashboard (Beszel) listens on the server's loopback only, for an SSH
   tunnel.
 - **The app (`app/`, Next.js)** stores the plan, portions, fasting days, adherence and users in
-  the `planner` database. It reads recipes and nutrition from Mealie and writes shopping lists
-  to it, always through Mealie's API, never its database.
+  the `planner` database. It reads recipes and nutrition from Mealie, always through Mealie's API, never its
+  database. The shopping list lives in the `planner` database too.
 - **Users** are created on the server with the `scrappy` CLI inside the app container. There is
   no sign-up page.
 - **Backups:** `scripts/backup.sh` (cron) runs the `backup` service, which dumps both databases
