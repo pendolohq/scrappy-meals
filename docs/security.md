@@ -45,7 +45,7 @@ arguments, whatever the UI allows. So every action is built with `userAction`
 3. runs the handler with the parsed input and the signed-in user;
 4. turns errors into `{ error }`: a `UserFacingError` (e.g. `PlanError`) keeps
    its message, anything else is logged and replaced by a generic message.
-   Being signed out and a `RetryableError` (Mealie down) add `retry: true`, so
+   Being signed out and a `RetryableError` (Mealie or the database down) add `retry: true`, so
    a caller with a queue (the shopping page) keeps the change and tries again.
 
 Per-person data is keyed by `user.id` from the session, never by an id from

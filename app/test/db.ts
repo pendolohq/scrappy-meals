@@ -15,7 +15,7 @@ export function useTestDb() {
   });
   beforeEach(async () => {
     await db.execute(
-      sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_pushes, household_settings, off_contributions CASCADE`
+      sql`TRUNCATE users, day_overrides, meal_slots, slot_portions, adherence, recipe_cache, shopping_ticks, shopping_hidden, shopping_extras, household_settings, off_contributions CASCADE`
     );
   });
   afterAll(async () => {
