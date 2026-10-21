@@ -43,8 +43,10 @@ export function parseDiscoverParams(
   };
 }
 
-/** The page's URL for a state; a filter change always goes back to page 1. */
-export function discoverHref(state: DiscoverState): string {
+/** The filters as `tag=…&category=…&quick=1`, as the page and the picker send them. */
+export function discoverQuery(
+  state: Pick<DiscoverState, "tags" | "categories" | "quick">
+): URLSearchParams {
   const query = new URLSearchParams();
   for (const tag of state.tags) {
     query.append("tag", tag);
@@ -55,11 +57,70 @@ export function discoverHref(state: DiscoverState): string {
   if (state.quick) {
     query.set("quick", "1");
   }
+  return query;
+}
+
+/** The page's URL for a state; a filter change always goes back to page 1. */
+export function discoverHref(state: DiscoverState): string {
+  const query = discoverQuery(state);
   if (state.page > 1) {
     query.set("page", String(state.page));
   }
   const qs = query.toString();
   return qs ? `/recipes?${qs}` : "/recipes";
+}
+
+/** What the add-meal picker asks for: Discover's filters plus a name search. */
+export type PickerQuery = Omit<DiscoverState, "page"> & {
+  search: string;
+  page: number;
+};
+
+/** The longest name search passed on to Mealie. */
+export const MAX_SEARCH_LENGTH = 100;
+
+/**
+ * The picker loads page after page as you scroll, with no page in the URL,
+ * so it allows more than Discover's `?page=`. Past the cap, the same page
+ * would come back for ever.
+ */
+const MAX_PICKER_PAGE = 1000;
+
+/** The picker's request query string: `q=…&tag=…&page=2`. */
+export function pickerSearch(query: PickerQuery): string {
+  const params = discoverQuery(query);
+  const search = query.search.trim();
+  if (search) {
+    params.set("q", search);
+  }
+  if (query.page > 1) {
+    params.set("page", String(query.page));
+  }
+  return params.toString();
+}
+
+/** Reads the picker's query string, keeping only slugs Mealie has, as Discover does. */
+export function parsePickerSearch(
+  params: URLSearchParams,
+  known: { tags: string[]; categories: string[] }
+): PickerQuery {
+  const { tags, categories, quick } = parseDiscoverParams(
+    {
+      tag: params.getAll("tag"),
+      category: params.getAll("category"),
+      quick: params.get("quick") ?? undefined,
+    },
+    known
+  );
+  const page = Number(params.get("page"));
+  return {
+    tags,
+    categories,
+    quick,
+    search: (params.get("q") ?? "").trim().slice(0, MAX_SEARCH_LENGTH),
+    page:
+      Number.isInteger(page) && page > 1 ? Math.min(page, MAX_PICKER_PAGE) : 1,
+  };
 }
 
 /** The page to load after the first `loaded` pages, or null when that was all. */

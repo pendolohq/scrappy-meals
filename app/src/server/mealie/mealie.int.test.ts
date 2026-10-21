@@ -22,12 +22,7 @@ import {
   patchRecipe,
 } from "./import";
 import { createProductRecipe, findProductByBarcode } from "./products";
-import {
-  discoverRecipes,
-  getRecipe,
-  listOrganizers,
-  searchRecipes,
-} from "./recipes";
+import { discoverRecipes, getRecipe, listOrganizers } from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
 const run = randomUUID().slice(0, 8);
@@ -156,13 +151,19 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
 
   it("rejects a bad token with a MealieError", async () => {
     const bad = createMealieClient({ baseUrl: baseUrl!, token: "nope" });
-    const err = await searchRecipes("", { client: bad }).catch((e) => e);
+    const err = await discoverRecipes(
+      { tags: [], categories: [], quick: false },
+      { client: bad }
+    ).catch((e) => e);
     expect(err).toBeInstanceOf(MealieError);
     expect(err.status).toBe(401);
   });
 
   it("searches recipes", async () => {
-    const page = await searchRecipes(`Lentil Soup ${run}`, { client });
+    const page = await discoverRecipes(
+      { tags: [], categories: [], quick: false, search: `Lentil Soup ${run}` },
+      { client }
+    );
     expect(page.items.map((r) => r.slug)).toContain(ids.fullSlug);
     const hit = page.items.find((r) => r.slug === ids.fullSlug)!;
     expect(hit.servings).toBe(4);
@@ -310,6 +311,19 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(
         await slugs({ ...none, tags: [tag.slug], categories: [category.slug] })
       ).toEqual([ids.fullSlug]);
+    });
+
+    it("combines a search with the filters", async () => {
+      const { items } = await discoverRecipes(
+        {
+          tags: [tag.slug],
+          categories: [],
+          quick: false,
+          search: "Lentil",
+        },
+        { client }
+      );
+      expect(items.map((r) => r.slug)).toEqual([ids.fullSlug]);
     });
   });
 
@@ -494,12 +508,19 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       ).rejects.toBeInstanceOf(Error);
     });
 
-    it("finds products in search, marked as products", async () => {
-      const page = await searchRecipes(name, { client });
-      expect(page.items.find((r) => r.slug === slug)).toMatchObject({
+    it("finds products by name, marked as products", async () => {
+      const none = { tags: [], categories: [], quick: false };
+      const found = await discoverRecipes(
+        { ...none, search: name },
+        { client }
+      );
+      expect(found.items.find((r) => r.slug === slug)).toMatchObject({
         isProduct: true,
       });
-      const soup = await searchRecipes(`Lentil Soup ${run}`, { client });
+      const soup = await discoverRecipes(
+        { ...none, search: `Lentil Soup ${run}` },
+        { client }
+      );
       expect(soup.items.find((r) => r.slug === ids.fullSlug)).toMatchObject({
         isProduct: false,
       });
@@ -525,6 +546,8 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(await all({ ...none, tags: ["product"] })).toEqual(
         expect.arrayContaining([slug, bareSlug])
       );
+      // A search by name finds them without the tag.
+      expect(await all({ ...none, search: name })).toContain(slug);
       // The tag filter combines with the quick filter's query.
       expect(await all({ ...none, quick: true })).not.toContain(slug);
     });

@@ -75,6 +75,8 @@ export default async function globalSetup() {
   const lentilsRef = crypto.randomUUID();
   await api("PATCH", `/api/recipes/${slug}`, {
     recipeServings: 4,
+    // The picker starts on the slot's tag: Alex plans it for lunch.
+    tags: [{ name: "Lunch" }],
     nutrition: {
       calories: "400",
       proteinContent: "25",
