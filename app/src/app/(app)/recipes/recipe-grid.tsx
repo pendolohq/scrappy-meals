@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Clock } from "lucide-react";
 import Link from "next/link";
 
@@ -87,30 +93,24 @@ export const RecipeGrid = ({
   const [status, setStatus] = useState<"idle" | "loading" | "failed">("idle");
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
-  const restoreTo = useRef<number | null>(null);
 
-  useEffect(() => {
+  // Once per mount: the page keys the grid by its URL.
+  const restore = useEffectEvent(() => {
     const saved = takeSaved(href);
     if (saved) {
-      restoreTo.current = saved.scrollY;
       setLoaded({
         items: appendRecipes(initial.items, saved.items),
         nextPage: saved.nextPage,
       });
+      // Once those pages are in the DOM.
+      requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
     }
-    // Only on mount: the props don't change without a remount.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (restoreTo.current !== null) {
-      window.scrollTo(0, restoreTo.current);
-      restoreTo.current = null;
-    }
-  }, [loaded]);
+  });
+  // oxlint-disable-next-line react/set-state-in-effect -- sessionStorage exists only in the browser, so it can't seed the server-rendered state
+  useLayoutEffect(() => restore(), []);
 
   const { nextPage } = loaded;
-  const loadMore = useCallback(async () => {
+  const loadMore = async () => {
     if (busy.current || nextPage === null) {
       return;
     }
@@ -130,7 +130,8 @@ export const RecipeGrid = ({
       nextPage: result.nextPage,
     }));
     setStatus("idle");
-  }, [filters, nextPage]);
+  };
+  const onSentinelInView = useEffectEvent(() => void loadMore());
 
   useEffect(() => {
     // After a failure only the button retries, so offline doesn't loop.
@@ -138,19 +139,20 @@ export const RecipeGrid = ({
     if (!target || nextPage === null || status !== "idle") {
       return;
     }
-    // Observing afresh after each page fires again at once if the end of
-    // the grid is still in view.
+    // A new observer per page on purpose: an observer fires only when the
+    // sentinel crosses into view, but a new one reports it at once, so the
+    // next page loads if the end of the grid is still showing.
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          void loadMore();
+          onSentinelInView();
         }
       },
       { rootMargin: "0px 0px 800px 0px" }
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [loadMore, nextPage, status]);
+  }, [nextPage, status]);
 
   return (
     <>
