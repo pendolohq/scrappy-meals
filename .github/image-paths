@@ -11,6 +11,7 @@ app/\.dockerignore
 app/docker/
 app/next\.config\.ts
 app/scripts/build-cli\.mjs
+app/scripts/copy-wasm\.mjs
 \.github/workflows/
 \.github/image-paths
 

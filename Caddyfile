@@ -18,6 +18,8 @@ app.{$DOMAIN} {
 	header {
 		Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 		X-Frame-Options DENY
+		# Only the planner scans barcodes, with its own camera.
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
 	}
 	reverse_proxy app:3000
 }

@@ -3,7 +3,7 @@
 // small on purpose.
 // Bump VERSION with every change to this file: it's how the browser sees an
 // update, and it drops the caches the old version filled.
-const VERSION = "v2";
+const VERSION = "v4";
 const STATIC = `static-${VERSION}`;
 const PAGES = `pages-${VERSION}`;
 // Recipe photos from /api/recipe-images: user data, cleared with the pages.
@@ -188,17 +188,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Build output is content-hashed: cache first.
+  // Build output is content-hashed: cache first. So is the barcode reader's
+  // wasm (its version is in the name), kept so a second scan works on a bad
+  // connection.
   if (
     url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/")
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/zxing/")
   ) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>
           hit ||
           fetch(req).then((res) => {
-            if (res.ok) {
+            // Not a redirect: an ended session answers with the login page.
+            if (res.ok && !res.redirected) {
               const copy = res.clone();
               caches
                 .open(STATIC)

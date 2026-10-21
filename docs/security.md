@@ -67,6 +67,9 @@ which is fine.
   `/api/health`, `/manifest.webmanifest`, plus the static `/icons/` and `/screenshots/`
   (the install dialog's, taken from sample data). None of these read user data. It's a second layer: removing a path from that list
   must never be what keeps data private.
+- Caddy sends `Permissions-Policy: camera=(self), microphone=(), geolocation=()` on the
+  planner's host: the barcode scanner needs the camera, nothing needs the rest. The scanner's
+  wasm is served from our own origin (`/zxing/`, behind sign-in like the rest), never a CDN.
 - Sessions are JWTs (30 days) that carry a session version. Every request
   checks it against the database, so removing a user or changing a password
   (`scrappy user passwd`) signs out every device
