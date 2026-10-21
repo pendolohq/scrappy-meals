@@ -62,7 +62,10 @@ until every place names the same version (`mealie-version.test.ts`).
 ## Tags, categories and total time
 
 The Discover page (`/recipes`) filters on Mealie's own tags and categories,
-so they stay editable in Mealie. The agreed set is `RECIPE_TAGS` /
+so they stay editable in Mealie. The add-meal picker uses the same filters
+(`discoverRecipes`, through `/api/recipes/search`) with a name search on
+top, starting on the slot's meal tag; Mealie ranks by relevance while
+searching and by name otherwise. The agreed set is `RECIPE_TAGS` /
 `RECIPE_CATEGORIES` in `src/server/domain/taxonomy.ts`; imports and the review
 page only ever assign those.
 
@@ -197,10 +200,14 @@ filters on the value alone, then reads the detail of each hit (at most 5) and
 keeps the first whose `extras.scrappyProduct` is the barcode. The barcode is
 digits only (asserted), as the filter syntax has no escape for quotes.
 
-**Discover.** With no tag chosen, the page adds
-`tags.slug NOT IN ["product"]` to `queryFilter` (in brackets, joined to the
-quick filter with `AND`), so the grid isn't buried in snack bars; recipes with
-no tags at all still match it. Choosing the Product tag lists them.
+**Discover and the add-meal picker** (both go through `discoverRecipes`). With
+no tag chosen and no search text, the query adds `tags.slug NOT IN ["product"]`
+to `queryFilter` (in brackets, joined to the quick filter with `AND`), so the
+grid isn't buried in snack bars; recipes with no tags at all still match it.
+Choosing the Product tag lists them, and so does any search text, so a product
+is found by name. Products carry no meal tags, so the picker lifts the slot's
+default meal tag while a search is typed. `/api/recipes/search?products=1`
+returns the latest products for the Product tab.
 
 ## Reviewing a recipe
 

@@ -102,32 +102,6 @@ export type Recipe = RecipeSummaryFields & {
 
 export type RecipePage = { items: RecipeListItem[] };
 
-export async function searchRecipes(
-  query: string,
-  opts: { perPage?: number; client?: MealieClient } = {}
-): Promise<RecipePage> {
-  const client = opts.client ?? mealie();
-  const search = query.trim();
-  const page = unwrap(
-    await client.GET("/api/recipes", {
-      params: {
-        query: {
-          search: search || undefined,
-          // Mealie ranks by relevance when searching; otherwise list alphabetically.
-          ...(search
-            ? {}
-            : { orderBy: "name", orderDirection: "asc" as const }),
-          page: 1,
-          perPage: opts.perPage ?? 20,
-        },
-      },
-    })
-  );
-  return {
-    items: page.items.map(toListItem),
-  };
-}
-
 export type DiscoverFilters = {
   /** Tag slugs; a recipe needs all of them. */
   tags: string[];
@@ -135,23 +109,29 @@ export type DiscoverFilters = {
   categories: string[];
   /** Total time of 30 minutes or less. */
   quick: boolean;
+  /** Words in the name (or description, ingredients…, as Mealie searches). */
+  search?: string;
 };
 
 export const DISCOVER_PAGE_SIZE = 48;
 
 /**
- * Products are in Mealie as recipes tagged Product; the default grid leaves
- * them out, and only the Product tag brings them back. (Mealie's `NOT IN`
- * also matches recipes with no tags at all.)
+ * Products are in Mealie as recipes tagged Product. Browsing with no tags and
+ * no search leaves them out of the grid, so snack bars don't bury the recipes;
+ * a tag filter or a search brings them back to where they can be found. (Mealie's
+ * `NOT IN` also matches recipes with no tags at all.)
  */
-function discoverQueryFilter(filters: DiscoverFilters): string | undefined {
+function discoverQueryFilter(
+  filters: DiscoverFilters,
+  search: string | undefined
+): string | undefined {
   const clauses = [];
   if (filters.quick) {
     clauses.push(
       `totalTimeSeconds > 0 AND totalTimeSeconds <= ${QUICK_MAX_MINUTES * 60}`
     );
   }
-  if (filters.tags.length === 0) {
+  if (filters.tags.length === 0 && !search) {
     clauses.push(`tags.slug NOT IN ["${PRODUCT_TAG.slug}"]`);
   }
   return clauses.length > 1
@@ -160,8 +140,9 @@ function discoverQueryFilter(filters: DiscoverFilters): string | undefined {
 }
 
 /**
- * Recipes matching the filters, by name. Every filter runs in Mealie: tags
- * and categories by slug, "quick" as a filter on the total time in seconds.
+ * Recipes matching the filters, by name, or by relevance when searching for
+ * words. Every filter runs in Mealie: tags and categories by slug, "quick"
+ * as a filter on the total time in seconds.
  * Callers pass only slugs that exist: Mealie drops a filter whose slugs it
  * doesn't know rather than matching nothing. With `fromStart`, it returns
  * pages 1 to `page` together, as a page opened at `?page=n` shows them.
@@ -178,6 +159,7 @@ export async function discoverRecipes(
   const client = opts.client ?? mealie();
   const page = opts.page ?? 1;
   const categories = categoryFilter(filters.categories);
+  const search = filters.search?.trim();
   const result = unwrap(
     await client.GET("/api/recipes", {
       params: {
@@ -186,9 +168,12 @@ export async function discoverRecipes(
           requireAllTags: true,
           categories: categories.length > 0 ? categories : undefined,
           requireAllCategories: false,
-          queryFilter: discoverQueryFilter(filters),
-          orderBy: "name",
-          orderDirection: "asc",
+          queryFilter: discoverQueryFilter(filters, search),
+          search: search || undefined,
+          // Mealie ranks by relevance when searching; otherwise by name.
+          ...(search
+            ? {}
+            : { orderBy: "name", orderDirection: "asc" as const }),
           page: opts.fromStart ? 1 : page,
           perPage: DISCOVER_PAGE_SIZE * (opts.fromStart ? page : 1),
         },

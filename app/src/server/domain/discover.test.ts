@@ -7,6 +7,8 @@ import {
   nextDiscoverPage,
   orderTagChips,
   parseDiscoverParams,
+  parsePickerSearch,
+  pickerSearch,
   toggleCategory,
   toggleQuick,
   toggleTag,
@@ -153,5 +155,55 @@ describe("orderTagChips", () => {
       ["snack"]
     );
     expect(chips.map((c) => c.slug)).toEqual(["snack"]);
+  });
+});
+
+describe("picker search", () => {
+  const none = { tags: [], categories: [], quick: false, search: "", page: 1 };
+
+  it("sends Discover's filters with the search and the page", () => {
+    expect(
+      pickerSearch({
+        tags: ["dinner"],
+        categories: ["vegan", "fish"],
+        quick: true,
+        search: " lentil soup ",
+        page: 3,
+      })
+    ).toBe(
+      "tag=dinner&category=vegan&category=fish&quick=1&q=lentil+soup&page=3"
+    );
+    expect(pickerSearch(none)).toBe("");
+  });
+
+  it("reads back what it sends", () => {
+    const query = {
+      tags: ["dinner", "high-protein"],
+      categories: ["vegetarian"],
+      quick: true,
+      search: "chickpea curry",
+      page: 2,
+    };
+    expect(
+      parsePickerSearch(new URLSearchParams(pickerSearch(query)), known)
+    ).toEqual(query);
+  });
+
+  it("drops unknown slugs and bad pages, and caps the search", () => {
+    expect(
+      parsePickerSearch(
+        new URLSearchParams(
+          `tag=lunch&category=meat&page=-2&q=${"a".repeat(150)}`
+        ),
+        known
+      )
+    ).toEqual({ ...none, search: "a".repeat(100) });
+  });
+
+  it("allows more pages than Discover's links, up to a cap", () => {
+    const page = (p: string) =>
+      parsePickerSearch(new URLSearchParams({ page: p }), known).page;
+    expect(page(String(MAX_DISCOVER_PAGE + 5))).toBe(MAX_DISCOVER_PAGE + 5);
+    expect(page("999999")).toBe(1000);
   });
 });
