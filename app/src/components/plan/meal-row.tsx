@@ -100,11 +100,12 @@ export const MealRow = ({
           short line, so a shared meal still reads as shared. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {canLog && (
-          <div className="w-52 max-w-full">
+          <div className="w-full sm:w-52">
             <AdherenceButtons
               mealId={meal.id}
               mealName={name}
               log={meal.adherence[currentUserId]}
+              fill
             />
           </div>
         )}
