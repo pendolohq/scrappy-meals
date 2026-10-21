@@ -21,11 +21,7 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./import";
-import {
-  discoverRecipes,
-  getRecipe,
-  listOrganizers,
-} from "./recipes";
+import { discoverRecipes, getRecipe, listOrganizers } from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
 const run = randomUUID().slice(0, 8);
