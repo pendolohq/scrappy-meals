@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Plus, Search, X } from "lucide-react";
 
-import { addMealAction } from "@/app/(app)/week/actions";
+import { addMealAction, loadProductAction } from "@/app/(app)/week/actions";
 import { IconButton } from "@/components/ui/icon-button";
 import { inputClass } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
@@ -11,59 +11,18 @@ import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import { formatDay } from "@/lib/format";
 import type { SlotType } from "@/server/domain/slots";
-import type { RecipeListItem } from "@/server/mealie/recipes";
+import type { ProductLookup } from "@/server/products";
 
-type SearchState = {
-  status: "idle" | "loading" | "done" | "error";
-  items: RecipeListItem[];
-  error?: string;
-};
-
-const useRecipeSearch = (query: string, enabled: boolean): SearchState => {
-  const [state, setState] = useState<SearchState>({
-    status: "idle",
-    items: [],
-  });
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    const ctrl = new AbortController();
-    const timer = setTimeout(async () => {
-      setState((s) => ({ ...s, status: "loading" }));
-      try {
-        const res = await fetch(
-          `/api/recipes/search?q=${encodeURIComponent(query)}`,
-          { signal: ctrl.signal }
-        );
-        const body = await res.json();
-        if (!res.ok) {
-          throw new Error(body.error ?? "Search failed");
-        }
-        setState({ status: "done", items: body.items });
-      } catch (err) {
-        if (!ctrl.signal.aborted) {
-          setState({
-            status: "error",
-            items: [],
-            error: (err as Error).message,
-          });
-        }
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      ctrl.abort();
-    };
-  }, [query, enabled]);
-  return state;
-};
+import { attempt, failureText } from "./attempt";
+import { ProductTab } from "./product-tab";
+import { useRecipeList } from "./use-recipe-list";
 
 export const AddMeal = ({
   date,
   slot,
   snackIndex,
   label,
+  today,
   className,
   text,
 }: {
@@ -71,6 +30,8 @@ export const AddMeal = ({
   slot: SlotType;
   snackIndex: number;
   label: string;
+  /** The viewer's today: a product can only have been eaten up to then. */
+  today: string;
   /** Replaces the trigger's styling. */
   className?: string;
   /** Shorter trigger text where the slot is clear from around it; screen readers still hear the slot and day. */
@@ -78,10 +39,19 @@ export const AddMeal = ({
 }) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"recipes" | "product">("recipes");
+  // A product picked from the search: its sheet opens in the Product tab.
+  const [picked, setPicked] = useState<ProductLookup>();
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
-  const search = useRecipeSearch(query, open);
+  const searching = open && mode === "recipes";
+  const search = useRecipeList(
+    `/api/recipes/search?q=${encodeURIComponent(query)}`,
+    searching,
+    250
+  );
+  const future = date > today;
 
   const show = () => {
     setOpen(true);
@@ -92,13 +62,29 @@ export const AddMeal = ({
     dialog.current?.close();
     setOpen(false);
     setQuery("");
+    setMode("recipes");
+    setPicked(undefined);
   };
 
-  const pick = (slug: string) =>
+  const pick = (slug: string, isProduct: boolean) =>
     startTransition(async () => {
-      const res = await addMealAction({ date, slot, snackIndex, slug });
+      setError(undefined);
+      if (isProduct) {
+        // Portion and "Already had it?" are chosen on the product's sheet.
+        const res = await attempt(() => loadProductAction({ slug }));
+        if (res.error === undefined) {
+          setPicked(res);
+          setMode("product");
+        } else {
+          setError(failureText(res));
+        }
+        return;
+      }
+      const res = await attempt(() =>
+        addMealAction({ date, slot, snackIndex, slug })
+      );
       if (res.error) {
-        setError(res.error);
+        setError(failureText(res));
       } else {
         close();
       }
@@ -143,23 +129,66 @@ export const AddMeal = ({
                 <X className="size-5" aria-hidden />
               </IconButton>
             </div>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
-                aria-hidden
-              />
-              <input
-                type="search"
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search recipes in Mealie"
-                aria-label="Search recipes"
-                className={cx(inputClass, "bg-background pl-10")}
+            <div
+              role="tablist"
+              aria-label="What to add"
+              className="grid grid-cols-2 gap-1 rounded-button bg-sunken p-1"
+            >
+              {(
+                [
+                  ["recipes", "Recipes"],
+                  ["product", "Product"],
+                ] as const
+              ).map(([id, title]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === id}
+                  onClick={() => {
+                    setPicked(undefined);
+                    setMode(id);
+                  }}
+                  className={cx(
+                    "min-h-tap rounded-[3px] text-sm font-medium transition",
+                    mode === id
+                      ? "bg-card text-foreground shadow-card"
+                      : "text-muted hover:text-foreground"
+                  )}
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+            {mode === "recipes" && (
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search recipes in Mealie"
+                  aria-label="Search recipes"
+                  className={cx(inputClass, "bg-background pl-10")}
+                />
+              </div>
+            )}
+          </div>
+          {open && mode === "product" && (
+            <div className="overflow-y-auto">
+              <ProductTab
+                at={{ date, slot, snackIndex }}
+                future={future}
+                onAdded={close}
+                initial={picked}
               />
             </div>
-          </div>
-          {open && (
+          )}
+          {searching && (
             <div className="overflow-y-auto p-2" aria-live="polite">
               {search.status === "loading" && search.items.length === 0 && (
                 <p className="p-3 text-sm text-muted">Searching…</p>
@@ -181,7 +210,7 @@ export const AddMeal = ({
                     <button
                       type="button"
                       disabled={pending}
-                      onClick={() => pick(r.slug)}
+                      onClick={() => pick(r.slug, r.isProduct)}
                       className="flex w-full items-center gap-3 rounded-button p-2 text-left transition hover:bg-sunken disabled:opacity-60"
                     >
                       <RecipeImage
@@ -192,7 +221,9 @@ export const AddMeal = ({
                         <span className="line-clamp-2 font-serif font-semibold">
                           {r.name}
                         </span>
-                        {r.servings ? (
+                        {r.isProduct ? (
+                          <Pill tone="accent">Product</Pill>
+                        ) : r.servings ? (
                           <span className="block text-xs text-muted">
                             {r.servings} servings
                           </span>

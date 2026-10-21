@@ -54,7 +54,7 @@ export default async function PlanPage({
             meals={day.meals}
             members={plan.members}
             snackSlots={plan.snackSlots}
-            isToday={day.date === now}
+            today={now}
           />
         ))}
       </div>

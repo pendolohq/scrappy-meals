@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Pill } from "@/components/ui/pill";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
@@ -137,9 +138,9 @@ export const PlanMeal = ({
             <Input
               id={servingsId}
               type="number"
-              min="0.25"
+              min="0.01"
               max="100"
-              step="0.25"
+              step="any"
               defaultValue={meal.baseServings}
               className="w-20 tabular-nums"
               onBlur={(e) => {
@@ -208,6 +209,12 @@ export const PlanMeal = ({
             <Ellipsis className="size-4" aria-hidden />
           </IconButton>
         </div>
+        {(meal.recipe?.product || meal.unplanned) && (
+          <p className="flex flex-wrap gap-1">
+            {meal.recipe?.product && <Pill tone="accent">Product</Pill>}
+            {meal.unplanned && <Pill>Unplanned</Pill>}
+          </p>
+        )}
         {summary && (
           <p className="truncate text-xs text-muted tabular-nums">{summary}</p>
         )}
@@ -243,6 +250,7 @@ export const PlanMeal = ({
         </IconButton>
       </div>
 
+      {meal.unplanned && <Pill>Unplanned</Pill>}
       {summary && <p className="text-xs text-muted tabular-nums">{summary}</p>}
       {options}
       {errorText}

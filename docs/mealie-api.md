@@ -42,6 +42,9 @@ until every place names the same version (`mealie-version.test.ts`).
 | Import from a URL | `POST /api/recipes/create/url` → slug; 400 when it finds no recipe (see below) |
 | Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
 | AI enabled? | `GET /api/groups/self` → `aiProviderSettings.aiEnabled`, `.imageProviderEnabled` (see below) |
+| Create a product | `POST /api/recipes` `{ name }` → slug, then one `PATCH` (see "Products") |
+| Find a product by barcode | `GET /api/recipes?queryFilter=extras.value = "<barcode>"`, then the detail of each hit |
+| Latest products | `GET /api/recipes?tags=product&orderBy=dateAdded&orderDirection=desc` |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
@@ -170,6 +173,41 @@ Mealie 3.29 with Claude Sonnet 5.5 as the provider:
 - **Errors** come back as 400 with a message (e.g. AI not enabled); with a
   screenshot, the first image is meant to become the cover image, though
   `image` was still empty on the recipe that came back.
+
+## Products
+
+A packaged product (a bar, a yoghurt) is a Mealie recipe, so the cache, the
+totals and the recipe page work on it unchanged. `createProductRecipe`
+(`src/server/mealie/products.ts`) makes one with `POST /api/recipes`
+`{ name }` (201, the body is the new slug as a JSON string) and a single
+`PATCH`:
+
+- `recipeServings: 1` and `recipeYield: "1 serving (60 g)"`; `nutrition` is per
+  that serving, only the macros the label gave (strings, as above).
+- `orgURL` is the Open Food Facts page, only when the data came from there.
+- `tags: [{ name: "Product" }]` (slug `product`, `PRODUCT_TAG`). It isn't in
+  `RECIPE_TAGS`: nothing classifies into it and the review page keeps it as a
+  tag from outside the list.
+- `extras` (`product-state.ts`, written with `withProductState` and
+  `withImportState`): `scrappyProduct` (the canonical barcode),
+  `scrappyServingGrams`, `scrappyServingUnit` (`g` | `ml`), `scrappyPackGrams`
+  (when known), plus `scrappyReview: done` (the scan sheet is the review) and
+  `scrappyNutrition: source | reviewed`. `Recipe.product` reads them back;
+  the list items from `GET /api/recipes` have `extras: null`, so only the tag
+  (`RecipeListItem.isProduct`) shows there.
+
+**Finding one by barcode.** `queryFilter=extras.value = "<barcode>"` matches
+recipes with *any* extra of that value. Filtering on
+`extras.key_name = "scrappyProduct" AND extras.value = "…"` is not reliable:
+the two conditions can match different extras rows of one recipe. So the lookup
+filters on the value alone, then reads the detail of each hit (at most 5) and
+keeps the first whose `extras.scrappyProduct` is the barcode. The barcode is
+digits only (asserted), as the filter syntax has no escape for quotes.
+
+**Discover.** With no tag chosen, the page adds
+`tags.slug NOT IN ["product"]` to `queryFilter` (in brackets, joined to the
+quick filter with `AND`), so the grid isn't buried in snack bars; recipes with
+no tags at all still match it. Choosing the Product tag lists them.
 
 ## Reviewing a recipe
 

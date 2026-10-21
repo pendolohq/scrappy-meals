@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { testDbUrl, useTestDb } from "../../test/db";
 
 import { mealSlots, recipeCache } from "./db/schema";
+import type { ProductInfo } from "./domain/product";
 import type { SlotType } from "./domain/slots";
 import { setSnackSlots } from "./household";
 import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
+  checkNewMeal,
   copyWeek,
   getMeal,
   getWeekPlan,
@@ -40,6 +42,7 @@ const recipe = (slug: string, kcal = 400): Recipe => ({
   tags: [],
   categories: [],
   totalMinutes: null,
+  product: null,
   nutrition: {
     perServing: { kcal, protein: 20, carbs: 40, fat: 15, fibre: 6 },
     missing: [],
@@ -855,6 +858,216 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       await expect(
         moveMeal(db, id, { date: "2026-10-21", slot: "dinner" })
       ).rejects.toThrow("no longer exists");
+    });
+  });
+
+  describe("products and unplanned meals", () => {
+    const info: ProductInfo = {
+      barcode: "5000159461122",
+      servingGrams: 50,
+      servingUnit: "g",
+      packGrams: 50,
+    };
+    const productFetch = vi.fn<RecipeFetcher>(async (slug: string) => ({
+      ...recipe(slug),
+      product: slug === "bar" ? info : null,
+    }));
+    const today = "2026-10-20";
+    const add = (
+      by: string,
+      extra: {
+        slug?: string;
+        date?: string;
+        baseServings?: number;
+        unplanned?: boolean;
+      } = {}
+    ) =>
+      addMeal(
+        db,
+        {
+          date: extra.date ?? today,
+          slot: "snack",
+          slug: extra.slug ?? "bar",
+          createdBy: by,
+          today,
+          ...extra,
+        },
+        { fetch: productFetch }
+      );
+    const meals = async (date = today) =>
+      (
+        await getWeekPlan(db, "2026-10-19", { fetch: productFetch })
+      ).days.flatMap((d) => d.meals.filter((m) => m.date === date));
+
+    it("gives a product's portion of 1 to whoever added it and 0 to everyone else", async () => {
+      const { a, b } = await twoUsers();
+      await add(a.id);
+      await add(b.id, { slug: "soup" });
+
+      const [bar, soup] = await meals();
+      expect(bar.portions).toEqual({ [a.id]: 1, [b.id]: 0 });
+      // A recipe is unchanged: everyone gets a portion.
+      expect(soup.portions).toEqual({ [a.id]: 1, [b.id]: 1 });
+    });
+
+    it("still gives the adder a portion when they fast that day", async () => {
+      const { a, b } = await twoUsers();
+      await setFasting(db, a.id, today, true);
+      await setFasting(db, b.id, today, true);
+
+      await add(a.id);
+      await add(b.id, { slug: "soup" });
+
+      const [bar, soup] = await meals();
+      expect(bar.portions).toEqual({ [a.id]: 1, [b.id]: 0 });
+      expect(soup.portions).toEqual({ [a.id]: 0, [b.id]: 0 });
+    });
+
+    it("stores baseServings, defaulting to 1, and refuses values outside 0.01 to 100", async () => {
+      const { a } = await twoUsers();
+      await add(a.id, { baseServings: 1.5 });
+      await add(a.id, { slug: "soup" });
+      expect((await meals()).map((m) => m.baseServings)).toEqual([1.5, 1]);
+
+      for (const bad of [0, -1, 0.001, 100.5]) {
+        await expect(add(a.id, { baseServings: bad })).rejects.toBeInstanceOf(
+          PlanError
+        );
+      }
+      await expect(add(a.id, { baseServings: 0.01 })).resolves.toBeTruthy();
+      await expect(add(a.id, { baseServings: 100 })).resolves.toBeTruthy();
+    });
+
+    it("stores unplanned for today and earlier, and not for ordinary meals", async () => {
+      const { a } = await twoUsers();
+      await add(a.id, { unplanned: true });
+      await add(a.id, { date: "2026-10-19", unplanned: true });
+      await add(a.id, { slug: "soup" });
+
+      expect((await meals()).map((m) => m.unplanned)).toEqual([true, false]);
+      expect((await meals("2026-10-19")).map((m) => m.unplanned)).toEqual([
+        true,
+      ]);
+    });
+
+    it("refuses an unplanned meal for a day after the viewer's today, but plans ahead as normal", async () => {
+      const { a } = await twoUsers();
+      await expect(
+        add(a.id, { date: "2026-10-21", unplanned: true })
+      ).rejects.toBeInstanceOf(PlanError);
+      expect(await meals("2026-10-21")).toEqual([]);
+
+      await add(a.id, { date: "2026-10-21", unplanned: false });
+      expect((await meals("2026-10-21"))[0].unplanned).toBe(false);
+    });
+
+    it("shows the product on the week's recipe and on the meal page", async () => {
+      const { a } = await twoUsers();
+      const id = await add(a.id, { unplanned: true });
+      await add(a.id, { slug: "soup" });
+
+      const [bar, soup] = await meals();
+      expect(bar.recipe?.product).toEqual(info);
+      expect(soup.recipe?.product).toBeNull();
+
+      const detail = await getMeal(db, id, { fetch: productFetch });
+      expect(detail).toMatchObject({ unplanned: true });
+      expect(detail?.recipe?.product).toEqual(info);
+    });
+
+    it("keeps the unplanned flag when a meal moves", async () => {
+      const { a } = await twoUsers();
+      const id = await add(a.id, { unplanned: true });
+      await moveMeal(db, id, { date: "2026-10-19", slot: "dinner", today });
+      expect((await meals("2026-10-19"))[0]).toMatchObject({
+        id,
+        unplanned: true,
+      });
+    });
+
+    it("checks a new meal up front: bad servings, a snack slot that is off, an unplanned meal for a day to come", async () => {
+      const ok = { date: today, slot: "snack" as const, today };
+      await expect(checkNewMeal(db, ok)).resolves.toBeUndefined();
+      await expect(
+        checkNewMeal(db, { ...ok, baseServings: 0 })
+      ).rejects.toBeInstanceOf(PlanError);
+      await expect(
+        checkNewMeal(db, { ...ok, snackIndex: 3 })
+      ).rejects.toBeInstanceOf(PlanError);
+      await expect(
+        checkNewMeal(db, { ...ok, date: "2026-10-21", unplanned: true })
+      ).rejects.toBeInstanceOf(PlanError);
+      await expect(
+        checkNewMeal(db, { ...ok, date: "2026-10-21", unplanned: false })
+      ).resolves.toBeUndefined();
+    });
+
+    it("won't move an unplanned meal to a day after the viewer's today", async () => {
+      const { a } = await twoUsers();
+      const id = await add(a.id, { unplanned: true });
+      const to = { date: "2026-10-21", slot: "snack" as const, today };
+      await expect(moveMeal(db, id, to)).rejects.toBeInstanceOf(PlanError);
+      await expect(
+        moveMeal(db, id, { ...to, today: undefined })
+      ).rejects.toBeInstanceOf(PlanError);
+      expect(await meals("2026-10-21")).toEqual([]);
+
+      await moveMeal(db, id, { ...to, date: "2026-10-19" });
+      expect(await meals("2026-10-19")).toHaveLength(1);
+
+      // A planned meal still moves anywhere.
+      const planned = await add(a.id, { slug: "soup" });
+      await moveMeal(db, planned, to);
+      expect(await meals("2026-10-21")).toHaveLength(1);
+    });
+
+    it("keeps an unplanned meal's portions when its day becomes a fast", async () => {
+      const { a } = await twoUsers();
+      await add(a.id, { unplanned: true });
+      await add(a.id, { slug: "soup" });
+
+      expect(await setFasting(db, a.id, today, true)).toBe(1);
+
+      const [bar, soup] = await meals();
+      expect(bar.portions[a.id]).toBe(1);
+      expect(soup.portions[a.id]).toBe(0);
+    });
+
+    it("copies into a slot where only an unplanned meal sits, after it", async () => {
+      const { a } = await twoUsers();
+      await add(a.id, { slug: "soup", date: "2026-10-13" });
+      await add(a.id, { unplanned: true });
+
+      const result = await copyWeek(db, "2026-10-12", "2026-10-19", a.id);
+
+      expect(result).toMatchObject({ skipped: 0 });
+      expect(result.copied).toHaveLength(1);
+      const day = await meals();
+      expect(day.map((m) => [m.slug, m.unplanned])).toEqual([
+        ["bar", true],
+        ["soup", false],
+      ]);
+    });
+
+    it("leaves unplanned meals out when copying a week, without counting them as skipped", async () => {
+      const { a } = await twoUsers();
+      await plan(a.id, "2026-10-13", "dinner", "stew");
+      await add(a.id, { date: "2026-10-13", unplanned: true });
+      await add(a.id, { date: "2026-10-14", unplanned: true });
+      // The unplanned snack's slot is taken in the target week, so copying it would count as skipped.
+      await addMeal(
+        db,
+        { date: "2026-10-20", slot: "snack", slug: "soup", createdBy: a.id },
+        { fetch: productFetch }
+      );
+
+      const result = await copyWeek(db, "2026-10-12", "2026-10-19", a.id);
+
+      expect(result.copied).toHaveLength(1);
+      expect(result.skipped).toBe(0);
+      const copied = await meals("2026-10-20");
+      expect(copied.map((m) => m.slug).toSorted()).toEqual(["soup", "stew"]);
+      expect(copied.every((m) => !m.unplanned)).toBe(true);
     });
   });
 });

@@ -108,22 +108,22 @@ The recipe:
 - A **"Product" tag**, so the Add snack dialog can list products and the search can label them.
   Products **do appear in the normal meal search**, with a "Product" pill. On the Discover page
   they show under the Product tag filter, so the default grid of recipes isn't buried in
-  snack bars. The tag joins `RECIPE_TAGS`, but `classifyRecipe` never assigns it.
+  snack bars. The tag (`PRODUCT_TAG`) is not in `RECIPE_TAGS`, so nothing classifies into it
+  and the review page leaves it alone.
 - Image: optional, `POST /api/recipes/{slug}/image { url }` with OFF's front image (CC BY-SA;
   the Source link covers attribution). Not needed for the first PR.
 
-**Finding a product again by barcode.** A small planner table
-`products (barcode text primary key, mealie_recipe_id uuid not null)`, written when a product
-is created. Rescans resolve here first, with no OFF call and no Mealie search, and it covers
-products typed in by hand (no `orgURL`). It keeps Mealie's id, not the slug, so a rename in
-Mealie doesn't break it (`loadRecipes` already follows ids). A recipe deleted in Mealie makes
-the row stale: then the lookup falls through to OFF and the row is replaced. *Check first:* if
-Mealie's `queryFilter` can match `extras`, the table can go and the lookup becomes a Mealie
-query.
+**Finding a product again by barcode.** Through Mealie's own extras, with no
+planner table: `GET /api/recipes?queryFilter=extras.value = "<barcode>"`, then
+the detail of each hit confirms `extras.scrappyProduct` (checked against Mealie
+3.29: `extras.key_name = X AND extras.value = Y` can match two different extras
+of one recipe, so the value is filtered alone). This also covers products typed
+in by hand (no `orgURL`), and a recipe deleted in Mealie simply stops matching.
 
-`recipe_cache` gains `barcode text` (from `scrappyProduct`, null for recipes), so the week and
-the shopping list know a product from a recipe without another call. Rows cached before it
-refresh within the hour, as the other added columns did.
+`recipe_cache` gains `product jsonb` (the barcode, serving and pack size, from
+the `scrappy*` extras; null for recipes), so the week and the shopping list know
+a product from a recipe without another call. Rows cached before it refresh
+within the hour, as the other added columns did.
 
 ### 2. Barcodes are validated and normalised on the server
 
@@ -226,7 +226,7 @@ Milk record), what we type from the pack goes to OFF too, so the next scan anywh
   `nutriment_fiber` (each with a `_unit`), and `app_name`, `app_version` and `app_uuid`.
   OFF asks for `app_uuid` to be a salted random id per user, so a moderator can block one
   person without blocking the app; we derive it from the user's id and `AUTH_SECRET`.
-- **Per 100 g, as printed.** UK packs always print per 100 g, so the sheet's manual entry asks
+- **Per 100 g, as printed.** UK packs always print per 100 g, so the sheet's manual entry (PR 1) asks
   for that column plus the serving size, and we work out per serving ourselves. That's also
   what OFF wants.
 - **Only fill gaps, never correct.** We send new products and fields OFF has empty. We never
@@ -254,26 +254,28 @@ existing review page cover that.
 
 ### PR 1: products by typed barcode (the core)
 
-- [ ] `server/domain/barcode.ts`: `parseBarcode` (check digit, UPC-A → EAN-13). Unit tests.
-- [ ] `server/openfoodfacts.ts`: v3 client, zod parse, UA, timeout, limiter. Unit tests with an
+- [x] `server/domain/barcode.ts`: `parseBarcode` (check digit, UPC-A → EAN-13). Unit tests.
+- [x] `server/openfoodfacts.ts`: v3 client, zod parse, UA, timeout (the limiter is in `server/products.ts`). Unit tests with an
       injected `fetch` and recorded fixtures (no network in tests).
-- [ ] `server/domain/product.ts`: OFF → draft (serving rule, per-serving maths, kJ fallback,
+- [x] `server/domain/product.ts`: OFF → draft (serving rule, per-serving maths, kJ fallback,
       sanity warning). Unit tests over the fixtures.
-- [ ] `server/mealie/products.ts`: create the recipe (`POST` + `PATCH` with nutrition,
+- [x] `server/mealie/products.ts`: create the recipe (`POST` + `PATCH` with nutrition,
       servings, `orgURL`, extras via a `withProductState` like `withImportState`, the Product
       tag). Integration test in `mealie.int.test.ts`. `Recipe` and `recipe_cache` gain
-      `barcode`.
-- [ ] Migration: `products` table, `meal_slots.unplanned`, `recipe_cache.barcode`.
-- [ ] `server/plan.ts`: `addProduct` (portion 1 for the adder, 0 for the others; `unplanned`
+      `product`.
+- [x] Migration: `meal_slots.unplanned`, `recipe_cache.product`.
+- [x] `server/plan.ts`: `addMeal` for products (portion 1 for the adder, 0 for the others; `unplanned`
       from the sheet's "Already had it?", refused for a day after the viewer's today).
       `summariseAdherence` skips unplanned entries. DB tests for both.
-- [ ] Actions `lookupProductAction`, `saveProductAction` (`userAction`, zod). They show up in
+- [x] Actions `lookupProductAction`, `saveProductAction` (`userAction`, zod). They show up in
       `access.test.ts` automatically.
-- [ ] UI: an Add snack dialog with a "Product" tab: barcode field, the sheet (name, the
-      macros per serving, editable, serving size, portion choice, OFF credit link), recent
+- [x] UI: an Add snack dialog with a "Product" tab: barcode field, the sheet (name, the
+      macros per 100 g, editable, serving size, portion choice, OFF credit link), recent
       products. "Unplanned" pill in the week grid and day card. A "Product" pill in the meal
       search; on Discover, products only under the Product filter.
-- [ ] `docs/mealie-api.md`: the product recipe's fields and the endpoints used.
+- [x] Per-100 g manual entry on the sheet: macros typed from the pack, with the serving size,
+      for products Open Food Facts lacks or has without nutrition.
+- [x] `docs/mealie-api.md`: the product recipe's fields and the endpoints used.
 - No new e2e journey: the parts unit and DB tests can't reach are the camera (PR 2) and OFF
   itself, which CI can't call. Optionally, add one step to Alex's journey later, logging a
   known product from the recent list.
@@ -299,7 +301,7 @@ existing review page cover that.
       the `off_contributions` table, the run after the response with one retry, and "retry"
       on the recipe page. Unit tests with an injected `fetch`. Try it once by hand against
       staging.
-- [ ] The tick box on the sheet, and per-100 g manual entry.
+- [ ] The tick box on the sheet (the per-100 g manual entry it sends shipped in PR 1).
 
 ### PR 4: follow-ups
 

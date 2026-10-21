@@ -49,6 +49,8 @@ export type PlannedMeal = {
   position: number;
   slug: string;
   baseServings: number;
+  /** Eaten off-plan and logged afterwards; adherence ignores it. */
+  unplanned: boolean;
   portions: Record<string, number>;
   /** What each person logged for this meal, by user id. */
   adherence: Record<string, { status: AdherenceStatus; note: string | null }>;
@@ -62,6 +64,7 @@ export type PlannedMeal = {
     | "nutrition"
     | "reviewState"
     | "nutritionSource"
+    | "product"
   > | null;
 };
 
@@ -170,6 +173,7 @@ export async function getWeekPlan(
       position: s.position,
       slug: s.mealieRecipeSlug,
       baseServings: s.baseServings,
+      unplanned: s.unplanned,
       portions: portionsBySlot.get(s.id) ?? {},
       adherence: logsBySlot.get(s.id) ?? {},
       recipe: r
@@ -181,6 +185,7 @@ export async function getWeekPlan(
             nutrition: r.nutrition,
             reviewState: r.reviewState,
             nutritionSource: r.nutritionSource,
+            product: r.product,
           }
         : null,
     };
@@ -233,6 +238,7 @@ export type MealDetail = {
   snackIndex: number;
   slug: string;
   baseServings: number;
+  unplanned: boolean;
   portions: Record<string, number>;
   members: Member[];
   /** Null if the recipe no longer exists in Mealie (and we have no cached copy). */
@@ -287,6 +293,7 @@ export async function getMeal(
     snackIndex: slot.snackIndex,
     slug: recipe?.slug ?? slug,
     baseServings: slot.baseServings,
+    unplanned: slot.unplanned,
     portions: Object.fromEntries(portions.map((p) => [p.userId, p.multiplier])),
     members,
     recipe,
@@ -295,7 +302,8 @@ export async function getMeal(
 
 /**
  * Sets whether a person fasts on a day. Starting a fast sets their portions
- * for that day to 0; ending one leaves portions as they are, to adjust by hand.
+ * for that day to 0 (except for unplanned meals, which were eaten); ending one
+ * leaves portions as they are, to adjust by hand.
  * Returns how many portions were zeroed.
  */
 export async function setFasting(
@@ -340,7 +348,8 @@ export async function setFasting(
         and(
           eq(slotPortions.userId, userId),
           sql`${slotPortions.multiplier} > 0`,
-          sql`${slotPortions.mealSlotId} IN (SELECT ${mealSlots.id} FROM ${mealSlots} WHERE ${mealSlots.date} = ${date})`
+          // Unplanned meals were eaten, fast or not.
+          sql`${slotPortions.mealSlotId} IN (SELECT ${mealSlots.id} FROM ${mealSlots} WHERE ${mealSlots.date} = ${date} AND NOT ${mealSlots.unplanned})`
         )
       )
       .returning({ id: slotPortions.mealSlotId });
@@ -380,7 +389,46 @@ async function nextPosition(
   return next;
 }
 
-/** Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone fasting that day. */
+/**
+ * What `addMeal` refuses before it touches anything, so a caller that does
+ * other work first (saving a product in Mealie) can check up front: the
+ * slot, the servings, and an unplanned meal for a day that hasn't come.
+ */
+export async function checkNewMeal(
+  db: Db,
+  input: {
+    date: string;
+    slot: SlotType;
+    snackIndex?: number;
+    baseServings?: number;
+    unplanned?: boolean;
+    today?: string;
+  }
+): Promise<void> {
+  const baseServings = input.baseServings ?? 1;
+  if (!(baseServings >= 0.01 && baseServings <= 100)) {
+    throw new PlanError("Servings must be between 0.01 and 100");
+  }
+  if (input.unplanned) {
+    checkHadIt(input.date, input.today);
+  }
+  await checkSlot(db, input.slot, input.snackIndex ?? 0);
+}
+
+const checkHadIt = (date: string, today: string | undefined) => {
+  if (today === undefined || date > today) {
+    throw new PlanError("You can't have had it yet: that day is still to come");
+  }
+};
+
+/**
+ * Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone
+ * fasting that day. A product is one person's snack: 1 for whoever added it
+ * (even on a fast, since they ate it) and 0 for everyone else.
+ *
+ * `unplanned` marks something already eaten off-plan, so it needs `today` (the
+ * viewer's) and can't be a later day.
+ */
 export async function addMeal(
   db: Db,
   input: {
@@ -389,11 +437,16 @@ export async function addMeal(
     snackIndex?: number;
     slug: string;
     createdBy: string;
+    baseServings?: number;
+    unplanned?: boolean;
+    today?: string;
   },
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   const snackIndex = input.snackIndex ?? 0;
-  await checkSlot(db, input.slot, snackIndex);
+  const baseServings = input.baseServings ?? 1;
+  const unplanned = input.unplanned ?? false;
+  await checkNewMeal(db, input);
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
   const recipes = await loadRecipes(db, [input.slug], {
     ...opts,
@@ -432,6 +485,8 @@ export async function addMeal(
         snackIndex,
         position: next,
         mealieRecipeSlug: input.slug,
+        baseServings,
+        unplanned,
         createdBy: input.createdBy,
       })
       .returning({ id: mealSlots.id });
@@ -440,7 +495,11 @@ export async function addMeal(
         members.map((m) => ({
           mealSlotId: slot.id,
           userId: m.id,
-          multiplier: isFasting(m.days, input.date, override.get(m.id)) ? 0 : 1,
+          multiplier: recipe.product
+            ? Number(m.id === input.createdBy)
+            : isFasting(m.days, input.date, override.get(m.id))
+              ? 0
+              : 1,
         }))
       );
     }
@@ -492,7 +551,7 @@ export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
 export async function moveMeal(
   db: Db,
   mealSlotId: string,
-  to: { date: string; slot: SlotType; snackIndex?: number }
+  to: { date: string; slot: SlotType; snackIndex?: number; today?: string }
 ): Promise<string> {
   const snackIndex = to.snackIndex ?? 0;
   await checkSlot(db, to.slot, snackIndex);
@@ -504,6 +563,10 @@ export async function moveMeal(
       .for("update");
     if (!meal) {
       throw new PlanError("That meal no longer exists");
+    }
+    // Eaten already: it can't be moved to a day that hasn't come.
+    if (meal.unplanned) {
+      checkHadIt(to.date, to.today);
     }
     if (
       meal.date === to.date &&
@@ -547,7 +610,8 @@ export type CopyResult = {
  * anyone's log. A slot that already has a meal is left as it is, and its
  * meals from `from` are counted as skipped. Snacks keep their index even
  * past the household's count, where they show as turned off. Portions follow
- * the new day's fasting, as when adding a meal.
+ * the new day's fasting, as when adding a meal. Unplanned meals weren't part
+ * of the plan, so they are neither copied nor counted as skipped.
  */
 export async function copyWeek(
   db: Db,
@@ -562,13 +626,15 @@ export async function copyWeek(
     const source = await tx
       .select()
       .from(mealSlots)
-      .where(inWeek(from))
+      .where(and(inWeek(from), eq(mealSlots.unplanned, false)))
       .orderBy(asc(mealSlots.position));
     const taken = await tx
       .select({
         date: mealSlots.date,
         slot: mealSlots.slot,
         snackIndex: mealSlots.snackIndex,
+        position: mealSlots.position,
+        unplanned: mealSlots.unplanned,
       })
       .from(mealSlots)
       .where(inWeek(to));
@@ -581,9 +647,17 @@ export async function copyWeek(
       .where(
         and(gte(dayOverrides.date, to), lte(dayOverrides.date, addDays(to, 6)))
       );
+    // Unplanned meals don't hold a slot, but copied ones go after them.
     const filled = new Set(
-      taken.map((t) => slotKey(t.date, t.slot, t.snackIndex))
+      taken
+        .filter((t) => !t.unplanned)
+        .map((t) => slotKey(t.date, t.slot, t.snackIndex))
     );
+    const firstFree = new Map<string, number>();
+    for (const t of taken) {
+      const key = slotKey(t.date, t.slot, t.snackIndex);
+      firstFree.set(key, Math.max(firstFree.get(key) ?? 0, t.position + 1));
+    }
     const copying = source.filter(
       (m) => !filled.has(slotKey(sameWeekday(m.date), m.slot, m.snackIndex))
     );
@@ -607,12 +681,12 @@ export async function copyWeek(
       overrides.map((o) => [`${o.userId}|${o.date}`, o.isFasting])
     );
 
-    // The target slot is empty, so positions restart at 0 in the old order.
+    // The target slots hold no planned meals, so positions restart in the old order.
     const positions = new Map<string, number>();
     const rows = copying.map((m) => {
       const date = sameWeekday(m.date);
       const target = slotKey(date, m.slot, m.snackIndex);
-      const position = positions.get(target) ?? 0;
+      const position = positions.get(target) ?? firstFree.get(target) ?? 0;
       positions.set(target, position + 1);
       return {
         from: m.id,

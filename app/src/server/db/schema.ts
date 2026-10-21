@@ -16,6 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { ProductInfo } from "../domain/product";
 import {
   DEFAULT_SNACK_SLOTS,
   MAX_SNACK_SLOTS,
@@ -126,6 +127,11 @@ export const mealSlots = pgTable(
     })
       .notNull()
       .default(1),
+    /**
+     * Eaten off-plan and logged afterwards: adherence leaves it out, since
+     * there was no plan to stick to.
+     */
+    unplanned: boolean("unplanned").notNull().default(false),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -225,6 +231,9 @@ export const recipeCache = pgTable(
     tags: jsonb("tags").$type<Organizer[]>(),
     categories: jsonb("categories").$type<Organizer[]>(),
     totalMinutes: integer("total_minutes"),
+    // Set for a packaged product; null for recipes and for rows cached
+    // before the column.
+    product: jsonb("product").$type<ProductInfo>(),
     // Rows cached before imports existed refresh within the hour; until then
     // they read as plain Mealie recipes.
     reviewState: text("review_state")

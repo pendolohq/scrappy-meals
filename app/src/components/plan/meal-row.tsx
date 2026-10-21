@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Pill } from "@/components/ui/pill";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
@@ -99,14 +100,18 @@ export const MealRow = ({
       {/* The viewer's log and portion; everyone else's portion stays in one
           short line, so a shared meal still reads as shared. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        {canLog && (
-          <div className="w-52 max-w-full">
-            <AdherenceButtons
-              mealId={meal.id}
-              mealName={name}
-              log={meal.adherence[currentUserId]}
-            />
-          </div>
+        {meal.unplanned ? (
+          <Pill>Unplanned</Pill>
+        ) : (
+          canLog && (
+            <div className="w-52 max-w-full">
+              <AdherenceButtons
+                mealId={meal.id}
+                mealName={name}
+                log={meal.adherence[currentUserId]}
+              />
+            </div>
+          )
         )}
         <p className="text-xs text-muted tabular-nums" data-testid="portions">
           {ordered.map((m, i) => (
@@ -166,9 +171,9 @@ export const MealRow = ({
               <Input
                 id={servingsId}
                 type="number"
-                min="0.25"
+                min="0.01"
                 max="100"
-                step="0.25"
+                step="any"
                 defaultValue={meal.baseServings}
                 className="w-24 tabular-nums"
                 onBlur={(e) => {

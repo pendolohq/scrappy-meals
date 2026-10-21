@@ -21,6 +21,7 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./import";
+import { createProductRecipe, findProductByBarcode } from "./products";
 import {
   discoverRecipes,
   getRecipe,
@@ -371,6 +372,190 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(
         await slugs({ ...none, tags: [tag.slug], categories: [category.slug] })
       ).toEqual([ids.fullSlug]);
+    });
+  });
+
+  describe("products", () => {
+    // A valid EAN-13 that differs on every run.
+    const barcodeFor = (seed: string) => {
+      const body = `599${seed}`.slice(0, 12).padEnd(12, "0");
+      const sum = [...body].reduce(
+        (t, c, i) => t + Number(c) * (i % 2 === 0 ? 1 : 3),
+        0
+      );
+      return body + String((10 - (sum % 10)) % 10);
+    };
+    const digits = (n: number) =>
+      String(Number.parseInt(run, 16) % 1e8).padStart(8, "0") + String(n);
+    const code = barcodeFor(digits(1));
+    const bareCode = barcodeFor(digits(2));
+    const decoyCode = barcodeFor(digits(3));
+    const name = `IT Product ${run}`;
+    const bareName = `IT Typed Product ${run}`;
+    let slug = "";
+    let bareSlug = "";
+    let decoySlug = "";
+
+    const remove = (s: string) => () =>
+      admin.DELETE("/api/recipes/{slug}", { params: { path: { slug: s } } });
+
+    beforeAll(async () => {
+      slug = await createProductRecipe(
+        {
+          name,
+          info: {
+            barcode: code,
+            servingGrams: 60,
+            servingUnit: "g",
+            packGrams: 180,
+          },
+          perServing: { kcal: 218.4, protein: 20.3, carbs: 16.9, fat: 8.9 },
+          orgURL: `https://world.openfoodfacts.org/product/${code}`,
+          nutrition: "source",
+        },
+        { client }
+      );
+      cleanup.push(remove(slug));
+      bareSlug = await createProductRecipe(
+        {
+          name: bareName,
+          info: {
+            barcode: bareCode,
+            servingGrams: 330,
+            servingUnit: "ml",
+            packGrams: null,
+          },
+          perServing: { kcal: 140 },
+          orgURL: null,
+          nutrition: "reviewed",
+        },
+        { client }
+      );
+      cleanup.push(remove(bareSlug));
+
+      // The same digits under another extras key: a lookup by value alone
+      // would find it, so it must be told apart.
+      decoySlug = unwrap(
+        await admin.POST("/api/recipes", {
+          body: { name: `IT Decoy ${run}` },
+        })
+      );
+      cleanup.push(remove(decoySlug));
+      await patchRecipe(
+        decoySlug,
+        {
+          extras: {
+            note: decoyCode,
+            scrappyProduct: bareCode.replace(/\d$/, "0"),
+          },
+        },
+        { client }
+      );
+    });
+
+    it("reads a created product back with per-serving nutrition, product info and import state", async () => {
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r).toMatchObject({
+        name,
+        servings: 1,
+        sourceUrl: `https://world.openfoodfacts.org/product/${code}`,
+        importState: { review: "done", nutrition: "source" },
+        product: {
+          barcode: code,
+          servingGrams: 60,
+          servingUnit: "g",
+          packGrams: 180,
+        },
+      });
+      expect(r.nutrition.perServing).toEqual({
+        kcal: 218.4,
+        protein: 20.3,
+        carbs: 16.9,
+        fat: 8.9,
+      });
+      expect(r.nutrition).toMatchObject({
+        status: "partial",
+        missing: ["fibre"],
+      });
+      expect(r.tags).toContainEqual({ name: "Product", slug: "product" });
+      // Mealie's sample ingredient and step must not stay.
+      expect(r.ingredients).toEqual([]);
+      expect(r.instructions).toEqual([]);
+    });
+
+    it("keeps a typed-in product in ml, reviewed, with no source link", async () => {
+      const r = (await getRecipe(bareSlug, { client }))!;
+      expect(r).toMatchObject({
+        sourceUrl: null,
+        importState: { review: "done", nutrition: "reviewed" },
+        product: { servingGrams: 330, servingUnit: "ml", packGrams: null },
+      });
+      expect(r.nutrition.perServing).toEqual({ kcal: 140 });
+    });
+
+    it("leaves ordinary recipes without product info", async () => {
+      expect((await getRecipe(ids.fullSlug, { client }))!.product).toBeNull();
+    });
+
+    it("finds a product by barcode", async () => {
+      expect(await findProductByBarcode(code, { client })).toEqual({
+        slug,
+        name,
+      });
+      expect(await findProductByBarcode(bareCode, { client })).toMatchObject({
+        slug: bareSlug,
+      });
+    });
+
+    it("returns null for an unknown barcode", async () => {
+      expect(
+        await findProductByBarcode(barcodeFor(digits(9)), { client })
+      ).toBeNull();
+    });
+
+    it("doesn't return a recipe that has the digits under another extras key", async () => {
+      expect(await findProductByBarcode(decoyCode, { client })).toBeNull();
+    });
+
+    it("refuses a barcode that isn't digits", async () => {
+      await expect(
+        findProductByBarcode('1" OR 1=1', { client })
+      ).rejects.toBeInstanceOf(Error);
+    });
+
+    it("finds products in search, marked as products", async () => {
+      const page = await searchRecipes(name, { client });
+      expect(page.items.find((r) => r.slug === slug)).toMatchObject({
+        isProduct: true,
+      });
+      const soup = await searchRecipes(`Lentil Soup ${run}`, { client });
+      expect(soup.items.find((r) => r.slug === ids.fullSlug)).toMatchObject({
+        isProduct: false,
+      });
+    });
+
+    it("leaves products out of Discover unless the Product tag is chosen", async () => {
+      const none = { tags: [], categories: [], quick: false };
+      const all = async (filters: Parameters<typeof discoverRecipes>[0]) => {
+        const slugs: string[] = [];
+        for (let page = 1, pages = 1; page <= pages; page += 1) {
+          const result = await discoverRecipes(filters, { client, page });
+          pages = result.totalPages;
+          slugs.push(...result.items.map((r) => r.slug));
+        }
+        return slugs;
+      };
+
+      const plain = await all(none);
+      expect(plain).toContain(ids.bareSlug);
+      expect(plain).not.toContain(slug);
+      expect(plain).not.toContain(bareSlug);
+
+      expect(await all({ ...none, tags: ["product"] })).toEqual(
+        expect.arrayContaining([slug, bareSlug])
+      );
+      // The tag filter combines with the quick filter's query.
+      expect(await all({ ...none, quick: true })).not.toContain(slug);
     });
   });
 

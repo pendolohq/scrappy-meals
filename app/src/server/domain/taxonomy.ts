@@ -19,6 +19,17 @@ export const RECIPE_TAGS = [
   { name: "High protein", slug: "high-protein" },
 ] as const satisfies Organizer[];
 
+/**
+ * Marks a packaged product (see `mealie/product-state.ts`). Not in
+ * `RECIPE_TAGS`: nothing classifies into it and the review page doesn't offer
+ * it (it keeps it, like any tag from outside the list). Discover leaves
+ * products out unless this tag is chosen.
+ */
+export const PRODUCT_TAG = {
+  name: "Product",
+  slug: "product",
+} as const satisfies Organizer;
+
 /** What's in it. Mostly one per recipe, so every recipe falls somewhere. */
 export const RECIPE_CATEGORIES = [
   { name: "Vegan", slug: "vegan" },
