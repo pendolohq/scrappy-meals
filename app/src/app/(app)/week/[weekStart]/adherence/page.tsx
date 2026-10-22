@@ -43,12 +43,13 @@ export default async function AdherencePage({
             date: meal.date,
             portion: meal.portions[m.id] ?? 0,
             status: meal.adherence[m.id]?.status ?? null,
+            unplanned: meal.unplanned,
           })),
           now
         );
         const notable = meals.filter((meal) => {
           const s = meal.adherence[m.id]?.status;
-          return s && s !== "stuck";
+          return !meal.unplanned && s && s !== "stuck";
         });
         const logged = ADHERENCE_STATUSES.reduce(
           (n, s) => n + summary.counts[s],

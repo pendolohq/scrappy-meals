@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Clock, Plus, Search, X } from "lucide-react";
 
-import { addMealAction } from "@/app/(app)/week/actions";
+import { addMealAction, loadProductAction } from "@/app/(app)/week/actions";
 import { FilterChips } from "@/components/recipe/filter-chips";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -27,6 +27,11 @@ import {
 import type { SlotType } from "@/server/domain/slots";
 import { formatMinutes, tagForSlot } from "@/server/domain/taxonomy";
 import type { OrganizerCount, RecipeListItem } from "@/server/mealie/recipes";
+import type { ProductLookup } from "@/server/products";
+
+import { attempt, failureText } from "./attempt";
+import { ProductTab } from "./product/product-tab";
+import { searchRecipes } from "./use-recipe-list";
 
 type Page = {
   items: RecipeListItem[];
@@ -53,19 +58,10 @@ const EMPTY: Results = {
   categories: [],
 };
 
-const fetchPage = async (
+const fetchPage = (
   query: Parameters<typeof pickerSearch>[0],
   signal: AbortSignal
-): Promise<Page> => {
-  const res = await fetch(`/api/recipes/search?${pickerSearch(query)}`, {
-    signal,
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body.error ?? "Search failed");
-  }
-  return body;
-};
+) => searchRecipes<Page>(pickerSearch(query), signal);
 
 /**
  * The picker's results for a search and filters, a page at a time. A new
@@ -183,7 +179,9 @@ const RecipeOption = ({
         {recipe.name}
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-        {recipe.servings ? (
+        {recipe.isProduct ? (
+          <Pill tone="accent">Product</Pill>
+        ) : recipe.servings ? (
           <span>{recipe.servings} servings</span>
         ) : (
           <Pill tone="danger">⚠ No servings count</Pill>
@@ -204,6 +202,7 @@ export const AddMeal = ({
   slot,
   snackIndex,
   label,
+  today,
   className,
   text,
 }: {
@@ -211,6 +210,8 @@ export const AddMeal = ({
   slot: SlotType;
   snackIndex: number;
   label: string;
+  /** The viewer's today: a product can only have been eaten up to then. */
+  today: string;
   /** Replaces the trigger's styling. */
   className?: string;
   /** Shorter trigger text where the slot is clear from around it; screen readers still hear the slot and day. */
@@ -225,16 +226,27 @@ export const AddMeal = ({
     quick: false,
     page: 1,
   });
+  const slotTag = tagForSlot(slot);
   const dialog = useRef<HTMLDialogElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"recipes" | "product">("recipes");
+  // A product picked from the results: its sheet opens in the Product tab.
+  const [picked, setPicked] = useState<ProductLookup>();
+  // The slot's meal tag lifted by typing a search; see `onSearch`.
+  const liftedTag = useRef(false);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState(startFilters);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
-  const { results, loadMore } = usePickerResults(query, filters, open);
+  const { results, loadMore } = usePickerResults(
+    query,
+    filters,
+    open && mode === "recipes"
+  );
   useScrollLock(open);
+  const future = date > today;
 
   const show = () => {
     setOpen(true);
@@ -247,18 +259,60 @@ export const AddMeal = ({
     setOpen(false);
     setQuery("");
     setFilters(startFilters());
+    setMode("recipes");
+    setPicked(undefined);
+    liftedTag.current = false;
+  };
+
+  // Products aren't tagged with meals, so the slot's tag would hide them from
+  // a search by name. Typing the first characters lifts it; emptying the
+  // search puts it back, unless the chips were touched in between.
+  const onSearch = (value: string) => {
+    const was = query.trim() !== "";
+    const now = value.trim() !== "";
+    setQuery(value);
+    if (
+      now &&
+      !was &&
+      filters.tags.length === 1 &&
+      filters.tags[0] === slotTag
+    ) {
+      liftedTag.current = true;
+      setFilters({ ...filters, tags: [] });
+    } else if (!now && was && liftedTag.current) {
+      liftedTag.current = false;
+      if (filters.tags.length === 0) {
+        setFilters({ ...filters, tags: [slotTag] });
+      }
+    }
   };
 
   const filter = (next: DiscoverState) => {
+    liftedTag.current = false;
     setFilters(next);
     scroller.current?.scrollTo({ top: 0 });
   };
 
-  const pick = (slug: string) =>
+  const pick = ({ slug, isProduct }: RecipeListItem) =>
     startTransition(async () => {
-      const res = await addMealAction({ date, slot, snackIndex, slug });
+      setError(undefined);
+      if (isProduct) {
+        // Portion and "Already had it?" are chosen on the product's sheet.
+        const res = await attempt(() => loadProductAction({ slug }));
+        if (res.error === undefined) {
+          setPicked(res);
+          setMode("product");
+        } else {
+          setError(failureText(res));
+          scroller.current?.scrollTo({ top: 0 });
+        }
+        return;
+      }
+      const res = await attempt(() =>
+        addMealAction({ date, slot, snackIndex, slug })
+      );
       if (res.error) {
-        setError(res.error);
+        setError(failureText(res));
         scroller.current?.scrollTo({ top: 0 });
       } else {
         close();
@@ -333,23 +387,56 @@ export const AddMeal = ({
                 <X className="size-5" aria-hidden />
               </IconButton>
             </div>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
-                aria-hidden
-              />
-              <input
-                type="search"
-                autoFocus
-                value={query}
-                maxLength={MAX_SEARCH_LENGTH}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search recipes in Mealie"
-                aria-label="Search recipes"
-                className={cx(inputClass, "bg-background pl-10")}
-              />
+            <div
+              role="tablist"
+              aria-label="What to add"
+              className="grid grid-cols-2 gap-1 rounded-button bg-sunken p-1"
+            >
+              {(
+                [
+                  ["recipes", "Recipes"],
+                  ["product", "Product"],
+                ] as const
+              ).map(([id, title]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === id}
+                  onClick={() => {
+                    setPicked(undefined);
+                    setMode(id);
+                  }}
+                  className={cx(
+                    "min-h-tap rounded-[3px] text-sm font-medium transition",
+                    mode === id
+                      ? "bg-card text-foreground shadow-card"
+                      : "text-muted hover:text-foreground"
+                  )}
+                >
+                  {title}
+                </button>
+              ))}
             </div>
-            {open && (
+            {mode === "recipes" && (
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  autoFocus
+                  value={query}
+                  maxLength={MAX_SEARCH_LENGTH}
+                  onChange={(e) => onSearch(e.target.value)}
+                  placeholder="Search recipes in Mealie"
+                  aria-label="Search recipes"
+                  className={cx(inputClass, "bg-background pl-10")}
+                />
+              </div>
+            )}
+            {open && mode === "recipes" && (
               <div className="space-y-2" data-testid="picker-filters">
                 <FilterChips
                   compact
@@ -361,7 +448,17 @@ export const AddMeal = ({
               </div>
             )}
           </div>
-          {open && (
+          {open && mode === "product" && (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+              <ProductTab
+                at={{ date, slot, snackIndex }}
+                future={future}
+                onAdded={close}
+                initial={picked}
+              />
+            </div>
+          )}
+          {open && mode === "recipes" && (
             <div
               ref={scroller}
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
@@ -394,7 +491,7 @@ export const AddMeal = ({
                     <RecipeOption
                       recipe={r}
                       disabled={pending}
-                      onPick={() => pick(r.slug)}
+                      onPick={() => pick(r)}
                     />
                   </li>
                 ))}

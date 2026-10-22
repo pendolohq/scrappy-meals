@@ -29,6 +29,8 @@ export type MealAdherence = {
   /** This person's planned portion; 0 = not planned to eat it. */
   portion: number;
   status: AdherenceStatus | null;
+  /** Eaten off-plan: there was no plan to stick to, so it isn't scored. */
+  unplanned?: boolean;
 };
 
 export type AdherenceSummary = {
@@ -42,6 +44,7 @@ export type AdherenceSummary = {
 /**
  * Summarises one person's week. A meal counts when they planned to eat it
  * (portion > 0) or logged it anyway; future meals only count once logged.
+ * Unplanned meals don't count at all.
  */
 export function summariseAdherence(
   meals: MealAdherence[],
@@ -58,6 +61,9 @@ export function summariseAdherence(
   let weighted = 0;
 
   for (const m of meals) {
+    if (m.unplanned) {
+      continue;
+    }
     if (m.status) {
       counts[m.status] += 1;
       logged += 1;

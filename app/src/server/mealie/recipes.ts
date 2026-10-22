@@ -2,15 +2,18 @@ import "server-only";
 
 import { parseDecimal } from "../domain/decimal";
 import { nextDiscoverPage } from "../domain/discover";
+import type { ProductInfo } from "../domain/product";
 import {
   categoryFilter,
   type Organizer,
+  PRODUCT_TAG,
   QUICK_MAX_MINUTES,
 } from "../domain/taxonomy";
 
 import { type MealieClient, mealie, unwrap } from "./client";
 import { type ImportState, readImportState } from "./import-state";
 import { normaliseNutrition, type RecipeNutrition } from "./nutrition";
+import { readProductState } from "./product-state";
 import type { components } from "./schema";
 
 type MealieRecipe = components["schemas"]["Recipe-Output"];
@@ -19,7 +22,7 @@ type MealieIngredient = components["schemas"]["RecipeIngredient-Output"];
 type MealieStep = components["schemas"]["RecipeStep"];
 type MealieNote = components["schemas"]["RecipeNote"];
 
-export type RecipeListItem = {
+type RecipeSummaryFields = {
   id: string | null;
   slug: string;
   name: string;
@@ -28,6 +31,11 @@ export type RecipeListItem = {
   servings: number | null;
   /** Mealie's total time, rounded to minutes; null when not set. */
   totalMinutes: number | null;
+};
+
+export type RecipeListItem = RecipeSummaryFields & {
+  /** Carries the Product tag: a packaged product rather than a dish. */
+  isProduct: boolean;
 };
 
 export type Ingredient = {
@@ -77,7 +85,7 @@ export type RecipeStep = {
 
 export type RecipeNote = { title: string; text: string };
 
-export type Recipe = RecipeListItem & {
+export type Recipe = RecipeSummaryFields & {
   id: string;
   nutrition: RecipeNutrition;
   ingredients: Ingredient[];
@@ -88,7 +96,11 @@ export type Recipe = RecipeListItem & {
   importState: ImportState;
   tags: Organizer[];
   categories: Organizer[];
+  /** Set for a packaged product: its barcode and what one serving is. */
+  product: ProductInfo | null;
 };
+
+export type RecipePage = { items: RecipeListItem[] };
 
 export type DiscoverFilters = {
   /** Tag slugs; a recipe needs all of them. */
@@ -102,6 +114,30 @@ export type DiscoverFilters = {
 };
 
 export const DISCOVER_PAGE_SIZE = 48;
+
+/**
+ * Products are in Mealie as recipes tagged Product. Browsing with no tags and
+ * no search leaves them out of the grid, so snack bars don't bury the recipes;
+ * a tag filter or a search brings them back to where they can be found. (Mealie's
+ * `NOT IN` also matches recipes with no tags at all.)
+ */
+function discoverQueryFilter(
+  filters: DiscoverFilters,
+  search: string | undefined
+): string | undefined {
+  const clauses = [];
+  if (filters.quick) {
+    clauses.push(
+      `totalTimeSeconds > 0 AND totalTimeSeconds <= ${QUICK_MAX_MINUTES * 60}`
+    );
+  }
+  if (filters.tags.length === 0 && !search) {
+    clauses.push(`tags.slug NOT IN ["${PRODUCT_TAG.slug}"]`);
+  }
+  return clauses.length > 1
+    ? clauses.map((c) => `(${c})`).join(" AND ")
+    : clauses[0];
+}
 
 /**
  * Recipes matching the filters, by name, or by relevance when searching for
@@ -132,9 +168,7 @@ export async function discoverRecipes(
           requireAllTags: true,
           categories: categories.length > 0 ? categories : undefined,
           requireAllCategories: false,
-          queryFilter: filters.quick
-            ? `totalTimeSeconds > 0 AND totalTimeSeconds <= ${QUICK_MAX_MINUTES * 60}`
-            : undefined,
+          queryFilter: discoverQueryFilter(filters, search),
           search: search || undefined,
           // Mealie ranks by relevance when searching; otherwise by name.
           ...(search
@@ -152,6 +186,29 @@ export async function discoverRecipes(
     total,
     nextPage: nextDiscoverPage(page, total, DISCOVER_PAGE_SIZE),
   };
+}
+
+/** The products added most recently, newest first. */
+export async function listProducts(
+  opts: { perPage?: number; client?: MealieClient } = {}
+): Promise<RecipePage> {
+  const client = opts.client ?? mealie();
+  const page = unwrap(
+    await client.GET("/api/recipes", {
+      params: {
+        query: {
+          tags: [PRODUCT_TAG.slug],
+          orderBy: "dateAdded",
+          orderDirection: "desc",
+          page: 1,
+          perPage: opts.perPage ?? 8,
+        },
+      },
+    })
+  );
+  // Mealie drops a filter on a tag that doesn't exist yet (no product saved
+  // so far) and returns every recipe.
+  return { items: page.items.map(toListItem).filter((r) => r.isProduct) };
 }
 
 export type OrganizerCount = Organizer & { recipeCount: number };
@@ -206,7 +263,7 @@ export function toRecipe(r: MealieRecipe): Recipe {
     throw new Error(`Mealie recipe ${r.slug} has no id`);
   }
   return {
-    ...toListItem(r),
+    ...toSummaryFields(r),
     id: r.id,
     nutrition: normaliseNutrition(r.nutrition),
     ingredients: (r.recipeIngredient ?? []).map(toIngredient),
@@ -216,6 +273,7 @@ export function toRecipe(r: MealieRecipe): Recipe {
     importState: readImportState(r.extras),
     tags: (r.tags ?? []).map(toOrganizer),
     categories: (r.recipeCategory ?? []).map(toOrganizer),
+    product: readProductState(r.extras),
   };
 }
 
@@ -224,7 +282,12 @@ const toOrganizer = (o: { name: string; slug: string }): Organizer => ({
   slug: o.slug,
 });
 
-function toListItem(r: MealieSummary | MealieRecipe): RecipeListItem {
+const toListItem = (r: MealieSummary | MealieRecipe): RecipeListItem => ({
+  ...toSummaryFields(r),
+  isProduct: (r.tags ?? []).some((t) => t.slug === PRODUCT_TAG.slug),
+});
+
+function toSummaryFields(r: MealieSummary | MealieRecipe): RecipeSummaryFields {
   return {
     id: r.id ?? null,
     slug: r.slug ?? "",

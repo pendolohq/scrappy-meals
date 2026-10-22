@@ -29,13 +29,15 @@ export const RecipeFlags = ({
       flags.push("No servings count in Mealie");
     }
   }
+  const product = Boolean(recipe?.product);
   const estimated = recipe?.nutritionSource === "estimated";
   const needsReview = recipe?.reviewState === "pending";
-  if (flags.length === 0 && !estimated && !needsReview) {
+  if (flags.length === 0 && !product && !estimated && !needsReview) {
     return null;
   }
   return (
     <ul className="mt-1.5 flex flex-wrap gap-1.5">
+      {product && <li className={pillClass("accent")}>Product</li>}
       {flags.map((f) => (
         <li key={f} className={pillClass("danger")}>
           ⚠ {f}

@@ -18,18 +18,19 @@ export const PlanDay = ({
   meals,
   members,
   snackSlots,
+  today,
   fasting,
   currentUserId,
-  isToday,
 }: {
   date: string;
   meals: PlannedMeal[];
   members: Member[];
   snackSlots: number;
+  today: string;
   fasting: Record<string, boolean>;
   currentUserId: string;
-  isToday: boolean;
 }) => {
+  const isToday = date === today;
   const viewer = members.find((m) => m.id === currentUserId);
   return (
     <section
@@ -82,6 +83,7 @@ export const PlanDay = ({
                     slot={slot}
                     snackIndex={snackIndex}
                     label={label}
+                    today={today}
                     className={
                       inSlot.length === 0
                         ? "flex min-h-tap w-full items-center justify-center gap-1 rounded-control border border-dashed border-border-strong text-sm font-medium text-accent-ink transition hover:border-accent hover:bg-accent-soft"

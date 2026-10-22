@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import { dayParts, formatAmount, formatDay, formatPortion } from "@/lib/format";
 import { daySlots } from "@/server/domain/slots";
@@ -54,12 +55,16 @@ const WeekMeal = ({
           )}
         </span>
       </Link>
-      {canLog && (
-        <AdherenceButtons
-          mealId={meal.id}
-          mealName={name}
-          log={meal.adherence[currentUserId]}
-        />
+      {meal.unplanned ? (
+        <Pill>Unplanned</Pill>
+      ) : (
+        canLog && (
+          <AdherenceButtons
+            mealId={meal.id}
+            mealName={name}
+            log={meal.adherence[currentUserId]}
+          />
+        )
       )}
     </li>
   );
@@ -234,6 +239,7 @@ export const WeekGrid = ({
                         slot={slot}
                         snackIndex={snackIndex}
                         label={label}
+                        today={today}
                         text="Add meal"
                         className={cx(
                           "flex w-full items-center gap-1.5 rounded-control px-2.5 text-sm text-muted transition hover:bg-accent-soft hover:text-accent-ink",

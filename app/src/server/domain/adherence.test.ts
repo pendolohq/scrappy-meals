@@ -44,4 +44,37 @@ describe("summariseAdherence", () => {
     );
     expect(s).toMatchObject({ score: 1, counts: { stuck: 1 } });
   });
+
+  it("ignores unplanned meals completely: not unlogged, not counted, not scored", () => {
+    const s = summariseAdherence(
+      [
+        { date: "2026-10-20", portion: 1, status: null, unplanned: true },
+        { date: "2026-10-20", portion: 1, status: "stuck", unplanned: true },
+        { date: "2026-10-20", portion: 1, status: "skipped", unplanned: true },
+      ],
+      TODAY
+    );
+    expect(s).toEqual({
+      counts: { stuck: 0, partial: 0, skipped: 0, swapped: 0 },
+      unlogged: 0,
+      score: null,
+    });
+  });
+
+  it("scores planned meals the same with unplanned ones alongside", () => {
+    const s = summariseAdherence(
+      [
+        { date: "2026-10-19", portion: 1, status: "skipped" },
+        { date: "2026-10-20", portion: 1, status: null },
+        { date: "2026-10-20", portion: 1, status: "stuck", unplanned: true },
+        { date: "2026-10-20", portion: 1, status: null, unplanned: false },
+      ],
+      TODAY
+    );
+    expect(s).toEqual({
+      counts: { stuck: 0, partial: 0, skipped: 1, swapped: 0 },
+      unlogged: 2,
+      score: 0,
+    });
+  });
 });

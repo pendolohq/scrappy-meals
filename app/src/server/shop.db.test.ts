@@ -57,6 +57,7 @@ const soup: Recipe = {
   categories: [],
   totalMinutes: null,
   nutrition: { perServing: {}, missing: [], status: "missing" },
+  product: null,
 };
 
 const uuid = (n: number) =>

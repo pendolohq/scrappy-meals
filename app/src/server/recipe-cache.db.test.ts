@@ -19,6 +19,7 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   tags: [],
   categories: [],
   totalMinutes: null,
+  product: null,
   nutrition: { perServing: {}, missing: [], status: "missing" },
   ...over,
 });
@@ -85,6 +86,51 @@ describe.skipIf(!testDbUrl)("recipe cache (Postgres)", () => {
     expect(rows.get("soup")).toMatchObject({
       instructions: [{ title: null, text: "Simmer." }],
       notes: [{ title: "Freezing", text: "Keeps for 3 months." }],
+    });
+  });
+
+  it("caches a product's barcode and serving, and null for a recipe", async () => {
+    const info = {
+      barcode: "5000159461122",
+      servingGrams: 50,
+      servingUnit: "g",
+      packGrams: null,
+    } as const;
+    const rows = await loadRecipes(db, ["bar", "soup"], {
+      fetch: async (slug) =>
+        slug === "bar" ? recipe({ slug: "bar", product: info }) : recipe(),
+    });
+    expect(rows.get("bar")?.product).toEqual(info);
+    expect(rows.get("soup")?.product).toBeNull();
+  });
+
+  it("updates the product when the recipe is refreshed", async () => {
+    await loadRecipes(db, ["soup"], {
+      fetch: async () =>
+        recipe({
+          product: {
+            barcode: "5000159461122",
+            servingGrams: 50,
+            servingUnit: "g",
+            packGrams: null,
+          },
+        }),
+    });
+    const rows = await loadRecipes(db, ["soup"], {
+      force: true,
+      fetch: async () =>
+        recipe({
+          product: {
+            barcode: "5000159461122",
+            servingGrams: 25,
+            servingUnit: "g",
+            packGrams: 100,
+          },
+        }),
+    });
+    expect(rows.get("soup")?.product).toMatchObject({
+      servingGrams: 25,
+      packGrams: 100,
     });
   });
 });

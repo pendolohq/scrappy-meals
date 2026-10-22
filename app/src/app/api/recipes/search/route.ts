@@ -6,7 +6,11 @@ import {
   parsePickerSearch,
 } from "@/server/domain/discover";
 import { MealieError, MealieUnavailableError } from "@/server/mealie/client";
-import { discoverRecipes, listOrganizers } from "@/server/mealie/recipes";
+import {
+  discoverRecipes,
+  listOrganizers,
+  listProducts,
+} from "@/server/mealie/recipes";
 import { userRoute } from "@/server/session";
 
 /**
@@ -17,6 +21,10 @@ import { userRoute } from "@/server/session";
  */
 export const GET = userRoute(async (req: NextRequest) => {
   try {
+    // The Add dialog's Product tab starts from the latest products, no search.
+    if (req.nextUrl.searchParams.get("products") === "1") {
+      return Response.json(await listProducts({ perPage: 8 }));
+    }
     const organizers = await listOrganizers();
     const { page, ...filters } = parsePickerSearch(req.nextUrl.searchParams, {
       tags: organizers.tags.map((t) => t.slug),

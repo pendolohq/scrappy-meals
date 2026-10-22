@@ -10,7 +10,9 @@ import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
 import {
+  addCheckedMeal,
   addMeal,
+  checkNewMeal,
   copyWeek,
   mealDate,
   moveMeal,
@@ -22,6 +24,11 @@ import {
   setFasting,
   setPortion,
 } from "@/server/plan";
+import {
+  loadKnownProduct,
+  lookupProduct,
+  saveProduct,
+} from "@/server/products";
 import { viewerToday } from "@/server/today";
 
 const date = z.string().refine(isIsoDate, "invalid date");
@@ -32,6 +39,8 @@ const snackIndex = z
   .min(0)
   .max(MAX_SNACK_SLOTS - 1)
   .default(0);
+// At least 0.01: the column keeps two decimals, and 0 isn't allowed.
+const baseServings = z.number().min(0.01).max(100);
 
 /**
  * Refreshes the week pages and the pages under them (a meal's recipe page,
@@ -53,10 +62,76 @@ export const addMealAction = userAction(
     slot,
     snackIndex,
     slug: recipeSlug,
+    baseServings: baseServings.optional(),
+    /** A product eaten already, off-plan: see `addMeal`. */
+    alreadyHad: z.boolean().optional(),
   }),
-  async (data, user) => {
-    await addMeal(getDb(), { ...data, createdBy: user.id });
+  async ({ alreadyHad, ...data }, user) => {
+    await addMeal(getDb(), {
+      ...data,
+      unplanned: alreadyHad,
+      today: await viewerToday(),
+      createdBy: user.id,
+    });
     return refreshWeek(data.date);
+  }
+);
+
+export const lookupProductAction = userAction(
+  z.object({ barcode: z.string().max(32) }),
+  ({ barcode }) => lookupProduct(barcode)
+);
+
+/** A product already in Mealie, picked by slug from search or recent products. */
+export const loadProductAction = userAction(
+  z.object({ slug: recipeSlug }),
+  ({ slug }) => loadKnownProduct(slug)
+);
+
+const macroAmount = (max: number) => z.number().min(0).max(max).optional();
+
+/** Saves a checked product in Mealie and adds it to the day in one go. */
+export const saveProductAction = userAction(
+  z.object({
+    barcode: z.string().max(32),
+    name: z.string().trim().min(1).max(120),
+    servingGrams: z.number().min(0.1).max(5000),
+    servingUnit: z.enum(["g", "ml"]),
+    packGrams: z.number().min(0.1).max(100000).nullable(),
+    per100: z.object({
+      kcal: macroAmount(1000),
+      protein: macroAmount(100),
+      carbs: macroAmount(100),
+      fat: macroAmount(100),
+      fibre: macroAmount(100),
+    }),
+    fromOpenFoodFacts: z.boolean(),
+    edited: z.boolean(),
+    date,
+    slot,
+    snackIndex,
+    baseServings,
+    alreadyHad: z.boolean(),
+  }),
+  async (
+    { date, slot, snackIndex, baseServings, alreadyHad, ...product },
+    user
+  ) => {
+    const today = await viewerToday();
+    const meal = {
+      date,
+      slot,
+      snackIndex,
+      baseServings,
+      unplanned: alreadyHad,
+      today,
+    };
+    // Before anything is created in Mealie.
+    await checkNewMeal(getDb(), meal);
+    const { slug } = await saveProduct(product);
+    await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    refreshWeek(date);
+    return { slug };
   }
 );
 
@@ -70,8 +145,7 @@ export const setPortionAction = userAction(
 );
 
 export const setServingsAction = userAction(
-  // At least 0.01: the column keeps two decimals, and 0 isn't allowed.
-  z.object({ mealId: id, baseServings: z.number().min(0.01).max(100) }),
+  z.object({ mealId: id, baseServings }),
   async (data) => {
     await setBaseServings(getDb(), data.mealId, data.baseServings);
     return refreshWeek(await mealDate(getDb(), data.mealId));
@@ -90,7 +164,7 @@ export const removeMealAction = userAction(
 export const moveMealAction = userAction(
   z.object({ mealId: id, date, slot, snackIndex }),
   async ({ mealId, ...to }) => {
-    await moveMeal(getDb(), mealId, to);
+    await moveMeal(getDb(), mealId, { ...to, today: await viewerToday() });
     return refreshWeek(to.date);
   }
 );
