@@ -16,7 +16,7 @@ import {
 
 /*
  * Assumed dependency contracts (injected, like recipe-import.ts):
- *   find(barcode)     -> { slug, name } | null
+ *   find(barcode)     -> Recipe | null     (`product` null when its extras are unreadable)
  *   getRecipe(slug)   -> Recipe | null     (a product recipe has `product`)
  *   create(input)     -> slug              (createProductRecipe's input:
  *                        { name, info: ProductInfo, perServing, orgURL: string | null,
@@ -96,7 +96,7 @@ describe("lookupProduct", () => {
 
   it("returns a product already in Mealie without asking Open Food Facts or the limiter", async () => {
     const { deps, find, getRecipe, lookupOff, hit } = lookupDeps();
-    find.mockResolvedValue({ slug: "snickers", name: "Snickers" });
+    find.mockResolvedValue(productRecipe());
 
     await expect(lookupProduct("5000159461122", deps)).resolves.toEqual({
       status: "known",
@@ -105,7 +105,7 @@ describe("lookupProduct", () => {
       info,
       nutrition: productRecipe().nutrition,
     });
-    expect(getRecipe).toHaveBeenCalledWith("snickers");
+    expect(getRecipe).not.toHaveBeenCalled();
     expect(lookupOff).not.toHaveBeenCalled();
     expect(hit).not.toHaveBeenCalled();
   });
@@ -239,15 +239,23 @@ describe("loadKnownProduct", () => {
     expect(getRecipe).toHaveBeenCalledWith("snickers");
   });
 
-  it("refuses a recipe that isn't a product, or one that's gone", async () => {
+  it("refuses a recipe that isn't a product, an incomplete one, or one that's gone", async () => {
     const { deps, getRecipe } = lookupDeps();
+    getRecipe.mockResolvedValue({
+      ...productRecipe(),
+      product: null,
+      tags: [],
+    });
+    await expect(loadKnownProduct("soup", deps)).rejects.toThrow(
+      "That isn't a product"
+    );
     getRecipe.mockResolvedValue({ ...productRecipe(), product: null });
-    await expect(loadKnownProduct("soup", deps)).rejects.toBeInstanceOf(
-      ProductError
+    await expect(loadKnownProduct("snickers", deps)).rejects.toThrow(
+      "incomplete in Mealie"
     );
     getRecipe.mockResolvedValue(null);
-    await expect(loadKnownProduct("gone", deps)).rejects.toBeInstanceOf(
-      ProductError
+    await expect(loadKnownProduct("gone", deps)).rejects.toThrow(
+      "no longer in Mealie"
     );
   });
 
@@ -332,10 +340,19 @@ describe("saveProduct", () => {
 
   it("returns the existing product instead of creating a duplicate", async () => {
     const { deps, find, create } = saveDeps();
-    find.mockResolvedValue({ slug: "old-grenade", name: "Grenade" });
+    find.mockResolvedValue({ ...productRecipe(), slug: "old-grenade" });
     await expect(saveProduct(grenadeInput, deps)).resolves.toEqual({
       slug: "old-grenade",
     });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("refuses to reuse an existing product that is incomplete in Mealie", async () => {
+    const { deps, find, create } = saveDeps();
+    find.mockResolvedValue({ ...productRecipe(), product: null });
+    await expect(saveProduct(grenadeInput, deps)).rejects.toThrow(
+      "incomplete in Mealie"
+    );
     expect(create).not.toHaveBeenCalled();
   });
 

@@ -22,7 +22,7 @@ export default async function PlanPage({
 }: {
   params: Promise<{ weekStart: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const weekStart = canonicalWeek((await params).weekStart, "", "/plan");
   const [plan, lastWeekHasMeals] = await Promise.all([
     getWeekPlan(getDb(), weekStart, { defer: after }),
@@ -55,6 +55,8 @@ export default async function PlanPage({
             members={plan.members}
             snackSlots={plan.snackSlots}
             today={now}
+            fasting={day.fasting}
+            currentUserId={user.id}
           />
         ))}
       </div>
@@ -62,6 +64,7 @@ export default async function PlanPage({
         plan={plan}
         today={now}
         mode="plan"
+        currentUserId={user.id}
         className="hidden xl:table"
       />
     </div>

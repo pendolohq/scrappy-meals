@@ -450,9 +450,10 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
     });
 
     it("finds a product by barcode", async () => {
-      expect(await findProductByBarcode(code, { client })).toEqual({
+      expect(await findProductByBarcode(code, { client })).toMatchObject({
         slug,
         name,
+        product: { barcode: code },
       });
       expect(await findProductByBarcode(bareCode, { client })).toMatchObject({
         slug: bareSlug,

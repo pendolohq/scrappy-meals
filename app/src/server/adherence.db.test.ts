@@ -76,6 +76,28 @@ describe.skipIf(!testDbUrl)("adherence (Postgres)", () => {
     expect((await logs())[a.id].note).toHaveLength(500);
   });
 
+  it("refuses a log for something had off-plan", async () => {
+    const { a } = await setup();
+    const unplanned = await addMeal(
+      db,
+      {
+        date: "2026-10-20",
+        slot: "snack",
+        slug: "bar",
+        createdBy: a.id,
+        unplanned: true,
+        today: "2026-10-20",
+      },
+      { fetch }
+    );
+    await expect(setAdherence(db, unplanned, a.id, "stuck")).rejects.toThrow(
+      "off-plan"
+    );
+    await expect(
+      setAdherence(db, unplanned, a.id, null)
+    ).resolves.toBeUndefined();
+  });
+
   it("goes away with the meal", async () => {
     const { a, meal } = await setup();
     await setAdherence(db, meal, a.id, "stuck");

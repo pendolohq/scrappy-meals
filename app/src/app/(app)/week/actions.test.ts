@@ -11,10 +11,12 @@ vi.mock("next/cache", () => ({
 vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/server/today", () => ({ viewerToday: async () => "2026-10-21" }));
 
-const addMeal = vi.hoisted(() => vi.fn<() => Promise<void>>(async () => {}));
+const addCheckedMeal = vi.hoisted(() =>
+  vi.fn<() => Promise<void>>(async () => {})
+);
 vi.mock("@/server/plan", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/plan")>()),
-  addMeal,
+  addCheckedMeal,
   checkNewMeal: async () => {},
 }));
 const saveProduct = vi.hoisted(() =>
