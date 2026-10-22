@@ -419,10 +419,7 @@ export const ReviewForm = ({
           ))}
         </div>
         {servingsChanged && (
-          <div
-            role="status"
-            className="mt-4 space-y-2 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
-          >
+          <div className="mt-4 space-y-2 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger">
             <p>
               These values are per serving when the recipe makes{" "}
               {nutritionServings}. It makes {servingsNow} now, so each serving
@@ -443,17 +440,14 @@ export const ReviewForm = ({
           </div>
         )}
         {warnings.length > 0 && (
-          <ul
-            role="status"
-            className="mt-4 space-y-1 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
-          >
+          <output className="mt-4 block space-y-1 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger">
             {warnings.map((w) => (
-              <li key={w} className="flex gap-1.5">
+              <span key={w} className="flex gap-1.5">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {w}
-              </li>
+              </span>
             ))}
-          </ul>
+          </output>
         )}
         {canEstimate && (
           <div className="mt-4 space-y-2">
