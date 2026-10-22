@@ -18,8 +18,9 @@ export type Macros = Record<MacroKey, number>;
  * "per serving"), in kcal and grams.
  *
  * A macro is only present when Mealie has a value we can read unambiguously.
- * We never estimate: anything blank, a range, or with an unexpected unit is
- * reported as missing so the UI can flag the recipe.
+ * Nothing is guessed here: anything blank, a range, or with an unexpected
+ * unit is reported as missing so the UI can flag the recipe. Estimates are
+ * written to Mealie like any other value (see `nutrition-estimate.ts`).
  */
 export type RecipeNutrition = {
   perServing: Partial<Macros>;

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { userAction } from "@/server/action";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { reviewInputSchema } from "@/server/domain/review-input";
+import { estimateForReview } from "@/server/nutrition-estimate";
 import { saveReview } from "@/server/recipe-review";
 
 const schema = reviewInputSchema.extend({ slug: recipeSlug });
@@ -41,4 +42,19 @@ export const saveReviewAction = userAction(
     return { saved: true as const };
   },
   { invalid: explain }
+);
+
+const estimateSchema = z.object({
+  name: z.string().max(300),
+  servings: z.number().positive().max(1000).nullable(),
+  ingredients: z.array(z.string().max(500)).min(1).max(200),
+});
+
+// Nothing is saved: the form shows the numbers and the review saves them.
+export const estimateNutritionAction = userAction(
+  estimateSchema,
+  async (input, user) => ({
+    estimate: await estimateForReview(input, user.id),
+  }),
+  { invalid: () => "Add some ingredients to estimate from." }
 );

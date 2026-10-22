@@ -23,6 +23,10 @@ import { importRecipe, importSocialRecipe } from "./recipe-import";
  *   limiter              -> { hit(key: string): boolean }; false = over the limit.
  *                           Called with the userId, before find/importFromUrl.
  *
+ *   estimate(input)      -> { servings, perServing } | null; null as a dep means
+ *                           estimating is off. Runs only when the page gave no
+ *                           macros; a failure or null leaves the import as it is.
+ *
  * An "exists" recipe without scrappyReview is marked pending (an earlier import
  * failed before marking it). Concurrent imports of one URL share one run.
  */
@@ -49,6 +53,7 @@ function makeDeps(overrides: Partial<Deps> = {}) {
     getRecipe,
     patch,
     limiter: { hit },
+    estimate: null,
     ...overrides,
   };
   return { deps, find, importFromUrl, getRecipe, patch, hit };
@@ -333,10 +338,107 @@ function makeSocialDeps(overrides: Partial<SocialDeps> = {}) {
     getRecipe,
     patch,
     limiter: { hit },
+    estimate: null,
     ...overrides,
   };
   return { deps, find, aiSettings, importFromAi, getRecipe, patch, hit };
 }
+
+describe("estimating nutrition on import", () => {
+  const estimate = {
+    servings: 4,
+    perServing: { kcal: 420, protein: 18, carbs: 50, fat: 15.5, fibre: 6 },
+  };
+  const fields = {
+    calories: "420",
+    proteinContent: "18",
+    carbohydrateContent: "50",
+    fatContent: "15.5",
+    fiberContent: "6",
+  };
+
+  it("fills in and marks estimated nutrition when the page gave none", async () => {
+    const estimator = vi
+      .fn<NonNullable<Deps["estimate"]>>()
+      .mockResolvedValue(estimate);
+    const { deps, getRecipe, patch } = makeDeps({ estimate: estimator });
+    getRecipe.mockResolvedValue({
+      name: "Soup",
+      recipeServings: 4,
+      nutrition: { sodiumContent: "300" },
+      extras: {},
+      recipeIngredient: [
+        { note: "200 g lentils" },
+        { originalText: "1 onion" },
+      ],
+    });
+
+    await importRecipe(URL_, "u1", deps);
+
+    expect(estimator).toHaveBeenCalledWith({
+      name: "Soup",
+      servings: 4,
+      ingredients: ["200 g lentils", "1 onion"],
+    });
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({
+        extras: { scrappyReview: "pending", scrappyNutrition: "estimated" },
+        nutrition: { sodiumContent: "300", ...fields },
+      })
+    );
+    expect(patch.mock.calls[0][1]).not.toHaveProperty("recipeServings");
+  });
+
+  it("sets the servings the estimate assumed when the recipe had none", async () => {
+    const estimator = vi
+      .fn<NonNullable<Deps["estimate"]>>()
+      .mockResolvedValue(estimate);
+    const { deps, getRecipe, patch } = makeDeps({ estimate: estimator });
+    getRecipe.mockResolvedValue({
+      name: "Soup",
+      recipeServings: 0,
+      extras: {},
+      recipeIngredient: [{ note: "200 g lentils" }],
+    });
+
+    await importRecipe(URL_, "u1", deps);
+
+    expect(estimator).toHaveBeenCalledWith(
+      expect.objectContaining({ servings: null })
+    );
+    expect(patch).toHaveBeenCalledWith(
+      "soup",
+      expect.objectContaining({ recipeServings: 4 })
+    );
+  });
+
+  it("doesn't estimate when the page gave nutrition", async () => {
+    const estimator = vi.fn<NonNullable<Deps["estimate"]>>();
+    const { deps, getRecipe } = makeDeps({ estimate: estimator });
+    getRecipe.mockResolvedValue({ nutrition: { calories: "320" }, extras: {} });
+
+    await importRecipe(URL_, "u1", deps);
+
+    expect(estimator).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["no estimate", () => Promise.resolve(null)],
+    ["a failed estimate", () => Promise.reject(new Error("API down"))],
+  ])("still imports with %s", async (_label, run) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { deps, patch } = makeDeps({ estimate: run });
+
+    await expect(importRecipe(URL_, "u1", deps)).resolves.toEqual({
+      status: "imported",
+      slug: "soup",
+    });
+    expect(patch).toHaveBeenCalledWith("soup", {
+      extras: { scrappyReview: "pending" },
+    });
+  });
+});
 
 describe("tagging an import", () => {
   it("assigns tags and categories from the agreed list", async () => {
