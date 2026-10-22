@@ -8,6 +8,7 @@ import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import { lookupOpenFoodFacts } from "./openfoodfacts";
 import {
+  attachProductPhoto,
   loadKnownProduct,
   lookupProduct,
   ProductError,
@@ -259,7 +260,7 @@ describe("saveProduct", () => {
   it("creates the recipe with per-serving nutrition, the OFF link and source nutrition", async () => {
     const { deps, create } = saveDeps();
 
-    await expect(saveProduct(grenadeInput, deps)).resolves.toEqual({
+    await expect(saveProduct(grenadeInput, deps)).resolves.toMatchObject({
       slug: "grenade-carb-killa",
     });
     expect(create).toHaveBeenCalledTimes(1);
@@ -301,20 +302,35 @@ describe("saveProduct", () => {
   it("passes on Open Food Facts' photo, and drops any other address", async () => {
     const photo = "https://images.openfoodfacts.org/images/products/1.jpg";
     const { deps, create } = saveDeps();
-    await saveProduct({ ...grenadeInput, imageUrl: photo }, deps);
-    await saveProduct(
-      { ...grenadeInput, imageUrl: "http://169.254.169.254/latest" },
-      deps
-    );
-    await saveProduct(
-      { ...grenadeInput, fromOpenFoodFacts: false, imageUrl: photo },
-      deps
-    );
-    expect(create.mock.calls.map(([arg]) => arg.imageUrl)).toEqual([
-      photo,
-      null,
-      null,
-    ]);
+    const photos = [
+      (await saveProduct({ ...grenadeInput, imageUrl: photo }, deps)).photoUrl,
+      (
+        await saveProduct(
+          { ...grenadeInput, imageUrl: "http://169.254.169.254/latest" },
+          deps
+        )
+      ).photoUrl,
+      (
+        await saveProduct(
+          { ...grenadeInput, fromOpenFoodFacts: false, imageUrl: photo },
+          deps
+        )
+      ).photoUrl,
+    ];
+    expect(photos).toEqual([photo, null, null]);
+    // The photo is fetched after the save, not as part of it.
+    expect(create.mock.calls.every(([arg]) => !("imageUrl" in arg))).toBe(true);
+  });
+
+  it("only logs when a product's photo can't be fetched", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      attachProductPhoto("grenade", "https://images.openfoodfacts.org/x.jpg", {
+        setImage: () => Promise.reject(new Error("no route to host")),
+      })
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("normalises the barcode it saves under", async () => {
@@ -327,7 +343,7 @@ describe("saveProduct", () => {
   it("returns the existing product instead of creating a duplicate", async () => {
     const { deps, find, create } = saveDeps();
     find.mockResolvedValue({ ...productRecipe(), slug: "old-grenade" });
-    await expect(saveProduct(grenadeInput, deps)).resolves.toEqual({
+    await expect(saveProduct(grenadeInput, deps)).resolves.toMatchObject({
       slug: "old-grenade",
     });
     expect(create).not.toHaveBeenCalled();

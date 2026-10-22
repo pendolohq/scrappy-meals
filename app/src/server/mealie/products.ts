@@ -19,8 +19,6 @@ export type ProductRecipeInput = {
   orgURL: string | null;
   /** `reviewed` when someone changed a value or typed it in. */
   nutrition: "source" | "reviewed";
-  /** Open Food Facts' front photo, for Mealie to fetch. */
-  imageUrl?: string | null;
 };
 
 /**
@@ -63,15 +61,6 @@ export async function createProductRecipe(
       .DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
       .catch(() => undefined);
     throw err;
-  }
-  if (input.imageUrl) {
-    // The photo is a nicety: Mealie may not reach the image, and the product
-    // is saved either way, so a failure here must not delete the recipe.
-    await setRecipeImageFromUrl(slug, input.imageUrl, { client }).catch(
-      (err: unknown) => {
-        console.warn(`Product ${slug}: could not fetch its image`, err);
-      }
-    );
   }
   return slug;
 }

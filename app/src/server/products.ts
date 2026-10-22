@@ -18,6 +18,7 @@ import {
   createProductRecipe,
   findProductByBarcode,
   type ProductRecipeInput,
+  setRecipeImageFromUrl,
 } from "./mealie/products";
 import { getRecipe, type Recipe } from "./mealie/recipes";
 import { lookupOpenFoodFacts, type OffResult } from "./openfoodfacts";
@@ -173,7 +174,7 @@ export async function lookupProduct(
 export async function saveProduct(
   input: SaveProductInput,
   deps: Partial<Deps> = {}
-): Promise<{ slug: string }> {
+): Promise<{ slug: string; photoUrl: string | null }> {
   const d = withDefaults(deps);
   const barcode = canonical(input.barcode);
 
@@ -181,7 +182,7 @@ export async function saveProduct(
     const existing = await d.find(barcode);
     if (existing) {
       // An incomplete one would be planned as an ordinary recipe for everyone.
-      return { slug: knownProduct(existing).slug };
+      return { slug: knownProduct(existing).slug, photoUrl: null };
     }
     const slug = await d.create({
       name: input.name,
@@ -195,9 +196,30 @@ export async function saveProduct(
       orgURL: input.fromOpenFoodFacts ? offProductUrl(barcode) : null,
       nutrition:
         input.edited || !input.fromOpenFoodFacts ? "reviewed" : "source",
-      // The browser sends it back, so it is only trusted as far as the allow-list.
-      imageUrl: input.fromOpenFoodFacts ? offImageUrl(input.imageUrl) : null,
     });
-    return { slug };
+    // The browser sends it back, so it is only trusted as far as the allow-list.
+    const photoUrl = input.fromOpenFoodFacts
+      ? offImageUrl(input.imageUrl)
+      : null;
+    return { slug, photoUrl };
   });
+}
+
+/**
+ * Has Mealie fetch a new product's photo. Meant to run after the response
+ * (`after()`): Mealie can take seconds to give up on an unreachable image, and
+ * the product is saved without it. Failures are only logged. The recipe cache
+ * is warmed before the photo lands, so it shows after the next hourly refresh.
+ */
+export async function attachProductPhoto(
+  slug: string,
+  url: string,
+  deps: { setImage?: (slug: string, url: string) => Promise<void> } = {}
+): Promise<void> {
+  const setImage = deps.setImage ?? setRecipeImageFromUrl;
+  try {
+    await setImage(slug, url);
+  } catch (err) {
+    console.warn(`Product ${slug}: could not fetch its image`, err);
+  }
 }

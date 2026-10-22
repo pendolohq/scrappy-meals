@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
@@ -27,6 +28,7 @@ import {
 import {
   loadKnownProduct,
   lookupProduct,
+  attachProductPhoto,
   saveProduct,
 } from "@/server/products";
 import { viewerToday } from "@/server/today";
@@ -130,8 +132,11 @@ export const saveProductAction = userAction(
     };
     // Before anything is created in Mealie.
     await checkNewMeal(getDb(), meal);
-    const { slug } = await saveProduct(product);
+    const { slug, photoUrl } = await saveProduct(product);
     await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    if (photoUrl) {
+      after(() => attachProductPhoto(slug, photoUrl));
+    }
     refreshWeek(date);
     return { slug };
   }

@@ -5,6 +5,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { attachProductPhoto } from "../products";
+
 import {
   checkMealieVersion,
   createMealieClient,
@@ -21,7 +23,11 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./import";
-import { createProductRecipe, findProductByBarcode } from "./products";
+import {
+  createProductRecipe,
+  findProductByBarcode,
+  setRecipeImageFromUrl,
+} from "./products";
 import { discoverRecipes, getRecipe, listOrganizers } from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
@@ -445,15 +451,8 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(r.nutrition.perServing).toEqual({ kcal: 140 });
     });
 
-    it("still saves the product when its photo can't be fetched", async () => {
+    it("sets a product's photo through Mealie, and a failure never throws", async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const failing = {
-        ...client,
-        POST: (path: string, init: unknown) =>
-          String(path).endsWith("/image")
-            ? Promise.reject(new Error("no route to host"))
-            : (client.POST as (p: string, i: unknown) => unknown)(path, init),
-      } as unknown as MealieClient;
       const photoSlug = await createProductRecipe(
         {
           name: `IT No Photo ${run}`,
@@ -466,11 +465,18 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           perServing: { kcal: 100 },
           orgURL: null,
           nutrition: "source",
-          imageUrl: "https://images.openfoodfacts.org/images/nope.jpg",
         },
-        { client: failing }
+        { client }
       );
       cleanup.push(remove(photoSlug));
+      // Mealie can't reach this address; the product stays as it was.
+      await attachProductPhoto(
+        photoSlug,
+        "https://images.openfoodfacts.org/images/nope.jpg",
+        {
+          setImage: (slug, url) => setRecipeImageFromUrl(slug, url, { client }),
+        }
+      );
       const r = (await getRecipe(photoSlug, { client }))!;
       expect(r.imagePath).toBeNull();
       expect(r.product).not.toBeNull();
