@@ -13,6 +13,10 @@ A meal planner for one household that you host yourself. Recipes live in
   too.
 - Install it on your phone like an app.
 
+There's no sign-up page: it's for the few people in one household, and you add
+their logins on the server (`scrappy user add`, see
+[docs/deploy.md](docs/deploy.md)).
+
 ## What you need
 
 To try it on your own computer:
@@ -58,6 +62,13 @@ restoring: **[docs/aws-backup-setup.md](docs/aws-backup-setup.md)**.
 
 [docs/README.md](docs/README.md) explains how the pieces fit together and
 lists the rest of the docs.
+
+## Contributing
+
+Issues and pull requests are welcome. It stays a planner for one household, so
+multi-tenant features such as public sign-up are out of scope.
+[docs/development.md](docs/development.md) covers the setup and the checks a
+change has to pass.
 
 ## License
 
