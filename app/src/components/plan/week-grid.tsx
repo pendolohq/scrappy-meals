@@ -137,7 +137,11 @@ export const WeekGrid = ({
         {plan.days.map(({ date, meals, fasting }) => {
           const isToday = date === today;
           const { day, weekday } = dayParts(date);
-          const { macros } = dayTotals(meals, currentUserId);
+          const { macros } = dayTotals(
+            meals,
+            currentUserId,
+            mode === "plan" ? "planned" : "logged"
+          );
           return (
             <tr key={date} data-testid="grid-day">
               <th

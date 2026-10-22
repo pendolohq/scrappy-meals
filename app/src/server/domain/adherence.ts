@@ -24,6 +24,18 @@ export const STATUS_WEIGHT: Record<AdherenceStatus, number> = {
   skipped: 0,
 };
 
+/**
+ * How much of the planned portion a log says was eaten, for the day's totals.
+ * A swap keeps the planned meal as a stand-in: what replaced it is unknown,
+ * and leaving it out would make the day look lighter than it was.
+ */
+export const EATEN_SHARE: Record<AdherenceStatus, number> = {
+  stuck: 1,
+  partial: 0.5,
+  swapped: 1,
+  skipped: 0,
+};
+
 export type MealAdherence = {
   date: string;
   /** This person's planned portion; 0 = not planned to eat it. */

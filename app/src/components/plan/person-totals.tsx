@@ -14,8 +14,15 @@ const MACROS = [
   { key: "fat", label: "Fat" },
 ] as const;
 
-/** One person's totals for a day's planned meals. */
-export const dayTotals = (meals: PlannedMeal[], userId: string) =>
+/**
+ * One person's totals for a day: as planned, or (on the Week page) with what
+ * they logged, so a skipped meal stops counting.
+ */
+export const dayTotals = (
+  meals: PlannedMeal[],
+  userId: string,
+  count: "planned" | "logged"
+) =>
   personDayTotals(
     meals.map((m) => ({
       nutrition: m.recipe?.nutrition ?? null,
@@ -23,6 +30,12 @@ export const dayTotals = (meals: PlannedMeal[], userId: string) =>
       estimated: m.recipe?.nutritionSource === "estimated",
       baseServings: m.baseServings,
       portions: m.portions,
+      logged:
+        count === "logged"
+          ? Object.fromEntries(
+              Object.entries(m.adherence).map(([id, log]) => [id, log.status])
+            )
+          : undefined,
     })),
     userId
   );

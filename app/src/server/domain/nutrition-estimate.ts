@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { Macros } from "../mealie/nutrition";
 
+import { kcalMatchesMacros } from "./nutrition-check";
+
 /** What the model is asked to return: whole-recipe servings and per-serving macros. */
 export const estimateSchema = z.object({
   servings: z.number(),
@@ -43,10 +45,6 @@ export function estimatePrompt(input: EstimateInput): string {
 
 const MAX_KCAL = 3000;
 const MAX_GRAMS = 400;
-// Fibre is partly fermented (about 2 kcal/g) and labels round, so the energy
-// check allows a margin either way.
-const TOLERANCE = 0.25;
-const SLACK_KCAL = 30;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -69,11 +67,7 @@ export function checkEstimate(
   ) {
     return null;
   }
-  const fromMacros = 4 * reply.protein + 4 * reply.carbs + 9 * reply.fat;
-  if (
-    reply.kcal < fromMacros * (1 - TOLERANCE) - SLACK_KCAL ||
-    reply.kcal > fromMacros * (1 + TOLERANCE) + SLACK_KCAL
-  ) {
+  if (!kcalMatchesMacros(reply)) {
     return null;
   }
   const replied = Math.round(reply.servings);
