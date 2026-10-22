@@ -33,7 +33,7 @@ export default async function PlanPage({
   return (
     <div className="space-y-5 pb-8" data-wide>
       <AutoRefresh />
-      <WeekHeader weekStart={weekStart} base="/plan" title="Plan">
+      <WeekHeader weekStart={weekStart} base="/plan" title="Planner">
         <Link href={`/week/${weekStart}`} className={linkClass}>
           See the week
         </Link>

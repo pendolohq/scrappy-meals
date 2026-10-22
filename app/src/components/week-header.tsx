@@ -10,7 +10,7 @@ import { iconButtonClass } from "./ui/icon-button";
 /**
  * The week's serif title with previous/next arrows. The arrows stay on the
  * same page (`page`, e.g. "shopping"; empty for the plan) of the same section
- * (`base`: "/week", or "/plan" for the Plan page). `title` names the
+ * (`base`: "/week", or "/plan" for the Planner). `title` names the
  * page ("Shopping"); without it the title is the week itself ("This week").
  * `children` sit under the date range.
  */

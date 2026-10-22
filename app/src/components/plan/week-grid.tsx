@@ -76,8 +76,8 @@ const WeekMeal = ({
 
 /**
  * The week on wide screens: a row per day, a column per meal slot, so the
- * same slot lines up down the week. The Plan page fills empty cells with
- * "Add"; the Week page links them to the Plan page. Both head each day with
+ * same slot lines up down the week. The Planner fills empty cells with
+ * "Add"; the Week page links them to the Planner. Both head each day with
  * the viewer's calories; the Week page adds their fasting toggle.
  */
 export const WeekGrid = ({

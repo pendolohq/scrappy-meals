@@ -50,7 +50,7 @@ const baseServings = z.number().min(0.01).max(100);
  * Refreshes the week pages and the pages under them (a meal's recipe page,
  * shopping); returns the empty success result. `"layout"` only reaches nested
  * pages with the route pattern, not a literal path, so this covers every week:
- * they are all rendered per request anyway. The Plan page shows the same meals.
+ * they are all rendered per request anyway. The Planner shows the same meals.
  */
 function refreshWeek(day: string | null) {
   if (day) {

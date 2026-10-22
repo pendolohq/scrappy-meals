@@ -70,7 +70,7 @@ export const DayCard = ({
   today: string;
 }) => {
   const isToday = date === today;
-  // The week shows the viewer's own numbers; the Plan page has everyone's portions.
+  // The week shows the viewer's own numbers; the Planner has everyone's portions.
   const viewer = members.find((m) => m.id === currentUserId);
 
   return (
@@ -121,7 +121,7 @@ export const DayCard = ({
                     <Icon className="size-4" strokeWidth={1.75} aria-hidden />
                     {label}
                   </h3>
-                  {/* Meals are added on the Plan page; an empty slot links there, at this day. */}
+                  {/* Meals are added on the Planner; an empty slot links there, at this day. */}
                   {!active ? (
                     <span className="text-xs text-muted">
                       Turned off in settings
