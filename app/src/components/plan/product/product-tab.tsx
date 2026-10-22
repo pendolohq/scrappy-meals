@@ -13,6 +13,7 @@ import { parseBarcode } from "@/server/domain/barcode";
 import type { ProductLookup } from "@/server/products";
 
 import { attempt, failureText } from "../attempt";
+import { BarcodeScanner } from "../barcode-scanner";
 import { useRecipeList } from "../use-recipe-list";
 
 import { ProductSheet } from "./product-sheet";
@@ -49,16 +50,16 @@ export const ProductTab = ({
     }
   }, [lookup]);
 
-  const find = () => {
+  const find = (code = barcode) => {
     setProblem(undefined);
-    if (!parseBarcode(barcode)) {
+    if (!parseBarcode(code)) {
       setProblem(
         "That doesn't look like a barcode: it should be 8 to 14 digits"
       );
       return;
     }
     startTransition(async () => {
-      const res = await attempt(() => lookupProductAction({ barcode }));
+      const res = await attempt(() => lookupProductAction({ barcode: code }));
       if (res.error === undefined) {
         setLookup(res);
       } else {
@@ -101,17 +102,32 @@ export const ProductTab = ({
           find();
         }}
       >
-        <Field label="Barcode" hint="The 8 to 14 digits under the bars.">
-          <input
-            ref={field}
-            inputMode="numeric"
-            autoComplete="off"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            placeholder="5000159461122"
-            className={inputClass}
+        <div className="flex items-start gap-2">
+          <Field
+            label="Barcode"
+            hint="The 8 to 14 digits under the bars."
+            className="min-w-0 flex-1"
+          >
+            <input
+              ref={field}
+              inputMode="numeric"
+              autoComplete="off"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="5000159461122"
+              className={inputClass}
+            />
+          </Field>
+          {/* Level with the input: the label above it is 1.625rem tall. */}
+          <BarcodeScanner
+            className="mt-[1.625rem]"
+            disabled={pending}
+            onCode={(code) => {
+              setBarcode(code);
+              find(code);
+            }}
           />
-        </Field>
+        </div>
         <Button type="submit" block disabled={pending || barcode.trim() === ""}>
           {pending ? "Looking up…" : "Look up"}
         </Button>

@@ -107,8 +107,9 @@ task in the file, in dependency order.
   logged and shown as a generic message.
 - Comments explain *why*, not what the next line does. No references to task files, dates or
   "verified manually".
-- One PR per milestone or issue. Merge with a merge commit: `.git-blame-ignore-revs` relies on
-  commit SHAs surviving.
+- One PR per milestone or issue. Squash-merge by default. A PR with a formatting-only commit for
+  `.git-blame-ignore-revs` is merged with a merge commit instead: the file lists SHAs, and a
+  squash would replace that commit and fold it into the real changes.
 
 ## Verification
 
