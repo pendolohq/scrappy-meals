@@ -32,3 +32,24 @@ export function parseBarcode(input: string): string | null {
   }
   return code.length === 14 && code.startsWith("0") ? code.slice(1) : code;
 }
+
+/**
+ * The UPC-A that an 8-digit UPC-E stands for (number system, six digits,
+ * check), or null when it isn't one. Only a reader that knows the format can
+ * call this: typed, the same 8 digits read as an EAN-8.
+ */
+export function expandUpcE(code: string): string | null {
+  if (!/^[01]\d{7}$/.test(code)) {
+    return null;
+  }
+  const [ns, d1, d2, d3, d4, d5, d6, check] = code;
+  const body =
+    d6 <= "2"
+      ? `${d1}${d2}${d6}0000${d3}${d4}${d5}`
+      : d6 === "3"
+        ? `${d1}${d2}${d3}00000${d4}${d5}`
+        : d6 === "4"
+          ? `${d1}${d2}${d3}${d4}00000${d5}`
+          : `${d1}${d2}${d3}${d4}${d5}0000${d6}`;
+  return parseBarcode(`${ns}${body}${check}`);
+}

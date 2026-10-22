@@ -6,36 +6,49 @@ import { Camera, ImageUp, ScanLine, X } from "lucide-react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import {
+  CAMERA,
+  cameraProblem,
   confirmRead,
-  createDetector,
+  createReaderSource,
+  firstBarcode,
   isScannerFailure,
   loadPhoto,
-  type Detector,
+  type Reader,
 } from "@/lib/barcode-scanner";
-import { parseBarcode } from "@/server/domain/barcode";
 
 // How often a frame is read. One detection at a time, so a slow phone just
 // reads less often.
 const FRAME_MS = 150;
 
-const BLOCKED =
-  "Camera blocked: allow it in the browser's settings, or take a photo / type the digits.";
-const NO_CAMERA = "No camera found: take a photo or type the digits.";
 const UNSUPPORTED =
   "This browser can't scan here: take a photo or type the digits.";
 const SCANNER_FAILED =
   "The scanner couldn't load: check your connection and try again, or type the digits.";
 const NO_BARCODE = "No barcode in that photo: try closer, in good light.";
+const AIMING = "Point the camera at the barcode.";
 
-const cameraProblem = (e: unknown) => {
-  const name = e instanceof DOMException ? e.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return BLOCKED;
+// One reader for the page: closing the scanner and opening it again (back
+// from a product) reuses the compiled wasm.
+const readers = createReaderSource();
+
+type Note = { text: string; problem: boolean };
+
+const noteClass = (note?: Note) =>
+  note?.problem ? "block text-sm text-danger" : "block text-sm text-muted";
+
+/** Asks a camera that can for continuous autofocus; others keep their own. */
+const keepFocusing = (track: MediaStreamTrack) => {
+  const caps = track.getCapabilities?.() as
+    | { focusMode?: string[] }
+    | undefined;
+  const modes = caps?.focusMode;
+  if (modes?.includes("continuous")) {
+    track
+      .applyConstraints({
+        advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+      })
+      .catch(() => undefined);
   }
-  if (name === "NotFoundError" || name === "OverconstrainedError") {
-    return NO_CAMERA;
-  }
-  return "The camera wouldn't start: take a photo or type the digits.";
 };
 
 /**
@@ -54,24 +67,23 @@ export const BarcodeScanner = ({
 }) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  // One detector for the camera and the photo, made when first needed.
-  const detector = useRef<Promise<Detector>>(undefined);
+  // Bumped whenever the dialog opens or closes, so a read that finishes
+  // after that (a photo still decoding) can tell it's no longer wanted.
+  const session = useRef(0);
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [problem, setProblem] = useState(false);
+  const [camera, setCamera] = useState<Note>();
   // The last photo's result, apart from the camera's status: the camera
   // restarts when the page comes back from the camera app, and its messages
   // must not replace this one.
-  const [photoNote, setPhotoNote] = useState<{ text: string; ok: boolean }>();
-
-  const say = (text: string, isProblem = false) => {
-    setMessage(text);
-    setProblem(isProblem);
-  };
-  const getDetector = () => (detector.current ??= createDetector());
+  const [photo, setPhoto] = useState<Note>();
 
   const close = () => dialog.current?.close();
-  const found = (code: string) => {
+  /** Hands over the code once per opening, whichever read got there first. */
+  const found = (code: string, from: number) => {
+    if (from !== session.current) {
+      return;
+    }
+    session.current += 1;
     close();
     onCode(code);
   };
@@ -80,6 +92,7 @@ export const BarcodeScanner = ({
     if (!open) {
       return;
     }
+    const opened = session.current;
 
     // Starts the camera and reads frames until stopped; returns the stopper.
     const startCamera = () => {
@@ -95,31 +108,26 @@ export const BarcodeScanner = ({
           video.current.srcObject = null;
         }
       };
-      const sayNow = (text: string, isProblem = false) => {
+      const say = (text: string, problem = false) => {
         if (!stopped) {
-          say(text, isProblem);
+          setCamera({ text, problem });
         }
       };
 
       const run = async () => {
         if (!navigator.mediaDevices?.getUserMedia) {
-          sayNow(UNSUPPORTED, true);
+          say(UNSUPPORTED, true);
           return;
         }
-        sayNow("Starting the camera…");
+        say("Starting the camera…");
         // Loads while the permission prompt is up.
-        const loading = getDetector();
-        loading.catch(() => {
-          if (detector.current === loading) {
-            detector.current = undefined;
-          }
-        });
+        let loading = readers.get();
+        const first = loading;
+        first.catch(() => readers.drop(first));
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } },
-          });
+          stream = await navigator.mediaDevices.getUserMedia(CAMERA);
         } catch (e) {
-          sayNow(cameraProblem(e), true);
+          say(cameraProblem(e), true);
           return;
         }
         if (stopped) {
@@ -132,32 +140,32 @@ export const BarcodeScanner = ({
           return;
         }
         el.srcObject = stream;
-        // A track the system ends (camera taken by another app) or mutes
-        // would leave a frozen frame that reads nothing.
-        const lost = () => {
-          if (!stopped) {
-            sayNow(
+        stream.getVideoTracks().forEach((t) => {
+          keepFocusing(t);
+          // Taken by another app for good: a frozen frame would read nothing.
+          t.addEventListener("ended", () => {
+            say(
               "The camera stopped: close this and scan again, or take a photo.",
               true
             );
             stop();
-          }
-        };
-        stream.getVideoTracks().forEach((t) => {
-          t.addEventListener("ended", lost);
-          t.addEventListener("mute", lost);
+          });
+          // Interrupted for a moment (the system camera for a photo, a call):
+          // frames resume on their own.
+          t.addEventListener("mute", () => say("The camera is paused…"));
+          t.addEventListener("unmute", () => say(AIMING));
         });
         await el.play().catch(() => undefined);
 
-        let reader: Detector;
+        let reader: Reader;
         try {
           reader = await loading;
         } catch {
-          sayNow(SCANNER_FAILED, true);
+          say(SCANNER_FAILED, true);
           stop();
           return;
         }
-        sayNow("Point the camera at the barcode.");
+        say(AIMING);
 
         let previous: string | null = null;
         const tick = async () => {
@@ -166,23 +174,31 @@ export const BarcodeScanner = ({
           }
           if (el.readyState >= 2) {
             try {
-              const read = confirmRead(
-                previous,
-                (await reader.detect(el)).map((b) => b.rawValue)
-              );
+              const read = confirmRead(previous, await reader.detect(el));
               previous = read.previous;
               if (read.confirmed !== null && !stopped) {
                 stop();
-                found(read.confirmed);
+                found(read.confirmed, opened);
                 return;
               }
             } catch (e) {
               if (isScannerFailure(e)) {
-                // The wasm didn't load: every frame would fail the same way.
-                detector.current = undefined;
-                sayNow(SCANNER_FAILED, true);
-                stop();
-                return;
+                readers.drop(loading, reader);
+                if (!reader.native) {
+                  say(SCANNER_FAILED, true);
+                  stop();
+                  return;
+                }
+                // The wasm reader takes over from a native one that broke.
+                loading = readers.get();
+                try {
+                  reader = await loading;
+                } catch {
+                  readers.drop(loading);
+                  say(SCANNER_FAILED, true);
+                  stop();
+                  return;
+                }
               }
               // Any other frame that can't be read is just skipped.
             }
@@ -219,45 +235,54 @@ export const BarcodeScanner = ({
   }, [open]);
 
   const readPhoto = async (file: File) => {
-    const fail = (text: string) => setPhotoNote({ text, ok: false });
-    setPhotoNote({ text: "Reading the photo…", ok: true });
+    const from = session.current;
+    // Nothing is shown once the scanner has closed or found a code.
+    const note = (text: string, problem = true) => {
+      if (from === session.current) {
+        setPhoto({ text, problem });
+      }
+    };
+    note("Reading the photo…", false);
     let bitmap: ImageBitmap;
     try {
       bitmap = await loadPhoto(file);
     } catch {
-      fail(
+      note(
         "This browser can't open that photo (HEIC, say): try another, or type the digits."
       );
       return;
     }
+    // A native detector that broke gets one retry, on the wasm reader.
     try {
-      let reader: Detector;
-      try {
-        reader = await getDetector();
-      } catch {
-        detector.current = undefined;
-        fail(SCANNER_FAILED);
-        return;
-      }
-      let raw: { rawValue: string }[];
-      try {
-        raw = await reader.detect(bitmap);
-      } catch (e) {
-        if (isScannerFailure(e)) {
-          detector.current = undefined;
-          fail(SCANNER_FAILED);
-        } else {
-          fail(NO_BARCODE);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const loading = readers.get();
+        let reader: Reader;
+        try {
+          reader = await loading;
+        } catch {
+          readers.drop(loading);
+          note(SCANNER_FAILED);
+          return;
         }
-        return;
-      }
-      const code = raw
-        .map((b) => parseBarcode(b.rawValue))
-        .find((c) => c !== null);
-      if (code) {
-        found(code);
-      } else {
-        fail(NO_BARCODE);
+        try {
+          const code = firstBarcode(await reader.detect(bitmap));
+          if (code) {
+            found(code, from);
+          } else {
+            note(NO_BARCODE);
+          }
+          return;
+        } catch (e) {
+          if (!isScannerFailure(e)) {
+            note(NO_BARCODE);
+            return;
+          }
+          readers.drop(loading, reader);
+          if (!reader.native) {
+            note(SCANNER_FAILED);
+            return;
+          }
+        }
       }
     } finally {
       bitmap.close();
@@ -271,9 +296,9 @@ export const BarcodeScanner = ({
         className={className}
         disabled={disabled}
         onClick={() => {
-          setMessage("");
-          setProblem(false);
-          setPhotoNote(undefined);
+          session.current += 1;
+          setCamera(undefined);
+          setPhoto(undefined);
           setOpen(true);
           dialog.current?.showModal();
         }}
@@ -288,6 +313,7 @@ export const BarcodeScanner = ({
           // React bubbles `close` to the Add dialog around this one, which
           // would take it for its own closing.
           e.stopPropagation();
+          session.current += 1;
           setOpen(false);
         }}
         className="m-auto w-[min(26rem,calc(100vw-1rem))] rounded-card border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-scrim/40"
@@ -316,24 +342,9 @@ export const BarcodeScanner = ({
               className="relative size-full object-cover"
             />
           </div>
-          <output
-            className={
-              problem ? "block text-sm text-danger" : "block text-sm text-muted"
-            }
-          >
-            {message}
-          </output>
-          {photoNote && (
-            <output
-              className={
-                photoNote.ok
-                  ? "block text-sm text-muted"
-                  : "block text-sm text-danger"
-              }
-            >
-              {photoNote.text}
-            </output>
-          )}
+          {/* Always there, so a screen reader hears the first message too. */}
+          <output className={noteClass(camera)}>{camera?.text}</output>
+          {photo && <output className={noteClass(photo)}>{photo.text}</output>}
           <label
             className={`${buttonClass({ variant: "secondary", block: true })} cursor-pointer has-[:focus-visible]:outline-2`}
           >

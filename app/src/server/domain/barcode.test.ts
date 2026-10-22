@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseBarcode } from "./barcode";
+import { expandUpcE, parseBarcode } from "./barcode";
 
 describe("parseBarcode", () => {
   it("accepts a valid EAN-13 and EAN-8 unchanged", () => {
@@ -50,5 +50,22 @@ describe("parseBarcode", () => {
     expect(parseBarcode("000000000000")).toBeNull();
     expect(parseBarcode("0000000000000")).toBeNull();
     expect(parseBarcode("00000000000000")).toBeNull();
+  });
+});
+
+describe("expandUpcE", () => {
+  it("expands each UPC-E pattern to the UPC-A key a 13-digit read gives", () => {
+    expect(expandUpcE("04963406")).toBe("0049000006346");
+    expect(expandUpcE("04252614")).toBe("0042100005264");
+    expect(expandUpcE("01234531")).toBe("0012300000451");
+    expect(expandUpcE("01234543")).toBe("0012340000053");
+    expect(expandUpcE("01234565")).toBe("0012345000065");
+  });
+
+  it("refuses a wrong check digit, another number system or length", () => {
+    expect(expandUpcE("04963407")).toBeNull();
+    expect(expandUpcE("24963406")).toBeNull();
+    expect(expandUpcE("0496340")).toBeNull();
+    expect(expandUpcE("0049000006346")).toBeNull();
   });
 });

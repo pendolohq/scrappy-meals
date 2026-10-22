@@ -174,8 +174,9 @@ the first use asks for permission (on an iPhone's Home Screen app it may ask
 again each launch). Caddy sends `Permissions-Policy: camera=(self),
 microphone=(), geolocation=()` on `app.` only, so nothing embedded can reach
 the camera; Mealie's site is untouched. The reader's wasm is served by the app
-itself from `/zxing/` (copied from `node_modules` by `scripts/copy-wasm.mjs`
-during `bun run build`), so no scanner request leaves for a CDN. Changing the
+itself from `/zxing/` (copied from the `zxing-wasm` package by
+`scripts/copy-wasm.mjs` during `bun run build`, which fails if it can't), so no
+scanner request leaves for a CDN. Changing the
 Caddyfile needs `docker compose restart caddy`.
 
 ## 6. Backups
