@@ -137,10 +137,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
-      # The cache holds the browser, not the system libraries it needs.
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
+        run: bunx playwright install chromium
+      # The cache holds the browser, not the system libraries it needs. The
+      # runner image already has them (it ships Chrome), and apt's mirrors can
+      # take minutes, so apt only runs when the dry run finds one missing.
+      - name: Install the browser's system libraries if any are missing
+        run: bunx playwright install-deps --dry-run chromium || bunx playwright install-deps chromium
       - name: Wait for Mealie and create an API token for the app
         run: |
           for i in $(seq 1 60); do curl -fsS http://localhost:9000/api/app/about >/dev/null && break; sleep 3; done
