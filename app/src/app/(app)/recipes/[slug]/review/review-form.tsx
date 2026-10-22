@@ -409,13 +409,18 @@ export const ReviewForm = ({
               )}
               <fieldset
                 className={cx(
-                  "min-w-0 rounded-control border p-3 pt-1 sm:p-4 sm:pt-1.5",
+                  "min-w-0 rounded-control border p-3 sm:p-4",
+                  // A floated legend is laid out inside the box like any
+                  // block; left in place, browsers draw it across the border.
+                  "[&>legend+*]:clear-left",
                   low
                     ? "border-danger/60 bg-danger-soft/40"
                     : "border-border bg-sunken/40"
                 )}
               >
-                <legend className="px-1.5 font-medium">{line.original}</legend>
+                <legend className="float-left mb-2 w-full font-medium break-words">
+                  {line.original}
+                </legend>
                 {line.linked && (
                   <p className="text-sm text-muted">
                     Linked recipe: edit it in Mealie
@@ -431,7 +436,7 @@ export const ReviewForm = ({
                   </p>
                 )}
                 {!line.linked && !state.asText && (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_2fr]">
                     <label className="block">
                       <span className={fieldLabel}>Amount</span>
                       <input
