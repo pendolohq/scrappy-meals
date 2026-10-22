@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { buttonClass } from "@/components/ui/button";
 import { RecipeImage } from "@/components/ui/recipe-image";
+import { estimatingEnabled } from "@/server/nutrition-estimate";
 import { loadReview } from "@/server/recipe-review";
 import { requireUser } from "@/server/session";
 
@@ -61,7 +62,7 @@ export default async function ReviewPage({
           )}
         </p>
       </div>
-      <ReviewForm draft={draft} />
+      <ReviewForm draft={draft} canEstimate={estimatingEnabled()} />
     </section>
   );
 }

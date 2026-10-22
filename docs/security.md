@@ -100,6 +100,16 @@ account's credentials, and an `app_uuid` derived from `AUTH_SECRET` and the
 session's `user.id` (never the id itself). The password is never stored in
 `off_contributions`, logged or put in an error message.
 
+## Outbound requests to Anthropic
+
+Estimating nutrition (`src/server/nutrition-estimate.ts`) is off unless
+`ANTHROPIC_API_KEY` is set. It runs during a recipe import and from
+`estimateNutritionAction`, a `userAction` rate-limited per person, and sends a
+recipe's name, servings and ingredient lines only. Ingredient lines come from
+third-party pages, so the reply is held to a JSON schema of numbers and
+checked for plausibility before anything is written; nothing in it is run or
+shown as text.
+
 ## Tests
 
 `src/server/access.test.ts` finds every `"use server"` file, route handler and

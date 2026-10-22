@@ -58,7 +58,17 @@ until every place names the same version (`mealie-version.test.ts`).
   be anything. `normaliseNutrition` accepts only a plain number with an
   optional expected unit (`12`, `12,5`, `7 g`, `250 kcal`). Blanks, ranges
   (`10-12`) and other units count as **missing**, and the recipe is flagged
-  `partial` / `missing`; we never estimate.
+  `partial` / `missing`.
+- **Estimates** come from the planner, not Mealie
+  (`src/server/nutrition-estimate.ts`, on when `ANTHROPIC_API_KEY` is set). On
+  import, a recipe with no macros gets kcal, protein, carbs, fat and fibre per
+  serving from Claude (structured output, from the name, servings and
+  ingredient lines), written like any other value and marked `estimated`; a
+  recipe without servings also gets the number the estimate assumed. Answers
+  whose kcal don't match 4·P + 4·C + 9·F (±25 %) are dropped, so a bad estimate
+  leaves the recipe `missing` rather than counted wrong. Estimated values count
+  in the totals, shown as "≈". The review page can estimate again; saving the
+  review marks the values `reviewed`.
 
 ## Tags, categories and total time
 
@@ -151,7 +161,8 @@ Mealie 3.29 with Claude Sonnet 5.5 as the provider:
 - **It never estimates nutrition.** Mealie's prompt says to fill nutrition
   only when the source states it, and that's what happened: stated values
   come through per serving and unit-less (`"520"`), missing ones stay empty.
-  So an AI import's nutrition is `source`, not `estimated`.
+  So an AI import's nutrition is `source`, not `estimated`; when it stays
+  empty, the planner's own estimate (see Nutrition) fills it in.
 - **`orgURL` is set to the `url` passed in**, even when the page itself had
   nothing useful (an Instagram login wall, with the caption pasted as
   `content`). Without a `url` it stays empty.

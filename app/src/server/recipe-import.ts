@@ -17,6 +17,7 @@ import {
   normaliseNutrition,
   NUTRITION_FIELDS,
 } from "./mealie/nutrition";
+import { type Estimator, nutritionEstimator } from "./nutrition-estimate";
 import { createRateLimiter } from "./rate-limit";
 
 export type ImportResult =
@@ -25,6 +26,7 @@ export type ImportResult =
 
 type FetchedRecipe = {
   name?: string | null;
+  recipeServings?: number | null;
   nutrition?: Record<string, string | null> | null;
   extras?: Record<string, unknown> | null;
   recipeIngredient?:
@@ -41,6 +43,8 @@ type FetchedRecipe = {
 type ImportPatch = {
   extras: Record<string, string>;
   orgURL?: string;
+  recipeServings?: number;
+  nutrition?: Record<string, string | null>;
   tags?: Organizer[];
   recipeCategory?: Organizer[];
 };
@@ -56,6 +60,8 @@ type Deps = {
     imageProviderEnabled: boolean;
   }>;
   importFromAi: (input: SocialInput) => Promise<string | null>;
+  /** Null when estimating is off (no API key). */
+  estimate: Estimator | null;
 };
 
 export type SocialInput = {
@@ -76,6 +82,7 @@ const defaults: Deps = {
   limiter,
   aiSettings: () => getAiSettings(),
   importFromAi: (input) => importRecipeWithAi(input),
+  estimate: nutritionEstimator(),
 };
 
 // One import per page at a time: a second submission while the first is
@@ -217,15 +224,63 @@ async function markPending(
     const v = recipe.nutrition?.[NUTRITION_FIELDS[m]];
     return typeof v === "string" && v.trim() !== "";
   });
+  const estimated = hasNutrition ? null : await estimateFor(recipe, d);
   await d.patch(slug, {
     extras: withImportState(recipe.extras, {
       review: "pending",
-      nutrition: hasNutrition ? "source" : null,
+      nutrition: hasNutrition ? "source" : estimated ? "estimated" : null,
     }),
     ...(orgURL ? { orgURL } : {}),
+    ...estimated,
     ...organizersFor(recipe),
   });
 }
+
+/**
+ * Nutrition fields worked out from the ingredients, for a recipe whose page
+ * gave none. A failed estimate leaves the import as it is: the recipe just
+ * shows its nutrition as missing until someone fills it in.
+ */
+async function estimateFor(
+  recipe: FetchedRecipe,
+  d: Deps
+): Promise<Pick<ImportPatch, "nutrition" | "recipeServings"> | null> {
+  if (!d.estimate) {
+    return null;
+  }
+  const servings = recipe.recipeServings || null;
+  try {
+    const estimate = await d.estimate({
+      name: recipe.name ?? "",
+      servings,
+      ingredients: ingredientTexts(recipe),
+    });
+    if (!estimate) {
+      return null;
+    }
+    return {
+      nutrition: {
+        ...recipe.nutrition,
+        ...Object.fromEntries(
+          MACRO_KEYS.map((m) => [
+            NUTRITION_FIELDS[m],
+            String(estimate.perServing[m]),
+          ])
+        ),
+      },
+      // Per serving only means something once the recipe says how many.
+      ...(servings === null ? { recipeServings: estimate.servings } : {}),
+    };
+  } catch (err) {
+    console.error("nutrition estimate failed", err);
+    return null;
+  }
+}
+
+const ingredientTexts = (recipe: FetchedRecipe) =>
+  (recipe.recipeIngredient ?? []).map(
+    (i) => i.originalText || i.note || i.display || ""
+  );
 
 /**
  * Tags and categories from the agreed list, worked out from the recipe
@@ -241,9 +296,7 @@ function organizersFor(
   }
   const { tags, categories } = classifyRecipe({
     name: recipe.name ?? "",
-    ingredients: (recipe.recipeIngredient ?? []).map(
-      (i) => i.originalText || i.note || i.display || ""
-    ),
+    ingredients: ingredientTexts(recipe),
     proteinPerServing: normaliseNutrition(recipe.nutrition).perServing.protein,
   });
   return {

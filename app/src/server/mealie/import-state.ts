@@ -7,7 +7,7 @@ export type ImportState = {
   /** Recipes added in Mealie directly have no review step: they count as done. */
   review: "pending" | "done";
   /**
-   * Where the nutrition came from. `estimated` is AI-filled and not yet
+   * Where the nutrition came from. `estimated` is Claude's estimate and not yet
    * checked; `reviewed` was confirmed or edited by someone. Null when the
    * recipe wasn't imported through the planner.
    */

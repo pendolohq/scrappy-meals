@@ -69,6 +69,7 @@ the database passwords end up inside a `postgres://` URL):
 - `AUTH_SECRET`
 - `OFF_USER_ID`, `OFF_PASSWORD` (optional: leave empty unless you set up
   contributing to Open Food Facts, section 5)
+- `ANTHROPIC_API_KEY` (optional: estimating missing nutrition, section 5)
 - `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`
 
 Leave `MEALIE_API_TOKEN` empty for now. Keep comments on their own lines:
@@ -206,6 +207,20 @@ Each person gets a stable anonymous id (derived from `AUTH_SECRET`), so Open
 Food Facts can block one person without blocking the app. Nothing about who ate
 what is sent. A product is sent once; one that failed shows "Not sent to Open
 Food Facts yet" with a Retry button on its recipe page.
+
+### Estimating missing nutrition (optional)
+
+With `ANTHROPIC_API_KEY` set, the planner asks Claude for per-serving
+nutrition when an imported recipe's page gives none, and the review page gets
+an "Estimate from ingredients" button. Create a key at
+[console.anthropic.com](https://console.anthropic.com) (a separate key from the
+one Mealie's AI provider uses makes the spend easy to tell apart), put it in
+`.env` and `docker compose up -d`. Without it, missing nutrition stays missing
+until someone fills it in.
+
+What goes out: the recipe's name, servings and ingredient lines, nothing about
+who plans or eats it. One estimate is one request to `claude-opus-5-5`, a
+fraction of a cent; the review button allows 30 an hour per person.
 
 ## 6. Backups
 

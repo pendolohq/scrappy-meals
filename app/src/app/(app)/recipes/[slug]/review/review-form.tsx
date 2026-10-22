@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowLeft, Check, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { Button, buttonClass } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 } from "@/server/domain/taxonomy";
 import type { ReviewDraft } from "@/server/recipe-review";
 
-import { saveReviewAction } from "./actions";
+import { estimateNutritionAction, saveReviewAction } from "./actions";
 
 const MACROS = [
   { key: "kcal", label: "Calories (kcal)" },
@@ -127,7 +127,29 @@ const ToggleGroup = <T extends string>({
   </fieldset>
 );
 
-export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
+/** One line as the estimate should read it, with the form's edits. */
+const lineText = (line: {
+  asText: boolean;
+  quantity: string;
+  unit: string;
+  food: string;
+  note: string;
+}) =>
+  line.asText || line.food.trim() === ""
+    ? line.note.trim()
+    : [line.quantity, line.unit, line.food, line.note]
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join(" ");
+
+export const ReviewForm = ({
+  draft,
+  canEstimate,
+}: {
+  draft: ReviewDraft;
+  /** False when the server has no API key for estimating. */
+  canEstimate: boolean;
+}) => {
   const [servings, setServings] = useState(String(draft.servings ?? ""));
   const [totalMinutes, setTotalMinutes] = useState(
     String(draft.totalMinutes ?? "")
@@ -155,6 +177,8 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [estimateError, setEstimateError] = useState<string>();
+  const [estimating, startEstimate] = useTransition();
 
   const setLine = (i: number, patch: Partial<(typeof lines)[number]>) => {
     setLines((all) => all.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -179,6 +203,33 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
     : edited
       ? "Edited"
       : SOURCE_LABELS[nutritionSource ?? "source"];
+
+  const estimate = () => {
+    setEstimateError(undefined);
+    setSaved(false);
+    startEstimate(async () => {
+      const result = await estimateNutritionAction({
+        name: draft.name,
+        // Unreadable servings count as unknown: the estimate picks a number.
+        servings: toNumber(servings) || null,
+        ingredients: lines.map(lineText).filter(Boolean),
+      });
+      if (result.error !== undefined) {
+        setEstimateError(result.error);
+        return;
+      }
+      const values = Object.fromEntries(
+        MACROS.map((m) => [m.key, String(result.estimate.perServing[m.key])])
+      );
+      setNutrition(values);
+      // Shown as "Estimated" until edited; saving the review confirms it.
+      setBaseline(values);
+      setNutritionSource("estimated");
+      if (!(toNumber(servings) ?? 0)) {
+        setServings(String(result.estimate.servings));
+      }
+    });
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -317,6 +368,29 @@ export const ReviewForm = ({ draft }: { draft: ReviewDraft }) => {
             </label>
           ))}
         </div>
+        {canEstimate && (
+          <div className="mt-4 space-y-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={estimate}
+              disabled={estimating || pending}
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              {estimating ? "Estimating…" : "Estimate from ingredients"}
+            </Button>
+            {estimateError ? (
+              <p role="alert" className="text-sm text-danger">
+                {estimateError}
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                Claude works it out from the servings and ingredients on this
+                page. Check the numbers before saving.
+              </p>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card as="section" className="space-y-4">

@@ -16,7 +16,7 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   (`POST /api/parser/ingredients`, `nlp`) and **reviewed before the recipe counts as done**.
 - **AI-estimated nutrition is allowed, labelled "estimated"** everywhere macros show, until
   someone reviews it. Nutrition that came from the source page stays unlabelled. Missing stays
-  missing; the planner itself still never estimates.
+  missing, unless the planner's own estimate is on (item 9).
 - **Import state lives on the recipe in Mealie**, in `extras` (string key/values), so it
   survives with Mealie's backups and needs no planner table:
   - `scrappyReview`: `pending` | `done` (absent = a recipe not imported through the planner,
@@ -160,10 +160,9 @@ Mealie doesn't have: a review step, and labels showing where nutrition came from
   Mealie copies nutrition only when the post states it, so it's `source` like a web page's.
   Same review step as milestone 1.
 
-- [ ] ~~**9. Estimate missing nutrition.**~~ **Dropped for now.** `create/ai` never estimates
-  (see 7), and the owner chose not to have the app call a model itself. Missing nutrition stays
-  missing and is filled in on the review page. The `estimated` state stays supported for
-  recipes marked that way by hand.
+- [x] **9. Estimate missing nutrition.** First dropped (`create/ai` never estimates, see 7);
+  done later in issue #103: the planner calls Claude itself when `ANTHROPIC_API_KEY` is set,
+  on import and from the review page. See `docs/mealie-api.md` → Nutrition.
 
 - [x] **10. Deploy docs.** **Complexity:** S
   `docs/deploy.md`: set up an AI provider in Mealie (`default` and `image`; no `audio`),
