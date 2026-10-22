@@ -32,6 +32,8 @@ export type OffProduct = {
   hasNutrients100g: boolean;
   per100: Partial<Macros>;
   kcalFromKj: boolean;
+  /** The front photo, already checked by `offImageUrl`. */
+  imageUrl: string | null;
 };
 
 /** Where the draft's serving size came from; only data from the pack is public-worthy. */
@@ -52,6 +54,8 @@ export type ProductDraft = {
   /** The macros don't add up (see `macrosInconsistent`). */
   inconsistent: boolean;
   sourceUrl: string;
+  /** Open Food Facts' front photo; Mealie fetches it when the product is saved. */
+  imageUrl: string | null;
 };
 
 export type PortionChoice =
@@ -61,6 +65,34 @@ export type PortionChoice =
 
 export const offProductUrl = (barcode: string) =>
   `https://world.openfoodfacts.org/product/${barcode}`;
+
+const OFF_IMAGE_HOSTS = new Set([
+  "images.openfoodfacts.org",
+  "static.openfoodfacts.org",
+]);
+
+/**
+ * The URL when it is a plain https link to Open Food Facts' image hosts, else
+ * null. The address ends up in a request Mealie makes, and the browser sends
+ * it back to us on save, so only these hosts are accepted.
+ */
+export function offImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" &&
+      OFF_IMAGE_HOSTS.has(url.hostname) &&
+      url.port === "" &&
+      url.username === "" &&
+      url.password === ""
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 const NAME_MAX = 120;
 
@@ -171,6 +203,7 @@ export function draftFromOff(
     kcalFromKj: product.kcalFromKj,
     inconsistent: macrosInconsistent(product.per100),
     sourceUrl: offProductUrl(barcode),
+    imageUrl: product.imageUrl,
   };
 }
 

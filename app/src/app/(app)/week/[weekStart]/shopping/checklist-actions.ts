@@ -16,7 +16,7 @@ import {
   removeShopExtra,
 } from "@/server/shop";
 
-// A plan line's key is a food id or `recipeId|text`, both Mealie uuids. Ticks
+// A plan line's key is a food id, `recipeId|text` or `recipeId|product`, all starting with a Mealie uuid. Ticks
 // don't recompute the week's plan to check it: the row is keyed by week and
 // key and only ever shown for a line on that week's plan, so an unknown key
 // affects nothing, and recomputing the plan would slow every tick down. The

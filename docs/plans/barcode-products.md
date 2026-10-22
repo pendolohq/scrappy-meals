@@ -179,13 +179,14 @@ Snickers, Grenade, Huel, Kind and Fage ones above make good fixtures):
 - **Adherence leaves unplanned entries out entirely:** they are neither *unlogged* nor scored
   (`summariseAdherence` skips them; the week grid shows an "Unplanned" pill instead of the log
   buttons). They count in `personDayTotals` like any meal.
-- **Who ate it:** a product entry gives a portion of 1 to the person who added it and 0 to
-  everyone else, planned or not. Portions stay editable by anyone, as now. It keys on the
-  session's `user.id`, never an id from the input. If that person is fasting that day, an
-  unplanned entry is still added at 1, since they ate it; a planned one gets 0, like any
-  planned meal on a fast.
-- **Swaps:** "Swapped" stays a note for now. A follow-up can offer "Log what you had" from the
-  swap prompt, which opens the same sheet and adds an unplanned entry.
+- **Who ate it:** any unplanned entry (a product or a recipe) gives a portion of 1 to the person
+  who added it and 0 to everyone else, even if they fast that day, since they ate it. A planned
+  product gives 1 to the person who added it and 0 to everyone else, but 0 to them too on their
+  fast, like any planned meal. A planned recipe gives everyone 1 unless they fast. Portions stay
+  editable by anyone, as now. It keys on the session's `user.id`, never an id from the input.
+- **Swaps:** a swapped log offers "Log what you had", which opens the Add dialog on the
+  Product tab; whatever is picked (a product, or a recipe from search) is added as an
+  unplanned entry for the person who swapped. The swapped meal keeps its log.
 - The Add snack dialog also lists **recent products** (the Product tag, most recently added
   first), so the second bar of the week is two taps with no scan, and something eaten in the
   shop can be logged at home from that list.
@@ -202,9 +203,9 @@ I usually have". Entering grams is needed: half the products have no serving on 
 
 Planned products (not unplanned ones: those are already eaten) go on the week's list as
 themselves: "Grenade Carb Killa ×3". `buildShoppingList` gets a branch for meals whose recipe
-has a barcode, adding a free-text line with `ceil(servings eaten)` summed over the week. They are
-free text in Mealie, so they don't merge with ingredients. That's the right call: a bar isn't
-flour.
+is a product: one line per product, keyed `<recipe id>|product`, in a Products aisle, counting
+`ceil(servings eaten)` over the week, or packs when a pack holds two or more servings
+("FAGE Total 0% fat ×1 (450 g)"). They never merge with ingredients: a bar isn't flour.
 
 ### 7. Offline
 
@@ -323,10 +324,11 @@ existing review page cover that.
 
 ### PR 4: follow-ups
 
-- [ ] Shopping: planned products as "Name ×N" free-text lines; unit test in
+- [x] Shopping: planned products as "Name ×N" lines of the week's list; unit test in
       `domain/shopping.test.ts`.
-- [ ] "Log what you had" from the Swapped prompt.
-- [ ] Product photo from OFF on the recipe; taking front and nutrition photos for OFF.
+- [x] "Log what you had" from the Swapped prompt.
+- [x] Product photo from OFF on the recipe.
+- [ ] Taking front and nutrition photos for OFF (needs PR 3's contribution account).
 
 ## Settled
 

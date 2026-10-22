@@ -20,12 +20,14 @@ export async function weekShoppingList(
         slug: m.slug,
         baseServings: m.baseServings,
         portions: m.portions,
+        unplanned: m.unplanned,
         recipe: r
           ? {
               id: r.mealieId,
               name: r.name,
               servings: r.servings,
               ingredients: r.ingredients,
+              product: r.product,
             }
           : null,
       };

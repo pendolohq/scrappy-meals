@@ -434,8 +434,10 @@ type NewMeal = {
 
 /**
  * Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone
- * fasting that day. A product is one person's snack: 1 for whoever added it
- * and 0 for everyone else; on their fast it is 0 too, unless it was eaten.
+ * fasting that day. Anything already eaten off-plan is one person's: 1 for
+ * whoever added it (even on a fast, since they ate it) and 0 for everyone else.
+ * A planned product is the adder's snack: 1 for them unless they fast that day,
+ * 0 for everyone else.
  *
  * `unplanned` marks something already eaten off-plan, so it needs `today` (the
  * viewer's) and can't be a later day.
@@ -505,9 +507,11 @@ export async function addCheckedMeal(
       await tx.insert(slotPortions).values(
         members.map((m) => {
           const fasting = isFasting(m.days, input.date, override.get(m.id));
-          const eats = recipe.product
-            ? m.id === input.createdBy && (unplanned || !fasting)
-            : !fasting;
+          const eats = unplanned
+            ? m.id === input.createdBy
+            : recipe.product
+              ? m.id === input.createdBy && !fasting
+              : !fasting;
           return {
             mealSlotId: slot.id,
             userId: m.id,

@@ -20,12 +20,16 @@ vi.mock("@/server/plan", async (importOriginal) => ({
   checkNewMeal: async () => {},
 }));
 const saveProduct = vi.hoisted(() =>
-  vi.fn<(input: unknown) => Promise<{ slug: string }>>(async () => ({
-    slug: "chocolate-bar",
-  }))
+  vi.fn<(input: unknown) => Promise<{ slug: string; photoUrl: string | null }>>(
+    async () => ({ slug: "chocolate-bar", photoUrl: null })
+  )
+);
+const attachProductPhoto = vi.hoisted(() =>
+  vi.fn<(slug: string, url: string) => Promise<void>>(async () => {})
 );
 vi.mock("@/server/products", () => ({
   saveProduct,
+  attachProductPhoto,
   lookupProduct: vi.fn<() => void>(),
   loadKnownProduct: vi.fn<() => void>(),
 }));
@@ -45,6 +49,7 @@ const input = {
   servingUnit: "g" as const,
   packGrams: 180,
   per100: { kcal: 364, protein: 33.8 },
+  imageUrl: null,
   fromOpenFoodFacts: false,
   edited: false,
   date: "2026-10-21",
@@ -69,6 +74,32 @@ describe("saveProductAction", () => {
     // The flag is not part of what is saved in Mealie.
     expect(saveProduct.mock.calls[0][0]).not.toHaveProperty("contribute");
     expect(saveProduct.mock.calls[0][0]).not.toHaveProperty("servingKnown");
+  });
+
+  it("fetches a new product's photo after the response", async () => {
+    const photo = "https://images.openfoodfacts.org/images/products/front.jpg";
+    saveProduct.mockResolvedValueOnce({
+      slug: "chocolate-bar",
+      photoUrl: photo,
+    });
+    await saveProductAction(input);
+    expect(attachProductPhoto).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledTimes(1);
+    await after.mock.calls[0][0]();
+    expect(attachProductPhoto).toHaveBeenCalledWith("chocolate-bar", photo);
+  });
+
+  it("still fetches the photo when adding the meal fails", async () => {
+    const photo = "https://images.openfoodfacts.org/images/products/front.jpg";
+    saveProduct.mockResolvedValueOnce({
+      slug: "chocolate-bar",
+      photoUrl: photo,
+    });
+    addCheckedMeal.mockRejectedValueOnce(new Error("slot taken"));
+    await saveProductAction(input);
+    expect(after).toHaveBeenCalledTimes(1);
+    await after.mock.calls[0][0]();
+    expect(attachProductPhoto).toHaveBeenCalledWith("chocolate-bar", photo);
   });
 
   it("contributes after the save, as the signed-in user, with product data only", async () => {

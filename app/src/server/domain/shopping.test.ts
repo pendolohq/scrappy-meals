@@ -2,15 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import type { Ingredient } from "../mealie/recipes";
 
+import type { ProductInfo } from "./product";
 import {
   buildShoppingList,
   coverMax,
   formatAmounts,
+  formatProductAmount,
   type MealForShopping,
   type ShoppingAmount,
   stillNeeded,
   type WeekIngredients,
 } from "./shopping";
+
+// How the shopping list shows a product: its name, then the amount.
+const productLine = (p: {
+  name: string;
+  count: number;
+  unitLabel: string | null;
+}) => `${p.name} ${formatProductAmount(p)}`;
 
 const unit = (
   id: string,
@@ -58,14 +67,20 @@ const dal = {
   ],
 };
 
+type TestRecipe = Omit<NonNullable<MealForShopping["recipe"]>, "product"> & {
+  product?: ProductInfo | null;
+};
+
 const meal = (
-  recipe: MealForShopping["recipe"],
+  recipe: TestRecipe | null,
   portions: Record<string, number>,
-  baseServings = 1
+  baseServings = 1,
+  unplanned = false
 ): MealForShopping => ({
-  recipe,
+  recipe: recipe && { product: null, ...recipe },
   slug: recipe?.id ?? "gone",
   baseServings,
+  unplanned,
   portions,
 });
 
@@ -73,11 +88,29 @@ const recipe = (
   id: string,
   ingredients: Ingredient[],
   servings = 1
-): NonNullable<MealForShopping["recipe"]> => ({
+): TestRecipe => ({
   id,
   name: id,
   servings,
   ingredients,
+});
+
+const product = (
+  id: string,
+  name: string,
+  info: Partial<ProductInfo> = {}
+): TestRecipe => ({
+  id,
+  name,
+  servings: 1,
+  ingredients: [ing({ quantity: 1, food: onion, display: "a sample line" })],
+  product: {
+    barcode: "5000159461122",
+    servingGrams: 60,
+    servingUnit: "g",
+    packGrams: null,
+    ...info,
+  },
 });
 
 /** Each line as "food: amounts". */
@@ -322,6 +355,129 @@ describe("buildShoppingList", () => {
 
   it("reports recipes that are gone from Mealie", () => {
     expect(buildShoppingList([meal(null, { a: 1 })]).missing).toEqual(["gone"]);
+  });
+
+  describe("products", () => {
+    const bar = product("bar", "Grenade Carb Killa", { packGrams: 60 });
+    const box = product("box", "Grenade box", { packGrams: 180 });
+    const pot = product("pot", "FAGE Total 0% fat", {
+      servingGrams: 100,
+      packGrams: 450,
+    });
+
+    it("makes one line per product, with no ingredient lines", () => {
+      const list = buildShoppingList([meal(bar, { a: 1 })]);
+      expect(list.lines).toEqual([]);
+      expect(list.freeText).toEqual([]);
+      expect(list.unscaled).toEqual([]);
+      expect(list.products.map(productLine)).toEqual(["Grenade Carb Killa ×1"]);
+    });
+
+    it("adds up servings across days and people, then rounds up", () => {
+      const list = buildShoppingList([
+        meal(bar, { a: 1, b: 0 }),
+        meal(bar, { a: 1, b: 1 }),
+        meal(bar, { a: 0.5 }),
+      ]);
+      expect(list.products).toEqual([
+        {
+          key: "bar|product",
+          recipeId: "bar",
+          name: "Grenade Carb Killa",
+          count: 4,
+          unitLabel: null,
+        },
+      ]);
+    });
+
+    it("counts half a bar as a bar", () => {
+      expect(buildShoppingList([meal(bar, { a: 0.5 })]).products[0].count).toBe(
+        1
+      );
+    });
+
+    it("uses base servings", () => {
+      expect(
+        buildShoppingList([meal(bar, { a: 1 }, 1.5)]).products[0].count
+      ).toBe(2);
+    });
+
+    it("skips unplanned entries and meals nobody eats", () => {
+      const list = buildShoppingList([
+        meal(bar, { a: 1 }, 1, true),
+        meal(box, { a: 0 }),
+      ]);
+      expect(list.products).toEqual([]);
+      expect(list.missing).toEqual([]);
+    });
+
+    it("counts packs when a pack holds two or more servings", () => {
+      // 4.5 servings of 100 g is 450 g: one pot. 5 is 500 g: two.
+      expect(
+        buildShoppingList([
+          meal(pot, { a: 2 }),
+          meal(pot, { a: 2.5 }),
+        ]).products.map(productLine)
+      ).toEqual(["FAGE Total 0% fat ×1 (450 g)"]);
+      expect(buildShoppingList([meal(pot, { a: 5 })]).products[0].count).toBe(
+        2
+      );
+      // Four bars of a 3 × 60 g box need two boxes.
+      expect(
+        buildShoppingList([meal(box, { a: 4 })]).products.map(productLine)
+      ).toEqual(["Grenade box ×2 (180 g)"]);
+    });
+
+    it("doesn't buy a second pack for floating-point dust", () => {
+      // 3 × 70 g of a 210 g box is exactly one box, however it rounds.
+      const box70 = product("b70", "Box", { servingGrams: 70, packGrams: 210 });
+      expect(
+        buildShoppingList([meal(box70, { a: 1 }, 3)]).products[0].count
+      ).toBe(1);
+      expect(
+        buildShoppingList([meal(box70, { a: 1 }, 3.1)]).products[0].count
+      ).toBe(2);
+    });
+
+    it("buys a pack for a small share of it", () => {
+      const cereal = product("c", "Cereal", {
+        servingGrams: 30,
+        packGrams: 750,
+      });
+      expect(
+        buildShoppingList([meal(cereal, { a: 0.2 })]).products.map(productLine)
+      ).toEqual(["Cereal ×1 (750 g)"]);
+    });
+
+    it("doesn't buy a second bar for floating-point dust", () => {
+      expect(
+        buildShoppingList([
+          meal(bar, { a: 0.33 }),
+          meal(bar, { a: 0.56 }),
+          meal(bar, { a: 0.11 }),
+        ]).products[0].count
+      ).toBe(1);
+    });
+
+    it("counts servings when the pack is unknown or about one serving", () => {
+      const unknown = product("u", "Mystery", { packGrams: null });
+      const almost = product("a", "Can", { servingGrams: 330, packGrams: 500 });
+      expect(
+        buildShoppingList([
+          meal(unknown, { a: 3 }),
+          meal(almost, { a: 2 }),
+        ]).products.map(productLine)
+      ).toEqual(["Can ×2", "Mystery ×3"]);
+    });
+
+    it("keeps products apart from the ingredient lines of other recipes", () => {
+      const list = buildShoppingList([
+        meal(soup, { a: 4 }),
+        meal(bar, { a: 1 }),
+      ]);
+      expect(list.lines.length).toBeGreaterThan(0);
+      expect(list.products).toHaveLength(1);
+    });
   });
 });
 

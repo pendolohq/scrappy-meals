@@ -2,6 +2,7 @@ import type { Ingredient } from "../mealie/recipes";
 
 import { type Aisle, aisleOf, aisleOrder } from "./aisles";
 import { plannedServings, servingsScale, unitLabel } from "./ingredients";
+import type { ProductInfo } from "./product";
 import { measure, roundCount, roundMeasured } from "./units";
 
 export type MealForShopping = {
@@ -11,9 +12,13 @@ export type MealForShopping = {
     name: string;
     servings: number | null;
     ingredients: Ingredient[];
+    /** Set for a packaged product, which is bought as itself, not as ingredients. */
+    product: ProductInfo | null;
   } | null;
   slug: string;
   baseServings: number;
+  /** Eaten off-plan already: there is nothing left to buy. */
+  unplanned: boolean;
   portions: Record<string, number>;
 };
 
@@ -47,8 +52,21 @@ export type FreeTextLine = {
   times: number;
 };
 
+/** A packaged product to buy as it is: "Grenade Carb Killa ×3". */
+export type ProductLine = {
+  /** `${recipeId}|product`: a product is one line however often it is planned. */
+  key: string;
+  recipeId: string;
+  name: string;
+  count: number;
+  /** The pack size ("450 g") when `count` is packs; null when it counts servings. */
+  unitLabel: string | null;
+};
+
 export type WeekIngredients = {
   lines: ShoppingLine[];
+  /** Products planned this week, one line each. */
+  products: ProductLine[];
   /** Ingredients Mealie hasn't parsed into a food: passed through as written, never merged. */
   freeText: FreeTextLine[];
   /** Recipes without a servings count: their ingredients are listed unscaled, as free text. */
@@ -81,10 +99,14 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   const freeText = new Map<string, FreeTextLine>();
   const unscaled = new Set<string>();
   const missing = new Set<string>();
+  const products = new Map<
+    string,
+    { id: string; name: string; info: ProductInfo; servings: number }
+  >();
 
   for (const meal of meals) {
     const eaten = plannedServings(meal.baseServings, meal.portions);
-    if (eaten <= 0) {
+    if (eaten <= 0 || meal.unplanned) {
       continue;
     }
     if (!meal.recipe) {
@@ -92,6 +114,17 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       continue;
     }
     const { recipe } = meal;
+    if (recipe.product) {
+      const total = products.get(recipe.id) ?? {
+        id: recipe.id,
+        name: recipe.name,
+        info: recipe.product,
+        servings: 0,
+      };
+      total.servings += eaten;
+      products.set(recipe.id, total);
+      continue;
+    }
     const scale = servingsScale(recipe.servings, eaten);
     if (scale === null) {
       unscaled.add(recipe.name);
@@ -176,11 +209,49 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
         aisleOrder(a.aisle) - aisleOrder(b.aisle) ||
         a.foodName.localeCompare(b.foodName)
     ),
+    products: [...products.values()]
+      .map(productLine)
+      .toSorted((a, b) => a.name.localeCompare(b.name)),
     freeText: [...freeText.values()],
     unscaled: [...unscaled],
     missing: [...missing],
   };
 }
+
+// A hair over a whole number (3 × 70 g from a 210 g box, or portions of
+// 0.33 + 0.56 + 0.11, in floating point) is still that number; a planned
+// share, however small, still means buying one.
+const TOLERANCE = 0.01;
+const toBuy = (n: number) => Math.max(1, Math.ceil(n - TOLERANCE));
+
+function productLine({
+  id,
+  name,
+  info,
+  servings,
+}: {
+  id: string;
+  name: string;
+  info: ProductInfo;
+  servings: number;
+}): ProductLine {
+  const base = { key: `${id}|product`, recipeId: id, name };
+  // A multipack or a tub is bought whole, so it counts packs; a bar or a can
+  // is about one serving, and half of one still means buying one.
+  if (info.packGrams !== null && info.packGrams / info.servingGrams >= 2) {
+    return {
+      ...base,
+      count: toBuy((servings * info.servingGrams) / info.packGrams),
+      unitLabel: `${info.packGrams} ${info.servingUnit}`,
+    };
+  }
+  return { ...base, count: toBuy(servings), unitLabel: null };
+}
+
+/** "×3", "×1 (450 g)": how many to buy, in servings or in packs. */
+export const formatProductAmount = (
+  p: Pick<ProductLine, "count" | "unitLabel">
+) => `×${p.count}${p.unitLabel ? ` (${p.unitLabel})` : ""}`;
 
 function addAmount(food: Sums, ing: Ingredient, quantity: number) {
   const measured = ing.unit ? measure(quantity, ing.unit) : null;

@@ -22,6 +22,24 @@ export type ProductRecipeInput = {
 };
 
 /**
+ * Asks Mealie to download an image for the recipe (its "scrape image"
+ * endpoint). Mealie fetches the URL itself and refuses private addresses.
+ */
+export async function setRecipeImageFromUrl(
+  slug: string,
+  url: string,
+  opts: { client?: MealieClient } = {}
+): Promise<void> {
+  const client = opts.client ?? mealie();
+  unwrap(
+    await client.POST("/api/recipes/{slug}/image", {
+      params: { path: { slug } },
+      body: { url, includeTags: false },
+    })
+  );
+}
+
+/**
  * Creates the Mealie recipe for a packaged product and returns its slug. One
  * serving is the product's own, so `recipeServings` is 1 and the nutrition is
  * per that serving.

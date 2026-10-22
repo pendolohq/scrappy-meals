@@ -8,6 +8,7 @@ import { MealieUnavailableError } from "./mealie/client";
 import type { Recipe } from "./mealie/recipes";
 import { lookupOpenFoodFacts } from "./openfoodfacts";
 import {
+  attachProductPhoto,
   loadKnownProduct,
   lookupProduct,
   ProductError,
@@ -277,6 +278,7 @@ const grenadeInput = {
   per100: { kcal: 364, protein: 33.8, carbs: 28.2, fat: 14.8 },
   fromOpenFoodFacts: true,
   edited: false,
+  imageUrl: null,
 };
 
 function saveDeps() {
@@ -292,7 +294,7 @@ describe("saveProduct", () => {
   it("creates the recipe with per-serving nutrition, the OFF link and source nutrition", async () => {
     const { deps, create } = saveDeps();
 
-    await expect(saveProduct(grenadeInput, deps)).resolves.toEqual({
+    await expect(saveProduct(grenadeInput, deps)).resolves.toMatchObject({
       slug: "grenade-carb-killa",
     });
     expect(create).toHaveBeenCalledTimes(1);
@@ -331,6 +333,72 @@ describe("saveProduct", () => {
     expect(arg.orgURL ?? null).toBeNull();
   });
 
+  it("passes on Open Food Facts' photo, and drops any other address", async () => {
+    const photo = "https://images.openfoodfacts.org/images/products/1.jpg";
+    const { deps, create } = saveDeps();
+    const photos = [
+      (await saveProduct({ ...grenadeInput, imageUrl: photo }, deps)).photoUrl,
+      (
+        await saveProduct(
+          { ...grenadeInput, imageUrl: "http://169.254.169.254/latest" },
+          deps
+        )
+      ).photoUrl,
+      (
+        await saveProduct(
+          { ...grenadeInput, fromOpenFoodFacts: false, imageUrl: photo },
+          deps
+        )
+      ).photoUrl,
+    ];
+    expect(photos).toEqual([photo, null, null]);
+    // The photo is fetched after the save, not as part of it.
+    expect(create.mock.calls.every(([arg]) => !("imageUrl" in arg))).toBe(true);
+  });
+
+  it("only logs when a product's photo can't be fetched", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const refresh = vi.fn<(slug: string) => Promise<void>>(async () => {});
+    await expect(
+      attachProductPhoto("grenade", "https://images.openfoodfacts.org/x.jpg", {
+        setImage: () => Promise.reject(new Error("no route to host")),
+        refresh,
+      })
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("refreshes the cached recipe once the photo is in Mealie", async () => {
+    const calls: string[] = [];
+    await attachProductPhoto(
+      "grenade",
+      "https://images.openfoodfacts.org/x.jpg",
+      {
+        setImage: async () => {
+          calls.push("setImage");
+        },
+        refresh: async (slug) => {
+          calls.push(`refresh ${slug}`);
+        },
+      }
+    );
+    expect(calls).toEqual(["setImage", "refresh grenade"]);
+  });
+
+  it("only logs when the cached recipe can't be refreshed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      attachProductPhoto("grenade", "https://images.openfoodfacts.org/x.jpg", {
+        setImage: async () => {},
+        refresh: () => Promise.reject(new Error("Mealie down")),
+      })
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("normalises the barcode it saves under", async () => {
     const { deps, find, create } = saveDeps();
     await saveProduct({ ...grenadeInput, barcode: "036000291452" }, deps);
@@ -341,7 +409,7 @@ describe("saveProduct", () => {
   it("returns the existing product instead of creating a duplicate", async () => {
     const { deps, find, create } = saveDeps();
     find.mockResolvedValue({ ...productRecipe(), slug: "old-grenade" });
-    await expect(saveProduct(grenadeInput, deps)).resolves.toEqual({
+    await expect(saveProduct(grenadeInput, deps)).resolves.toMatchObject({
       slug: "old-grenade",
     });
     expect(create).not.toHaveBeenCalled();

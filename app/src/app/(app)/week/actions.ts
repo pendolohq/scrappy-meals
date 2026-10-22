@@ -30,6 +30,7 @@ import {
 import {
   loadKnownProduct,
   lookupProduct,
+  attachProductPhoto,
   saveProduct,
 } from "@/server/products";
 import { viewerToday } from "@/server/today";
@@ -110,6 +111,8 @@ export const saveProductAction = userAction(
     }),
     fromOpenFoodFacts: z.boolean(),
     edited: z.boolean(),
+    // Checked against Open Food Facts' hosts by `saveProduct`.
+    imageUrl: z.string().max(500).nullable(),
     date,
     slot,
     snackIndex,
@@ -146,7 +149,12 @@ export const saveProductAction = userAction(
     };
     // Before anything is created in Mealie.
     await checkNewMeal(getDb(), meal);
-    const { slug } = await saveProduct(product);
+    const { slug, photoUrl } = await saveProduct(product);
+    // Before the meal is added: if that fails, the retry finds the product
+    // already in Mealie and has no photo to attach.
+    if (photoUrl) {
+      after(() => attachProductPhoto(slug, photoUrl));
+    }
     await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
     const barcode = parseBarcode(product.barcode);
     if (contribute && barcode) {

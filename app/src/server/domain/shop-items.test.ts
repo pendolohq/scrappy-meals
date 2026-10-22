@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildShopItems } from "./shop-items";
 import type {
   FreeTextLine,
+  ProductLine,
   ShoppingAmount,
   ShoppingLine,
   WeekIngredients,
@@ -40,11 +41,21 @@ const freeText = (text: string): FreeTextLine => ({
   times: 1,
 });
 
+const product = (count: number, unitLabel: string | null): ProductLine => ({
+  key: "yoghurt|product",
+  recipeId: "yoghurt",
+  name: "FAGE Total",
+  count,
+  unitLabel,
+});
+
 const plan = (
   lines: ShoppingLine[],
-  free: FreeTextLine[] = []
+  free: FreeTextLine[] = [],
+  products: ProductLine[] = []
 ): WeekIngredients => ({
   lines,
+  products,
   freeText: free,
   unscaled: [],
   missing: [],
@@ -232,6 +243,49 @@ describe("buildShopItems", () => {
       checked: false,
       amounts: [{ quantity: 1, unit: null }],
     });
+  });
+
+  it("lists a product in its own group, ticks and hides it like any line", () => {
+    const pots = plan([], [], [product(1, "450 g")]);
+    expect(buildShopItems(pots, none)[0]).toMatchObject({
+      id: "yoghurt|product",
+      source: "plan",
+      text: "FAGE Total",
+      amount: "×1 (450 g)",
+      aisle: "Products",
+      checked: false,
+      amounts: [{ quantity: 1, unit: "450 g" }],
+    });
+    const state = (key: "ticks" | "hidden", quantity: number) => ({
+      ...none,
+      [key]: [
+        { lineKey: "yoghurt|product", amounts: [{ quantity, unit: "450 g" }] },
+      ],
+    });
+    expect(buildShopItems(pots, state("ticks", 1))[0].checked).toBe(true);
+    expect(buildShopItems(pots, state("hidden", 1))).toEqual([]);
+  });
+
+  it("brings a product back unticked when the plan needs more packs, or another pack size", () => {
+    const tick = {
+      ...none,
+      ticks: [
+        {
+          lineKey: "yoghurt|product",
+          amounts: [{ quantity: 1, unit: "450 g" }],
+        },
+      ],
+    };
+    expect(
+      buildShopItems(plan([], [], [product(3, "450 g")]), tick)[0]
+    ).toMatchObject({
+      checked: false,
+      amount: "×2 (450 g) more",
+      detail: "×3 (450 g) in all",
+    });
+    expect(
+      buildShopItems(plan([], [], [product(1, "500 g")]), tick)[0]
+    ).toMatchObject({ checked: false, amount: "×1 (500 g) more" });
   });
 
   it("puts extras after the plan's lines, in the order given, with the plan's order kept in position", () => {

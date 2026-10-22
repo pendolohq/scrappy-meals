@@ -12,9 +12,13 @@ describe("aisleOf", () => {
   });
 
   it("takes a label named like an aisle, in any case", () => {
-    for (const aisle of AISLES) {
+    for (const aisle of AISLES.filter((a) => a !== "Products")) {
       expect(aisleOf(` ${aisle.toUpperCase()} `)).toBe(aisle);
     }
+  });
+
+  it("keeps foods out of the planned products' group", () => {
+    expect(aisleOf("Products")).toBe("Other");
   });
 
   it("puts unlabelled foods and unknown labels under Other", () => {

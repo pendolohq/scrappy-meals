@@ -36,6 +36,7 @@ until every place names the same version (`mealie-version.test.ts`).
 | Import with AI | `POST /api/recipes/create/ai` (multipart: `content`, `url`, `images[]`) → slug; see below |
 | AI enabled? | `GET /api/groups/self` → `aiProviderSettings.aiEnabled`, `.imageProviderEnabled` (see below) |
 | Create a product | `POST /api/recipes` `{ name }` → slug, then one `PATCH` (see "Products") |
+| Product photo | `POST /api/recipes/{slug}/image` `{ url, includeTags: false }`: Mealie downloads the image itself (see "Products") |
 | Find a product by barcode | `GET /api/recipes?queryFilter=extras.value = "<barcode>"`, then the detail of each hit |
 | Latest products | `GET /api/recipes?tags=product&orderBy=dateAdded&orderDirection=desc` |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
@@ -191,6 +192,23 @@ totals and the recipe page work on it unchanged. `createProductRecipe`
   `scrappyNutrition: source | reviewed`. `Recipe.product` reads them back;
   the list items from `GET /api/recipes` have `extras: null`, so only the tag
   (`RecipeListItem.isProduct`) shows there.
+
+**Photo.** A product saved from Open Food Facts gets its front photo
+(`image_front_url`, only on `images.openfoodfacts.org` or
+`static.openfoodfacts.org`, `offImageUrl`) through `POST /api/recipes/{slug}/image`
+with `{ url, includeTags: false }`. Mealie downloads it from its own side
+(its `safehttp` refuses private addresses, which Open Food Facts isn't), so the
+planner never handles the bytes. The call comes after the `PATCH` and a failure
+is logged, not raised: the product is saved without a photo. The scan sheet
+shows the same URL small, next to the name.
+
+**Shopping list.** A planned product (not an unplanned one) is not an ingredient
+line: `buildShoppingList` sums the servings eaten per product and writes one
+line in the week's list, "Name ×N", keyed `<recipe id>|product`. When the pack
+holds two or more servings it counts packs and says so: "Name ×1 (450 g)". The
+checklist shows them in a "Products" group, and ticks and removals work as for
+other lines; the pack size is the line's unit, so a changed pack brings a
+ticked line back.
 
 **Finding one by barcode.** `queryFilter=extras.value = "<barcode>"` matches
 recipes with *any* extra of that value. Filtering on

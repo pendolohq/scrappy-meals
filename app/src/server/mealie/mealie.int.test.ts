@@ -3,7 +3,9 @@
 //
 //   MEALIE_TEST_URL=http://localhost:9000 bun run test:integration
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { attachProductPhoto } from "../products";
 
 import {
   checkMealieVersion,
@@ -21,7 +23,11 @@ import {
   parseIngredients,
   patchRecipe,
 } from "./import";
-import { createProductRecipe, findProductByBarcode } from "./products";
+import {
+  createProductRecipe,
+  findProductByBarcode,
+  setRecipeImageFromUrl,
+} from "./products";
 import { discoverRecipes, getRecipe, listOrganizers } from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
@@ -443,6 +449,39 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         product: { servingGrams: 330, servingUnit: "ml", packGrams: null },
       });
       expect(r.nutrition.perServing).toEqual({ kcal: 140 });
+    });
+
+    it("sets a product's photo through Mealie, and a failure never throws", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const photoSlug = await createProductRecipe(
+        {
+          name: `IT No Photo ${run}`,
+          info: {
+            barcode: barcodeFor(digits(6)),
+            servingGrams: 100,
+            servingUnit: "g",
+            packGrams: null,
+          },
+          perServing: { kcal: 100 },
+          orgURL: null,
+          nutrition: "source",
+        },
+        { client }
+      );
+      cleanup.push(remove(photoSlug));
+      // Mealie can't reach this address; the product stays as it was.
+      await attachProductPhoto(
+        photoSlug,
+        "https://images.openfoodfacts.org/images/nope.jpg",
+        {
+          setImage: (slug, url) => setRecipeImageFromUrl(slug, url, { client }),
+        }
+      );
+      const r = (await getRecipe(photoSlug, { client }))!;
+      expect(r.imagePath).toBeNull();
+      expect(r.product).not.toBeNull();
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     it("leaves ordinary recipes without product info", async () => {

@@ -1,9 +1,11 @@
 import "server-only";
 
+import { getDb } from "./db/client";
 import { parseBarcode } from "./domain/barcode";
 import { offHasGaps } from "./domain/off-contribution";
 import {
   draftFromOff,
+  offImageUrl,
   offProductUrl,
   perServing,
   type ProductDraft,
@@ -18,11 +20,13 @@ import {
   createProductRecipe,
   findProductByBarcode,
   type ProductRecipeInput,
+  setRecipeImageFromUrl,
 } from "./mealie/products";
 import { getRecipe, type Recipe } from "./mealie/recipes";
 import { contributionEnabled } from "./off-contribute";
 import { lookupOpenFoodFacts, type OffResult } from "./openfoodfacts";
 import { createRateLimiter } from "./rate-limit";
+import { loadRecipes } from "./recipe-cache";
 
 export class ProductError extends UserFacingError {
   name = "ProductError";
@@ -51,6 +55,8 @@ export type SaveProductInput = {
   fromOpenFoodFacts: boolean;
   /** Someone changed a value from what Open Food Facts had. */
   edited: boolean;
+  /** Open Food Facts' front photo, from the draft; checked again here. */
+  imageUrl?: string | null;
 };
 
 type Deps = {
@@ -182,7 +188,7 @@ export async function lookupProduct(
 export async function saveProduct(
   input: SaveProductInput,
   deps: Partial<Deps> = {}
-): Promise<{ slug: string }> {
+): Promise<{ slug: string; photoUrl: string | null }> {
   const d = withDefaults(deps);
   const barcode = canonical(input.barcode);
 
@@ -190,7 +196,7 @@ export async function saveProduct(
     const existing = await d.find(barcode);
     if (existing) {
       // An incomplete one would be planned as an ordinary recipe for everyone.
-      return { slug: knownProduct(existing).slug };
+      return { slug: knownProduct(existing).slug, photoUrl: null };
     }
     const slug = await d.create({
       name: input.name,
@@ -205,6 +211,41 @@ export async function saveProduct(
       nutrition:
         input.edited || !input.fromOpenFoodFacts ? "reviewed" : "source",
     });
-    return { slug };
+    // The browser sends it back, so it is only trusted as far as the allow-list.
+    const photoUrl = input.fromOpenFoodFacts
+      ? offImageUrl(input.imageUrl)
+      : null;
+    return { slug, photoUrl };
   });
+}
+
+/**
+ * Has Mealie fetch a new product's photo. Meant to run after the response
+ * (`after()`): Mealie can take seconds to give up on an unreachable image, and
+ * the product is saved without it. Failures are only logged.
+ */
+export async function attachProductPhoto(
+  slug: string,
+  url: string,
+  deps: {
+    setImage?: (slug: string, url: string) => Promise<void>;
+    refresh?: (slug: string) => Promise<unknown>;
+  } = {}
+): Promise<void> {
+  const setImage = deps.setImage ?? setRecipeImageFromUrl;
+  // Adding the meal cached the recipe without the photo; without this it
+  // would only show after the hourly refresh.
+  const refresh =
+    deps.refresh ?? ((s: string) => loadRecipes(getDb(), [s], { force: true }));
+  try {
+    await setImage(slug, url);
+  } catch (err) {
+    console.warn(`Product ${slug}: could not fetch its image`, err);
+    return;
+  }
+  try {
+    await refresh(slug);
+  } catch (err) {
+    console.warn(`Product ${slug}: could not refresh its cached recipe`, err);
+  }
 }

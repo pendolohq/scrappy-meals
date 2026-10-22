@@ -28,6 +28,7 @@ export const MealRow = ({
   weekStart,
   currentUserId,
   canLog,
+  today,
 }: {
   meal: PlannedMeal;
   /** The Monday of the meal's week, for the link to its recipe page. */
@@ -36,6 +37,8 @@ export const MealRow = ({
   currentUserId: string;
   /** True from the meal's day onwards: adherence can't be logged in advance. */
   canLog: boolean;
+  /** The viewer's today. */
+  today: string;
 }) => {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -109,6 +112,8 @@ export const MealRow = ({
                 mealId={meal.id}
                 mealName={name}
                 log={meal.adherence[currentUserId]}
+                at={meal}
+                today={today}
                 fill
               />
             </div>

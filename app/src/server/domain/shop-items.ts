@@ -3,6 +3,7 @@ import type { ShopItemView } from "@/lib/shop-list";
 import {
   coverMax,
   formatAmounts,
+  formatProductAmount,
   type ShoppingAmount,
   stillNeeded,
   type TickedAmount,
@@ -47,7 +48,7 @@ function standing(
 }
 
 /**
- * The checklist: the plan's lines, then its free-text lines, then the extras
+ * The checklist: the plan's lines, then its products, then its free-text lines, then the extras
  * added by hand. Removed lines are left out until the plan needs more of them.
  * A ticked line the plan has since outgrown reads as unticked with what's
  * still needed; ticks for lines that left the plan are simply never looked up.
@@ -81,6 +82,31 @@ export function buildShopItems(
       aisle: l.aisle,
       checked: seen === "ticked",
       amounts: l.amounts.map((a) => ({ quantity: a.quantity, unit: a.unit })),
+    });
+  }
+  for (const p of plan.products) {
+    // The count is per unit label, so a changed pack size brings the line back.
+    const need: ShoppingAmount = {
+      quantity: p.count,
+      unit: p.unitLabel,
+      standard: null,
+    };
+    const seen = standing([need], ticks.get(p.key), hidden.get(p.key));
+    if (seen === "hidden") {
+      continue;
+    }
+    const outgrown = typeof seen === "object";
+    items.push({
+      id: p.key,
+      source: "plan",
+      text: p.name,
+      amount: outgrown
+        ? `${formatProductAmount({ count: seen.more[0]?.quantity ?? 0, unitLabel: p.unitLabel })} more`
+        : formatProductAmount(p),
+      detail: outgrown ? `${formatProductAmount(p)} in all` : null,
+      aisle: "Products",
+      checked: seen === "ticked",
+      amounts: [{ quantity: p.count, unit: p.unitLabel }],
     });
   }
   for (const f of plan.freeText) {

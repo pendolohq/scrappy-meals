@@ -25,11 +25,13 @@ const WeekMeal = ({
   members,
   currentUserId,
   canLog,
+  today,
 }: {
   meal: PlannedMeal;
   members: Member[];
   currentUserId: string;
   canLog: boolean;
+  today: string;
 }) => {
   const name = meal.recipe?.name ?? meal.slug;
   const mine = meal.portions[currentUserId] ?? 0;
@@ -63,6 +65,8 @@ const WeekMeal = ({
             mealId={meal.id}
             mealName={name}
             log={meal.adherence[currentUserId]}
+            at={meal}
+            today={today}
           />
         )
       )}
@@ -228,6 +232,7 @@ export const WeekGrid = ({
                               members={plan.members}
                               currentUserId={currentUserId}
                               canLog={date <= today}
+                              today={today}
                             />
                           )
                         )}

@@ -205,6 +205,9 @@ export const AddMeal = ({
   today,
   className,
   text,
+  initialMode = "recipes",
+  controlled,
+  alreadyHad = false,
 }: {
   date: string;
   slot: SlotType;
@@ -216,6 +219,12 @@ export const AddMeal = ({
   className?: string;
   /** Shorter trigger text where the slot is clear from around it; screen readers still hear the slot and day. */
   text?: string;
+  /** The tab the dialog opens on. */
+  initialMode?: "recipes" | "product";
+  /** Opened from elsewhere (no trigger button of its own): the parent owns `open`. */
+  controlled?: { open: boolean; onClose: () => void };
+  /** Logs what someone had instead of the plan: a recipe picked here is eaten off-plan, by them alone. */
+  alreadyHad?: boolean;
 }) => {
   // Starts on the slot's meal tag, as "Add to meal plan" starts on the slot
   // the tags name; one tap on the chip clears it. A tag Mealie doesn't have
@@ -231,7 +240,7 @@ export const AddMeal = ({
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"recipes" | "product">("recipes");
+  const [mode, setMode] = useState(initialMode);
   // A product picked from the results: its sheet opens in the Product tab.
   const [picked, setPicked] = useState<ProductLookup>();
   // The slot's meal tag lifted by typing a search; see `onSearch`.
@@ -250,6 +259,7 @@ export const AddMeal = ({
 
   const show = () => {
     setOpen(true);
+    setMode(initialMode);
     setError(undefined);
     dialog.current?.showModal();
   };
@@ -259,10 +269,20 @@ export const AddMeal = ({
     setOpen(false);
     setQuery("");
     setFilters(startFilters());
-    setMode("recipes");
+    setMode(initialMode);
     setPicked(undefined);
     liftedTag.current = false;
+    controlled?.onClose();
   };
+
+  const wantsOpen = controlled?.open ?? false;
+  useEffect(() => {
+    if (wantsOpen && !dialog.current?.open) {
+      show();
+    }
+    // `show` only reads props that stay put while the dialog is open.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsOpen]);
 
   // Products aren't tagged with meals, so the slot's tag would hide them from
   // a search by name. Typing the first characters lifts it; emptying the
@@ -309,7 +329,13 @@ export const AddMeal = ({
         return;
       }
       const res = await attempt(() =>
-        addMealAction({ date, slot, snackIndex, slug })
+        addMealAction({
+          date,
+          slot,
+          snackIndex,
+          slug,
+          ...(alreadyHad ? { alreadyHad: true } : {}),
+        })
       );
       if (res.error) {
         setError(failureText(res));
@@ -352,18 +378,20 @@ export const AddMeal = ({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={show}
-        aria-label={text ? `Add ${what}, ${formatDay(date)}` : undefined}
-        className={
-          className ??
-          "-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
-        }
-      >
-        <Plus className="size-4" aria-hidden />
-        {text ?? `Add ${what}`}
-      </button>
+      {!controlled && (
+        <button
+          type="button"
+          onClick={show}
+          aria-label={text ? `Add ${what}, ${formatDay(date)}` : undefined}
+          className={
+            className ??
+            "-mr-2 inline-flex min-h-tap items-center gap-1 rounded-button px-3 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
+          }
+        >
+          <Plus className="size-4" aria-hidden />
+          {text ?? `Add ${what}`}
+        </button>
+      )}
       {/* The whole screen on phones, a centred dialog on wider screens. */}
       <dialog
         ref={dialog}

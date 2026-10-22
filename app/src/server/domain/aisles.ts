@@ -14,6 +14,8 @@ export const AISLES = [
   "Spices, oils & condiments",
   "Frozen",
   "Drinks",
+  // Packaged products planned as themselves; no food label maps here.
+  "Products",
   "Other",
 ] as const;
 
@@ -43,7 +45,10 @@ const FROM_LABEL: Record<string, Aisle> = {
   "frozen foods": "Frozen",
   beverages: "Drinks",
   alcohol: "Drinks",
-  ...Object.fromEntries(AISLES.map((a) => [a.toLowerCase(), a])),
+  // Products are the planned products' own group; a food labelled so is Other.
+  ...Object.fromEntries(
+    AISLES.filter((a) => a !== "Products").map((a) => [a.toLowerCase(), a])
+  ),
 };
 
 /** The aisle for a Mealie label; unlabelled and unknown labels are "Other". */
