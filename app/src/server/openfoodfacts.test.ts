@@ -57,7 +57,7 @@ describe("lookupOpenFoodFacts", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url, init] = fetcher.mock.calls[0];
     expect(String(url)).toBe(
-      "https://world.openfoodfacts.org/api/v3/product/5000159461122?fields=product_name,brands,quantity,product_quantity,product_quantity_unit,serving_quantity,serving_quantity_unit,image_front_url,nutriments"
+      "https://world.openfoodfacts.org/api/v3/product/5000159461122?fields=product_name,brands,quantity,product_quantity,product_quantity_unit,serving_quantity,serving_quantity_unit,image_front_url,serving_size,nutrition_data_per,no_nutrition_data,nutriments"
     );
     const headers = new Headers(init?.headers);
     expect(headers.get("user-agent")).toBe(
@@ -85,6 +85,11 @@ describe("lookupOpenFoodFacts", () => {
       productQuantityUnit: "g",
       servingQuantity: 50,
       servingQuantityUnit: "g",
+      servingSize: "50 g",
+      nutritionPer: "100g",
+      noNutritionData: false,
+      hasNutrients: true,
+      hasNutrients100g: true,
       per100: { kcal: 481, protein: 8.6, carbs: 60.5, fat: 22.5, fibre: 4.3 },
       kcalFromKj: false,
     });
@@ -101,10 +106,38 @@ describe("lookupOpenFoodFacts", () => {
         quantity: "3 x 60 g",
         productQuantity: 180,
         servingQuantity: null,
+        servingSize: null,
         per100: { kcal: 364, protein: 33.8, carbs: 28.2, fat: 14.8 },
       },
     });
     expect(foundProduct(result).per100.fibre).toBeUndefined();
+  });
+
+  it("tells Huel's prepared-only nutrition from nutrition per 100 g as sold", async () => {
+    expect(foundProduct(await lookup("huel-prepared-only"))).toMatchObject({
+      hasNutrients: true,
+      hasNutrients100g: false,
+      nutritionPer: "100g",
+    });
+  });
+
+  it("reads a record with no nutriments as having no nutrients, and the no-nutrition flag", async () => {
+    const result = lookupOpenFoodFacts("5000159461122", {
+      fetch: answering(() =>
+        json(
+          productBody({
+            product_name: "Bare",
+            no_nutrition_data: "on",
+            nutriments: { "nutrition-score-fr_100g": 12 },
+          })
+        )
+      ),
+    });
+    expect(foundProduct(await result)).toMatchObject({
+      hasNutrients: false,
+      hasNutrients100g: false,
+      noNutritionData: true,
+    });
   });
 
   it("keeps zeros: Coca-Cola has 0 g protein and fat, and is in ml", async () => {
@@ -298,5 +331,71 @@ describe("lookupOpenFoodFacts", () => {
     }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(UserFacingError);
     expect(err).not.toBeInstanceOf(RetryableError);
+  });
+});
+
+describe("lookupOpenFoodFacts (strict, for writes)", () => {
+  const strict = (response: () => Response) =>
+    lookupOpenFoodFacts("5000159461122", {
+      fetch: answering(response),
+      strict: true,
+    });
+
+  it("still reads a found product and a real 'not found'", async () => {
+    expect((await strict(() => fixture("snickers"))).status).toBe("found");
+    expect((await strict(() => fixture("not-found"))).status).toBe("not-found");
+  });
+
+  it("takes a 404 as absent only with a product_not_found body", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await strict(() => fixture("not-found", 404))).status).toBe(
+      "not-found"
+    );
+    for (const body of [
+      "{}",
+      "<html>Not Found</html>",
+      { status: "failure" },
+    ]) {
+      await expect(strict(() => json(body, 404))).rejects.toBeInstanceOf(
+        RetryableError
+      );
+    }
+    // The lenient read keeps treating any 404 as absent.
+    await expect(
+      lookupOpenFoodFacts("5000159461122", {
+        fetch: answering(() => json("{}", 404)),
+      })
+    ).resolves.toEqual({ status: "not-found" });
+  });
+
+  it("accepts v3's success_with_warnings when the product is there", async () => {
+    const body = {
+      ...offFixtureJson("snickers"),
+      status: "success_with_warnings",
+    };
+    expect((await strict(() => json(body))).status).toBe("found");
+    const bare = { status: "success_with_warnings" };
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(strict(() => json(bare))).rejects.toBeInstanceOf(
+      RetryableError
+    );
+  });
+
+  it("throws on a reply it can't read instead of calling the product absent", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const body of ["<html>oops</html>", { status: "weird" }, {}]) {
+      await expect(strict(() => json(body))).rejects.toBeInstanceOf(
+        RetryableError
+      );
+    }
+  });
+
+  it("the lenient read still calls an unreadable reply not found", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      lookupOpenFoodFacts("5000159461122", {
+        fetch: answering(() => json("<html>")),
+      })
+    ).resolves.toEqual({ status: "not-found" });
   });
 });

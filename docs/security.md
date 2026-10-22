@@ -65,8 +65,13 @@ which is fine.
 - `src/proxy.ts` (Next.js middleware) redirects (or answers 401 under `/api/`) for everything
   except a short public list: `/login`, `/offline`, `/sw.js`, `/api/auth`,
   `/api/health`, `/manifest.webmanifest`, plus the static `/icons/` and `/screenshots/`
-  (the install dialog's, taken from sample data). None of these read user data. It's a second layer: removing a path from that list
+  (the install dialog's, taken from sample data) and `/zxing/` (the barcode reader's wasm). None of these read user data. It's a second layer: removing a path from that list
   must never be what keeps data private.
+- Caddy sends `Permissions-Policy: camera=(self), microphone=(), geolocation=()` on the
+  planner's host: the barcode scanner needs the camera, nothing needs the rest. The scanner's
+  wasm is served from our own origin (`/zxing/`), never a CDN. Like `/icons/`, it's public:
+  it's the open-source library's own file, and signed out a redirect would hand the reader
+  the login page instead.
 - Sessions are JWTs (30 days) that carry a session version. Every request
   checks it against the database, so removing a user or changing a password
   (`scrappy user passwd`) signs out every device
@@ -84,6 +89,16 @@ which is fine.
 - Sign-in failures are rate-limited per IP, per email from one IP, and per
   email overall (`createSignInLimits` in `src/server/rate-limit.ts`), so
   guessing someone's password can't lock them out of their own device.
+
+## Outbound writes to Open Food Facts
+
+Contributing a product (`src/server/off-contribute.ts`) is the one place the app
+writes to a third party. It is off unless `OFF_USER_ID` and `OFF_PASSWORD` are
+set, runs only from `saveProductAction` (when ticked) and
+`retryContributionAction`, both `userAction`s, and sends product data only: the
+account's credentials, and an `app_uuid` derived from `AUTH_SECRET` and the
+session's `user.id` (never the id itself). The password is never stored in
+`off_contributions`, logged or put in an error message.
 
 ## Tests
 

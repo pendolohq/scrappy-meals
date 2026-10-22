@@ -11,6 +11,7 @@ import {
   type ProductDraft,
   type ProductInfo,
   type ServingUnit,
+  servingIsKnown,
   servingsFor,
 } from "@/server/domain/product";
 import {
@@ -22,6 +23,11 @@ import {
 import { attempt, failureText } from "../attempt";
 
 import { AlreadyHad } from "./already-had";
+import {
+  ContributeToggle,
+  rememberContribute,
+  rememberedContribute,
+} from "./contribute-toggle";
 import { Notice } from "./notice";
 import { MACROS, nutritionLine } from "./nutrition";
 import {
@@ -42,11 +48,17 @@ const number = (text: string): number | undefined =>
 export const DraftSheet = ({
   barcode,
   draft,
+  canContribute,
   at,
   future,
   onAdded,
   onBack,
-}: SheetProps & { barcode: string; draft: ProductDraft | null }) => {
+}: SheetProps & {
+  barcode: string;
+  draft: ProductDraft | null;
+  /** The app can send it to Open Food Facts, and they'd gain from it. */
+  canContribute: boolean;
+}) => {
   const [name, setName] = useState(draft?.name ?? "");
   const [per100, setPer100] = useState<Record<MacroKey, string>>(
     () =>
@@ -64,6 +76,7 @@ export const DraftSheet = ({
   const [picked, setKind] = useState<PortionKind>("one");
   const [grams, setGrams] = useState("");
   const [alreadyHad, setAlreadyHad] = useState(!future);
+  const [contribute, setContribute] = useState(rememberedContribute);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
 
@@ -119,6 +132,10 @@ export const DraftSheet = ({
           ...at,
           baseServings,
           alreadyHad: alreadyHad && !future,
+          contribute: canContribute && contribute,
+          servingKnown: servingIsKnown(draft, info.servingGrams),
+          // A pack size is OFF's own or typed by the person.
+          packKnown: info.packGrams !== null,
         })
       );
       if (res.error) {
@@ -272,6 +289,15 @@ export const DraftSheet = ({
         future={future}
         onChange={setAlreadyHad}
       />
+      {canContribute && (
+        <ContributeToggle
+          checked={contribute}
+          onChange={(on) => {
+            setContribute(on);
+            rememberContribute(on);
+          }}
+        />
+      )}
 
       {draft && (
         <p className="text-xs text-muted">

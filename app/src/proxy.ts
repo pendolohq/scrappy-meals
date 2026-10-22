@@ -33,9 +33,11 @@ export const proxy = auth((req) => {
 
 // Proxy always runs on Node.js, which the session check needs (it reads the database).
 // Icons and the install screenshots (sample data) are fetched by the browser's
-// install dialog, signed in or not.
+// install dialog, signed in or not. The barcode reader's wasm is the open-source
+// library's own file; signed out, a redirect would hand the reader the login
+// page in its place.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons/|screenshots/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|screenshots/|zxing/).*)",
   ],
 };

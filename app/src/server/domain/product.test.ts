@@ -16,6 +16,7 @@ import {
   type ProductInfo,
   perServing,
   productName,
+  servingIsKnown,
   servingsFor,
 } from "./product";
 
@@ -45,6 +46,11 @@ const off = (over: Partial<OffProduct> = {}): OffProduct => ({
   productQuantityUnit: null,
   servingQuantity: null,
   servingQuantityUnit: null,
+  servingSize: null,
+  nutritionPer: null,
+  noNutritionData: false,
+  hasNutrients: false,
+  hasNutrients100g: false,
   per100: {},
   kcalFromKj: false,
   imageUrl: null,
@@ -455,5 +461,42 @@ describe("servingsFor", () => {
     expect(servings({ kind: "grams", grams: 7000 })).toBeNull();
     expect(servings({ kind: "servings", count: 0.01 })).toBe(0.01);
     expect(servings({ kind: "servings", count: 100 })).toBe(100);
+  });
+});
+
+describe("serving source and servingIsKnown", () => {
+  const source = (over: Partial<OffProduct>) =>
+    draftFromOff(BARCODE, off(over));
+
+  it("records where the serving size came from", () => {
+    expect(source({ servingQuantity: 30 }).servingSource).toBe("off");
+    expect(source({ quantity: "3 x 60 g" }).servingSource).toBe("multipack");
+    expect(
+      source({ productQuantity: 200, productQuantityUnit: "g" }).servingSource
+    ).toBe("pack");
+    expect(source({}).servingSource).toBe("default");
+  });
+
+  it("trusts OFF's and the multipack's serving, not a guess from the pack or the default", () => {
+    const check = (over: Partial<OffProduct>) => {
+      const draft = source(over);
+      return servingIsKnown(draft, draft.servingGrams);
+    };
+    expect(check({ servingQuantity: 30 })).toBe(true);
+    expect(check({ quantity: "3 x 60 g" })).toBe(true);
+    expect(check({ productQuantity: 200, productQuantityUnit: "g" })).toBe(
+      false
+    );
+    expect(check({})).toBe(false);
+  });
+
+  it("trusts a guess once the person changed it, and a serving typed with no draft", () => {
+    const draft = source({});
+    expect(servingIsKnown(draft, 40)).toBe(true);
+    expect(servingIsKnown(null, 100)).toBe(true);
+  });
+
+  it("doesn't count a unit-only change on the default", () => {
+    expect(servingIsKnown(source({}), 100)).toBe(false);
   });
 });

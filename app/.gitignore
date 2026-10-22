@@ -44,3 +44,6 @@ dist/
 test-results/
 playwright-report/
 e2e/.state.json
+
+# Copied from node_modules by scripts/copy-wasm.mjs
+/public/zxing/

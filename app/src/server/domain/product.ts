@@ -20,11 +20,24 @@ export type OffProduct = {
   productQuantityUnit: string | null;
   servingQuantity: number | null;
   servingQuantityUnit: string | null;
+  /** The free text ("60 g"); only the contribution check reads it. */
+  servingSize: string | null;
+  /** `nutrition_data_per`: "100g", "serving", ... */
+  nutritionPer: string | null;
+  /** Someone marked the pack as having no nutrition table. */
+  noNutritionData: boolean;
+  /** Any nutrient at all, on any basis (as sold, prepared, per serving). */
+  hasNutrients: boolean;
+  /** Any nutrient per 100 g as sold, which is what we would add to. */
+  hasNutrients100g: boolean;
   per100: Partial<Macros>;
   kcalFromKj: boolean;
   /** The front photo, already checked by `offImageUrl`. */
   imageUrl: string | null;
 };
+
+/** Where the draft's serving size came from; only data from the pack is public-worthy. */
+export type ServingSource = "off" | "multipack" | "pack" | "default";
 
 export type ProductDraft = {
   barcode: string;
@@ -32,6 +45,7 @@ export type ProductDraft = {
   name: string;
   servingGrams: number;
   servingUnit: ServingUnit;
+  servingSource: ServingSource;
   packGrams: number | null;
   per100: Partial<Macros>;
   missing: MacroKey[];
@@ -123,7 +137,7 @@ function packSize(p: OffProduct): number | null {
 function guessServing(
   p: OffProduct,
   pack: number | null
-): { grams: number; unit: ServingUnit } {
+): { grams: number; unit: ServingUnit; source: ServingSource } {
   const unit: ServingUnit =
     p.servingQuantityUnit === "ml" || p.productQuantityUnit === "ml"
       ? "ml"
@@ -134,19 +148,20 @@ function guessServing(
     isUnit(p.servingQuantityUnit) &&
     (pack === null || p.servingQuantity <= pack)
   ) {
-    return { grams: p.servingQuantity, unit };
+    return { grams: p.servingQuantity, unit, source: "off" };
   }
   const multipack = p.quantity ? MULTIPACK.exec(p.quantity) : null;
   if (multipack) {
     return {
       grams: Number(multipack[2].replace(",", ".")),
       unit: multipack[3].toLowerCase() === "ml" ? "ml" : "g",
+      source: "multipack",
     };
   }
   if (pack !== null && pack <= 250) {
-    return { grams: pack, unit };
+    return { grams: pack, unit, source: "pack" };
   }
-  return { grams: 100, unit };
+  return { grams: 100, unit, source: "default" };
 }
 
 /**
@@ -181,6 +196,7 @@ export function draftFromOff(
     name: productName(product.name, product.brand),
     servingGrams: serving.grams,
     servingUnit: serving.unit,
+    servingSource: serving.source,
     packGrams,
     per100: product.per100,
     missing: MACRO_KEYS.filter((k) => product.per100[k] === undefined),
@@ -189,6 +205,26 @@ export function draftFromOff(
     sourceUrl: offProductUrl(barcode),
     imageUrl: product.imageUrl,
   };
+}
+
+/**
+ * Whether the serving size on the sheet is worth sending to Open Food Facts:
+ * it came from their data or the pack's multipack text, or a person typed or
+ * changed it. A guess from the pack size or the 100 g default is not.
+ */
+export function servingIsKnown(
+  draft: Pick<ProductDraft, "servingGrams" | "servingSource"> | null,
+  grams: number
+): boolean {
+  if (draft === null) {
+    return true;
+  }
+  return (
+    draft.servingSource === "off" ||
+    draft.servingSource === "multipack" ||
+    // The unit alone doesn't count: 100 ml is as much a guess as 100 g.
+    draft.servingGrams !== grams
+  );
 }
 
 /** Per-100 values for a serving of `grams`, to one decimal. Absent stays absent. */

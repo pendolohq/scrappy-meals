@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { RecipeFlags } from "@/components/plan/recipe-flags";
 import { EditInMealie } from "@/components/recipe/edit-in-mealie";
+import { OffContribution } from "@/components/recipe/off-contribution";
 import {
   NutritionGrid,
   RecipeFacts,
@@ -94,6 +95,11 @@ export default async function MealPage({
           />
         )}
         {recipe && <NutritionGrid nutrition={recipe.nutrition} />}
+        {recipe?.product && (
+          <Suspense fallback={null}>
+            <OffContribution barcode={recipe.product.barcode} />
+          </Suspense>
+        )}
       </header>
 
       <CookingPanel

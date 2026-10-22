@@ -17,6 +17,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { OffFields } from "../domain/off-contribution";
 import type { ProductInfo } from "../domain/product";
 import {
   DEFAULT_SNACK_SLOTS,
@@ -254,6 +255,33 @@ export const recipeCache = pgTable(
     check(
       "recipe_cache_nutrition_source",
       sql`${t.nutritionSource} in ('source', 'estimated', 'reviewed')`
+    ),
+  ]
+);
+
+/**
+ * What we sent Open Food Facts for a product, once per barcode: a product is
+ * contributed once, whoever scanned it. `fields` never holds credentials.
+ */
+export const offContributions = pgTable(
+  "off_contributions",
+  {
+    barcode: text("barcode").primaryKey(),
+    status: text("status")
+      .$type<"pending" | "sent" | "nothing" | "failed">()
+      .notNull(),
+    fields: jsonb("fields").$type<OffFields>(),
+    error: text("error"),
+    attempts: smallint("attempts").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (t) => [
+    check(
+      "off_contributions_status",
+      sql`${t.status} in ('pending', 'sent', 'nothing', 'failed')`
     ),
   ]
 );

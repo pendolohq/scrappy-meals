@@ -93,6 +93,9 @@ services:
       MEALIE_PUBLIC_URL: https://recipes.${DOMAIN:?}
       MEALIE_API_TOKEN: ${MEALIE_API_TOKEN:-}
       AUTH_SECRET: ${AUTH_SECRET:?}
+      # Optional; contributing products to Open Food Facts is off unless both are set.
+      OFF_USER_ID: ${OFF_USER_ID:-}
+      OFF_PASSWORD: ${OFF_PASSWORD:-}
       AUTH_URL: https://app.${DOMAIN:?}
       AUTH_TRUST_HOST: "true"
       TZ: ${TZ:-UTC}
