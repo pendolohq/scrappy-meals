@@ -178,8 +178,9 @@ Snickers, Grenade, Huel, Kind and Fage ones above make good fixtures):
   buttons). They count in `personDayTotals` like any meal.
 - **Who ate it:** a product entry gives a portion of 1 to the person who added it and 0 to
   everyone else, planned or not. Portions stay editable by anyone, as now. It keys on the
-  session's `user.id`, never an id from the input. If that person is fasting that day, the
-  entry is still added at 1, since they ate it; the sheet says so.
+  session's `user.id`, never an id from the input. If that person is fasting that day, an
+  unplanned entry is still added at 1, since they ate it; a planned one gets 0, like any
+  planned meal on a fast.
 - **Swaps:** "Swapped" stays a note for now. A follow-up can offer "Log what you had" from the
   swap prompt, which opens the same sheet and adds an unplanned entry.
 - The Add snack dialog also lists **recent products** (the Product tag, most recently added

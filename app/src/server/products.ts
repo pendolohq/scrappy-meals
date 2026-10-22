@@ -9,6 +9,7 @@ import {
   type ProductInfo,
   type ServingUnit,
 } from "./domain/product";
+import { PRODUCT_TAG } from "./domain/taxonomy";
 import { RetryableError, UserFacingError } from "./errors";
 import { isMealieUnavailable } from "./mealie/client";
 import type { Macros, RecipeNutrition } from "./mealie/nutrition";
@@ -51,7 +52,7 @@ export type SaveProductInput = {
 };
 
 type Deps = {
-  find: (barcode: string) => Promise<{ slug: string; name: string } | null>;
+  find: (barcode: string) => Promise<Recipe | null>;
   getRecipe: (slug: string) => Promise<Recipe | null>;
   create: (input: ProductRecipeInput) => Promise<string>;
   lookupOff: (barcode: string) => Promise<OffResult>;
@@ -106,6 +107,10 @@ async function inMealie<T>(work: () => Promise<T>): Promise<T> {
 /** A product recipe as the sheet shows it; refuses one whose extras are unreadable. */
 function knownProduct(recipe: Recipe): KnownProduct {
   if (!recipe.product) {
+    const tagged = recipe.tags.some((t) => t.slug === PRODUCT_TAG.slug);
+    if (!tagged) {
+      throw new ProductError("That isn't a product");
+    }
     throw new ProductError(
       "That product is incomplete in Mealie. Fix it there, or remove it."
     );
@@ -126,8 +131,8 @@ export async function loadKnownProduct(
 ): Promise<KnownProduct> {
   const d = withDefaults(deps);
   const recipe = await inMealie(() => d.getRecipe(slug));
-  if (!recipe?.product) {
-    throw new ProductError("That isn't a product");
+  if (!recipe) {
+    throw new ProductError("That product is no longer in Mealie");
   }
   return knownProduct(recipe);
 }
@@ -143,10 +148,7 @@ export async function lookupProduct(
   const d = withDefaults(deps);
   const barcode = canonical(input);
 
-  const found = await inMealie(async () => {
-    const hit = await d.find(barcode);
-    return hit && (await d.getRecipe(hit.slug));
-  });
+  const found = await inMealie(() => d.find(barcode));
   if (found) {
     return knownProduct(found);
   }
@@ -162,7 +164,8 @@ export async function lookupProduct(
 
 /**
  * Saves a checked product as a Mealie recipe and returns its slug. A barcode
- * that is already there gets the existing recipe, not a second one.
+ * that is already there (saved meanwhile from another device) gets the
+ * existing recipe, not a second one, and what was typed here is dropped.
  */
 export async function saveProduct(
   input: SaveProductInput,
@@ -174,7 +177,8 @@ export async function saveProduct(
   return inMealie(async () => {
     const existing = await d.find(barcode);
     if (existing) {
-      return { slug: existing.slug };
+      // An incomplete one would be planned as an ordinary recipe for everyone.
+      return { slug: knownProduct(existing).slug };
     }
     const slug = await d.create({
       name: input.name,

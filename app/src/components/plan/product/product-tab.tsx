@@ -12,9 +12,11 @@ import { RecipeImage } from "@/components/ui/recipe-image";
 import { parseBarcode } from "@/server/domain/barcode";
 import type { ProductLookup } from "@/server/products";
 
-import { attempt, failureText } from "./attempt";
-import { ProductSheet, type Slot } from "./product-sheet";
-import { useRecipeList } from "./use-recipe-list";
+import { attempt, failureText } from "../attempt";
+import { useRecipeList } from "../use-recipe-list";
+
+import { ProductSheet } from "./product-sheet";
+import type { Slot } from "./sheet-props";
 
 /**
  * The Add dialog's Product mode: type a barcode, or tap one of the latest
@@ -38,7 +40,7 @@ export const ProductTab = ({
   const [problem, setProblem] = useState<string>();
   const [pending, startTransition] = useTransition();
   const field = useRef<HTMLInputElement>(null);
-  const recent = useRecipeList("/api/recipes/search?products=1", !lookup);
+  const recent = useRecipeList("products=1", !lookup);
 
   // Back from a sheet, the field is there again for the next barcode.
   useEffect(() => {

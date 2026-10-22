@@ -10,6 +10,7 @@ import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
 import {
+  addCheckedMeal,
   addMeal,
   checkNewMeal,
   copyWeek,
@@ -128,7 +129,7 @@ export const saveProductAction = userAction(
     // Before anything is created in Mealie.
     await checkNewMeal(getDb(), meal);
     const { slug } = await saveProduct(product);
-    await addMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
     refreshWeek(date);
     return { slug };
   }
