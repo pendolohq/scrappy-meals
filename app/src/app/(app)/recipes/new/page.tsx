@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+
+import { WriteInMealie } from "@/components/recipe/write-in-mealie";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/server/session";
@@ -16,6 +19,9 @@ export default async function NewRecipePage() {
       <Card className="p-5 sm:p-6">
         <ImportForm />
       </Card>
+      <Suspense fallback={null}>
+        <WriteInMealie />
+      </Suspense>
     </section>
   );
 }
