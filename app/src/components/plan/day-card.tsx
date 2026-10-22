@@ -93,7 +93,7 @@ export const DayCard = ({
         <div className="mb-4 rounded-control bg-sunken/70 p-3">
           <PersonTotals
             member={viewer}
-            totals={dayTotals(meals, viewer.id)}
+            totals={dayTotals(meals, viewer.id, "logged")}
             date={date}
             fasting={fasting[viewer.id] ?? false}
             plannedPortions={

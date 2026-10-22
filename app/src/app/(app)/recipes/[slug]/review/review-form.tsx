@@ -15,6 +15,10 @@ import {
   type ThreeDigitGroup,
 } from "@/server/domain/decimal";
 import {
+  nutritionWarnings,
+  rescalePerServing,
+} from "@/server/domain/nutrition-check";
+import {
   isQuick,
   QUICK_MAX_MINUTES,
   RECIPE_CATEGORIES,
@@ -62,6 +66,20 @@ const toNumber = (
   text.trim() === ""
     ? null
     : (parseDecimal(text, threeDigitGroup) ?? Number.NaN);
+
+type MacroKey = (typeof MACROS)[number]["key"];
+
+/** The fields that read as numbers; blank or unreadable ones are left out. */
+const macroValues = (texts: Record<string, string>) => {
+  const out: Partial<Record<MacroKey, number>> = {};
+  for (const m of MACROS) {
+    const value = toNumber(texts[m.key], THREE_DIGIT_GROUP[m.key]);
+    if (value !== null && Number.isFinite(value)) {
+      out[m.key] = value;
+    }
+  }
+  return out;
+};
 
 const macroTexts = (draft: ReviewDraft) =>
   Object.fromEntries(
@@ -162,6 +180,9 @@ export const ReviewForm = ({
   const [nutritionSource, setNutritionSource] = useState(
     draft.importState.nutrition
   );
+  // How many servings the nutrition figures are per serving of, so changing
+  // the servings can offer to rescale them.
+  const [nutritionServings, setNutritionServings] = useState(draft.servings);
   const [lines, setLines] = useState(
     draft.lines.map((l) => ({
       asText: l.asText,
@@ -198,6 +219,33 @@ export const ReviewForm = ({
 
   const anyMacro = Object.values(nutrition).some((v) => v.trim() !== "");
   const edited = MACROS.some((m) => nutrition[m.key] !== baseline[m.key]);
+  const warnings = nutritionWarnings(macroValues(nutrition));
+  const servingsNow = toNumber(servings);
+  const servingsChanged =
+    anyMacro &&
+    nutritionServings !== null &&
+    servingsNow !== null &&
+    servingsNow > 0 &&
+    servingsNow !== nutritionServings;
+
+  const rescale = () => {
+    if (nutritionServings === null || !servingsNow) {
+      return;
+    }
+    const scaled = rescalePerServing(
+      macroValues(nutrition),
+      nutritionServings,
+      servingsNow
+    );
+    setNutrition((n) => ({
+      ...n,
+      ...Object.fromEntries(
+        Object.entries(scaled).map(([k, v]) => [k, String(v)])
+      ),
+    }));
+    setNutritionServings(servingsNow);
+  };
+
   const nutritionLabel = !anyMacro
     ? "Missing"
     : edited
@@ -228,6 +276,7 @@ export const ReviewForm = ({
       if (!(toNumber(servings) ?? 0)) {
         setServings(String(result.estimate.servings));
       }
+      setNutritionServings(result.estimate.servings);
     });
   };
 
@@ -248,7 +297,7 @@ export const ReviewForm = ({
             m.key,
             toNumber(nutrition[m.key], THREE_DIGIT_GROUP[m.key]),
           ])
-        ) as Record<(typeof MACROS)[number]["key"], number | null>,
+        ) as Record<MacroKey, number | null>,
         lines: lines.map((l, i) => {
           const asText = l.asText || l.food.trim() === "";
           return {
@@ -271,6 +320,7 @@ export const ReviewForm = ({
       }
       setNutritionSource(anyMacro ? "reviewed" : null);
       setBaseline(nutrition);
+      setNutritionServings(servingsNow);
       setSaved(true);
     });
   };
@@ -368,6 +418,43 @@ export const ReviewForm = ({
             </label>
           ))}
         </div>
+        {servingsChanged && (
+          <div
+            role="status"
+            className="mt-4 space-y-2 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+          >
+            <p>
+              These values are per serving when the recipe makes{" "}
+              {nutritionServings}. It makes {servingsNow} now, so each serving
+              holds a different share of the dish.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={rescale}>
+                Rescale to {servingsNow} servings
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNutritionServings(servingsNow)}
+              >
+                They're already right
+              </Button>
+            </div>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <ul
+            role="status"
+            className="mt-4 space-y-1 rounded-control bg-danger-soft px-4 py-3 text-sm text-danger"
+          >
+            {warnings.map((w) => (
+              <li key={w} className="flex gap-1.5">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                {w}
+              </li>
+            ))}
+          </ul>
+        )}
         {canEstimate && (
           <div className="mt-4 space-y-2">
             <Button

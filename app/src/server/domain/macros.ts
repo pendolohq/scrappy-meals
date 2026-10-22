@@ -4,6 +4,8 @@ import {
   type RecipeNutrition,
 } from "../mealie/nutrition";
 
+import { type AdherenceStatus, EATEN_SHARE } from "./adherence";
+
 export type MealForMacros = {
   /** Null when the recipe is gone from Mealie. */
   nutrition: RecipeNutrition | null;
@@ -14,6 +16,11 @@ export type MealForMacros = {
   baseServings: number;
   /** Portion multiplier per user id; missing = 0. */
   portions: Record<string, number>;
+  /**
+   * What each person logged, by user id. Left out, the totals are the plan;
+   * given, a skipped meal counts as nothing and a partly eaten one as half.
+   */
+  logged?: Record<string, AdherenceStatus | undefined>;
 };
 
 export type PersonDayTotals = {
@@ -32,9 +39,13 @@ export type PersonDayTotals = {
 };
 
 const servingsEaten = (
-  meal: Pick<MealForMacros, "baseServings" | "portions">,
+  meal: Pick<MealForMacros, "baseServings" | "portions" | "logged">,
   userId: string
-) => meal.baseServings * (meal.portions[userId] ?? 0);
+) => {
+  const status = meal.logged?.[userId];
+  const share = status ? EATEN_SHARE[status] : 1;
+  return meal.baseServings * (meal.portions[userId] ?? 0) * share;
+};
 
 export function personDayTotals(
   meals: MealForMacros[],

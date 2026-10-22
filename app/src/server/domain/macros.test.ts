@@ -90,6 +90,28 @@ describe("personDayTotals", () => {
     expect(personDayTotals([meal({})], "a").estimatedRecipes).toEqual([]);
   });
 
+  it("counts what each person logged: none of a skip, half of a partial", () => {
+    const meals = [
+      meal({ recipeName: "Lunch", logged: { a: "skipped", b: "stuck" } }),
+      meal({ recipeName: "Dinner", logged: { a: "partial" } }),
+      meal({ recipeName: "Snack", logged: { a: "swapped" } }),
+    ];
+    expect(personDayTotals(meals, "a")).toMatchObject({
+      macros: { kcal: 750, protein: 45 },
+      mealsEaten: 2,
+    });
+    // b logged one meal and not the others: those still count as planned.
+    expect(personDayTotals(meals, "b").macros.kcal).toBe(1500);
+  });
+
+  it("leaves a skipped meal's missing nutrition out of the warning", () => {
+    const t = personDayTotals(
+      [meal({ nutrition: null, recipeName: "Gone", logged: { a: "skipped" } })],
+      "a"
+    );
+    expect(t).toMatchObject({ incomplete: false, mealsEaten: 0 });
+  });
+
   it("rounds to one decimal without drifting", () => {
     const n: RecipeNutrition = {
       ...full,

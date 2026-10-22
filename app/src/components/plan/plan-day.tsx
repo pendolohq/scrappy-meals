@@ -103,7 +103,7 @@ export const PlanDay = ({
         <div className="mt-4">
           <DayMacros
             member={viewer}
-            totals={dayTotals(meals, viewer.id)}
+            totals={dayTotals(meals, viewer.id, "planned")}
             fasting={fasting[viewer.id] ?? false}
           />
         </div>

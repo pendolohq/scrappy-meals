@@ -69,6 +69,14 @@ until every place names the same version (`mealie-version.test.ts`).
   leaves the recipe `missing` rather than counted wrong. Estimated values count
   in the totals, shown as "≈". The review page can estimate again; saving the
   review marks the values `reviewed`.
+- **Nothing checks that a page means "per serving"**, and some give the whole
+  dish or 100 g. The review page warns (`nutritionWarnings`) when a serving is
+  over 1500 kcal or under 150, or when kcal don't match 4·P + 4·C + 9·F. Changing
+  the servings there offers to rescale the values, since the dish stays the
+  same and each serving becomes a different share of it.
+- **Day totals:** the Plan page adds up what is planned. The Week page counts
+  each person's log too: a skipped meal counts as nothing, a partly eaten one
+  as half, a swapped one as planned (a stand-in for whatever replaced it).
 
 ## Tags, categories and total time
 
