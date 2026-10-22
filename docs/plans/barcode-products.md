@@ -56,7 +56,10 @@ Checked live on 21 Oct 2026 against `world.openfoodfacts.org`.
   last release Oct 2026) implements the same `BarcodeDetector` API on top of `zxing-wasm`, as a
   ponyfill, so one code path covers both. The reader wasm is ~1 MB. By default it loads from
   jsDelivr; we self-host it (`prepareZXingModule({ overrides: { locateFile } })` and a file in
-  `public/`) so nothing third-party loads and the service worker can cache it.
+  `public/`) so nothing third-party loads and the service worker can cache it. In the end the
+  app calls `zxing-wasm` directly, in a Web Worker, with options for retail codes (the
+  ponyfill hardcodes inversion and runs on the main thread), and uses the native
+  `BarcodeDetector` itself where it reads EAN-13.
   `html5-qrcode` is unmaintained, `@zxing/browser` releases rarely, and quagga2 is weaker on
   EAN in poor light.
 - **Camera in the installed PWA on iOS** works (`getUserMedia` in Home Screen apps since 13.4),
@@ -283,16 +286,23 @@ existing review page cover that.
 
 ### PR 2: camera scanning
 
-- [ ] `bun add --exact barcode-detector@latest`; native `BarcodeDetector` when
+- [x] `bun add --exact barcode-detector@latest`; native `BarcodeDetector` when
       `getSupportedFormats()` includes `ean_13`, else the ponyfill, imported lazily when the
       scanner opens so the rest of the app doesn't load it.
-- [ ] Self-host the reader wasm in `public/`; the service worker caches it. Check how it
+- [x] Self-host the reader wasm in `public/`; the service worker caches it. Check how it
       lands in the standalone image (`.github/image-paths`).
-- [ ] Scanner component: live video (formats `ean_13`, `ean_8`, `upc_a`, `upc_e`), the photo
-      fallback, digits always available; stops the camera on close. Verify on an iPhone (home
-      screen app) and an Android phone.
-- [ ] Optional hardening in the Caddyfile: `Permissions-Policy: camera=(self), microphone=(),
+- [x] Scanner component: live video (formats `ean_13`, `ean_8`, `upc_a`, `upc_e`), the photo
+      fallback, digits always available; stops the camera on close.
+- [ ] Try it on an iPhone (Home Screen app) and an Android phone.
+- [x] Optional hardening in the Caddyfile: `Permissions-Policy: camera=(self), microphone=(),
       geolocation=()` (with `docs/deploy.md`).
+- Learned: the wasm file name carries the zxing-wasm version
+  (`/zxing/zxing_reader.<version>.wasm`, written by `scripts/copy-wasm.mjs` on `dev` and
+  `build`, gitignored), so an upgrade is a new URL and a unit test checks the file against
+  the version and SHA-256 the library expects. The worker caches `/zxing/` cache-first, in a
+  cache of its own that new chunks can't trim.
+- Learned: Chrome's native detector gives a UPC-E as its 8 digits, which read as an EAN-8 fail
+  the check digit or get another key; the scanner expands them to UPC-A (`expandUpcE`).
 
 ### PR 3: contributing to Open Food Facts
 

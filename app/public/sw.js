@@ -3,11 +3,13 @@
 // small on purpose.
 // Bump VERSION with every change to this file: it's how the browser sees an
 // update, and it drops the caches the old version filled.
-const VERSION = "v2";
+const VERSION = "v5";
 const STATIC = `static-${VERSION}`;
 const PAGES = `pages-${VERSION}`;
 // Recipe photos from /api/recipe-images: user data, cleared with the pages.
 const IMAGES = `images-${VERSION}`;
+// The barcode reader's wasm, apart from STATIC so new chunks never trim it.
+const WASM = `wasm-${VERSION}`;
 const OFFLINE_URL = "/offline";
 // Every deploy brings new content-hashed chunks; keep the newest ones only.
 const MAX_STATIC = 200;
@@ -23,6 +25,24 @@ const trim = async (cache, max) => {
   const keys = await cache.keys(); // oldest first
   await Promise.all(keys.slice(0, -max).map((k) => cache.delete(k)));
 };
+
+/** Answers from `cache`, else the network, keeping what comes back. */
+const cacheFirst = (event, cache, tidy) =>
+  event.respondWith(
+    caches.match(event.request).then(
+      (hit) =>
+        hit ||
+        fetch(event.request).then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches
+              .open(cache)
+              .then((c) => c.put(event.request, copy).then(() => tidy(c)));
+          }
+          return res;
+        })
+    )
+  );
 
 const clearUserData = () =>
   Promise.all([caches.delete(PAGES), caches.delete(IMAGES)]);
@@ -140,7 +160,9 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k !== STATIC && k !== PAGES && k !== IMAGES)
+            .filter(
+              (k) => k !== STATIC && k !== PAGES && k !== IMAGES && k !== WASM
+            )
             .map((k) => caches.delete(k))
         )
       )
@@ -193,21 +215,18 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/")
   ) {
-    event.respondWith(
-      caches.match(req).then(
-        (hit) =>
-          hit ||
-          fetch(req).then((res) => {
-            if (res.ok) {
-              const copy = res.clone();
-              caches
-                .open(STATIC)
-                .then((c) => c.put(req, copy).then(() => trim(c, MAX_STATIC)));
-            }
-            return res;
-          })
-      )
-    );
+    cacheFirst(event, STATIC, (c) => trim(c, MAX_STATIC));
+    return;
+  }
+  // So is the barcode reader's wasm (its version is in the name), kept so a
+  // second scan works on a bad connection. Only the newest version stays.
+  if (url.pathname.startsWith("/zxing/")) {
+    cacheFirst(event, WASM, async (c) => {
+      const keys = await c.keys();
+      await Promise.all(
+        keys.filter((k) => k.url !== req.url).map((k) => c.delete(k))
+      );
+    });
     return;
   }
 
