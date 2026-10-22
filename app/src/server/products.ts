@@ -1,6 +1,7 @@
 import "server-only";
 
 import { parseBarcode } from "./domain/barcode";
+import { offHasGaps } from "./domain/off-contribution";
 import {
   draftFromOff,
   offProductUrl,
@@ -19,6 +20,7 @@ import {
   type ProductRecipeInput,
 } from "./mealie/products";
 import { getRecipe, type Recipe } from "./mealie/recipes";
+import { contributionEnabled } from "./off-contribute";
 import { lookupOpenFoodFacts, type OffResult } from "./openfoodfacts";
 import { createRateLimiter } from "./rate-limit";
 
@@ -36,8 +38,8 @@ export type KnownProduct = {
 
 export type ProductLookup =
   | KnownProduct
-  | { status: "draft"; draft: ProductDraft }
-  | { status: "not-found"; barcode: string };
+  | { status: "draft"; draft: ProductDraft; canContribute: boolean }
+  | { status: "not-found"; barcode: string; canContribute: boolean };
 
 export type SaveProductInput = {
   barcode: string;
@@ -57,6 +59,8 @@ type Deps = {
   create: (input: ProductRecipeInput) => Promise<string>;
   lookupOff: (barcode: string) => Promise<OffResult>;
   limiter: { hit: (key: string) => boolean };
+  /** Whether the app can send products to Open Food Facts. */
+  canContribute: () => boolean;
 };
 
 // Every lookup leaves from the server's address, and Open Food Facts allows 15
@@ -70,6 +74,7 @@ const defaults: Deps = {
   create: (input) => createProductRecipe(input),
   lookupOff: (barcode) => lookupOpenFoodFacts(barcode),
   limiter,
+  canContribute: contributionEnabled,
 };
 
 const withDefaults = (deps: Partial<Deps>): Deps => ({
@@ -78,6 +83,7 @@ const withDefaults = (deps: Partial<Deps>): Deps => ({
   create: deps.create ?? defaults.create,
   lookupOff: deps.lookupOff ?? defaults.lookupOff,
   limiter: deps.limiter ?? defaults.limiter,
+  canContribute: deps.canContribute ?? defaults.canContribute,
 });
 
 const canonical = (input: string): string => {
@@ -157,9 +163,15 @@ export async function lookupProduct(
     throw new ProductError("Too many lookups; wait a minute and try again");
   }
   const off = await d.lookupOff(barcode);
+  const enabled = d.canContribute();
   return off.status === "found"
-    ? { status: "draft", draft: draftFromOff(barcode, off.product) }
-    : { status: "not-found", barcode };
+    ? {
+        status: "draft",
+        draft: draftFromOff(barcode, off.product),
+        // Nothing to offer when Open Food Facts already has it all.
+        canContribute: enabled && offHasGaps(off.product),
+      }
+    : { status: "not-found", barcode, canContribute: enabled };
 }
 
 /**

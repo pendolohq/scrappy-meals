@@ -17,10 +17,18 @@ export const ProductSheet = ({
         <DraftSheet
           barcode={lookup.draft.barcode}
           draft={lookup.draft}
+          canContribute={lookup.canContribute}
           {...rest}
         />
       );
     case "not-found":
-      return <DraftSheet barcode={lookup.barcode} draft={null} {...rest} />;
+      return (
+        <DraftSheet
+          barcode={lookup.barcode}
+          draft={null}
+          canContribute={lookup.canContribute}
+          {...rest}
+        />
+      );
   }
 };

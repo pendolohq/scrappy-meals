@@ -6,6 +6,7 @@ import { after } from "next/server";
 
 import { RecipeFlags } from "@/components/plan/recipe-flags";
 import { EditInMealie } from "@/components/recipe/edit-in-mealie";
+import { OffContribution } from "@/components/recipe/off-contribution";
 import {
   NutritionGrid,
   RecipeFacts,
@@ -102,6 +103,11 @@ export default async function RecipePage({
           tags={recipe.tags}
         />
         <NutritionGrid nutrition={recipe.nutrition} />
+        {recipe.product && (
+          <Suspense fallback={null}>
+            <OffContribution barcode={recipe.product.barcode} />
+          </Suspense>
+        )}
         <AddToPlan
           slug={recipe.slug}
           name={recipe.name}

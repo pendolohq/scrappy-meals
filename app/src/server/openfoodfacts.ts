@@ -1,7 +1,9 @@
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 
 import "server-only";
 
+import type { OffFields } from "./domain/off-contribution";
 import type { OffProduct } from "./domain/product";
 import { RetryableError, UserFacingError } from "./errors";
 
@@ -17,12 +19,15 @@ const FIELDS = [
   "product_quantity_unit",
   "serving_quantity",
   "serving_quantity_unit",
+  "serving_size",
+  "nutrition_data_per",
+  "no_nutrition_data",
   "nutriments",
 ].join(",");
 
 // Open Food Facts asks apps to say who they are.
-const USER_AGENT =
-  "ScrappyMeals/1.0 (+https://github.com/pendolohq/scrappy-meals)";
+const APP_VERSION = "1.0";
+const USER_AGENT = `ScrappyMeals/${APP_VERSION} (+https://github.com/pendolohq/scrappy-meals)`;
 const TIMEOUT_MS = 8000;
 const KJ_PER_KCAL = 4.184;
 
@@ -55,23 +60,10 @@ const productSchema = z.object({
   product_quantity_unit: text,
   serving_quantity: amount,
   serving_quantity_unit: text,
-  nutriments: z
-    .object({
-      "energy-kcal_100g": amount,
-      "energy-kj_100g": amount,
-      proteins_100g: amount,
-      carbohydrates_100g: amount,
-      fat_100g: amount,
-      fiber_100g: amount,
-    })
-    .catch({
-      "energy-kcal_100g": null,
-      "energy-kj_100g": null,
-      proteins_100g: null,
-      carbohydrates_100g: null,
-      fat_100g: null,
-      fiber_100g: null,
-    }),
+  serving_size: text,
+  nutrition_data_per: text,
+  no_nutrition_data: text,
+  nutriments: z.record(z.string(), z.unknown()).catch({}),
 });
 
 const bodySchema = z.object({
@@ -80,8 +72,40 @@ const bodySchema = z.object({
   product: productSchema.optional(),
 });
 
+// Every nutrient a table can hold, so "has no nutrition" means none of them.
+const NUTRIENTS = [
+  "energy",
+  "energy-kcal",
+  "energy-kj",
+  "proteins",
+  "carbohydrates",
+  "fat",
+  "fiber",
+  "sugars",
+  "saturated-fat",
+  "salt",
+  "sodium",
+];
+
 function toProduct(p: z.output<typeof productSchema>): OffProduct {
-  const n = p.nutriments;
+  const raw = p.nutriments;
+  const value = (key: string) => amount.parse(raw[key]);
+  const n = {
+    "energy-kcal_100g": value("energy-kcal_100g"),
+    "energy-kj_100g": value("energy-kj_100g"),
+    proteins_100g: value("proteins_100g"),
+    carbohydrates_100g: value("carbohydrates_100g"),
+    fat_100g: value("fat_100g"),
+    fiber_100g: value("fiber_100g"),
+  };
+  const sold100g = NUTRIENTS.some((k) => value(`${k}_100g`) !== null);
+  const anyBasis = NUTRIENTS.some((k) =>
+    ["", "_prepared"].some((form) =>
+      ["_100g", "_serving", "_value", ""].some(
+        (basis) => value(`${k}${form}${basis}`) !== null
+      )
+    )
+  );
   const kcalFromKj =
     n["energy-kcal_100g"] === null && n["energy-kj_100g"] !== null;
   const kcal = kcalFromKj
@@ -109,6 +133,13 @@ function toProduct(p: z.output<typeof productSchema>): OffProduct {
     productQuantityUnit: p.product_quantity_unit?.toLowerCase() ?? null,
     servingQuantity: p.serving_quantity,
     servingQuantityUnit: p.serving_quantity_unit?.toLowerCase() ?? null,
+    servingSize: p.serving_size,
+    nutritionPer: p.nutrition_data_per,
+    noNutritionData: ["on", "true", "1"].includes(
+      p.no_nutrition_data?.toLowerCase() ?? ""
+    ),
+    hasNutrients: anyBasis,
+    hasNutrients100g: sold100g,
     per100,
     kcalFromKj,
   };
@@ -117,11 +148,13 @@ function toProduct(p: z.output<typeof productSchema>): OffProduct {
 /**
  * Looks a barcode up on Open Food Facts. A product it doesn't know, or a
  * reply we can't read, is "not-found"; it being down or limiting us is a
- * RetryableError. `barcode` is already in canonical form.
+ * RetryableError. `barcode` is already in canonical form. With `strict`, only
+ * a real "no such product" reply counts as not found and an unreadable one
+ * throws: a write must not take a broken reply for an empty record.
  */
 export async function lookupOpenFoodFacts(
   barcode: string,
-  opts: { fetch?: typeof fetch } = {}
+  opts: { fetch?: typeof fetch; strict?: boolean } = {}
 ): Promise<OffResult> {
   const url = `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(barcode)}?fields=${FIELDS}`;
   let response: Response;
@@ -133,13 +166,13 @@ export async function lookupOpenFoodFacts(
   } catch {
     throw new RetryableError(DOWN);
   }
-  if (response.status === 404) {
+  if (response.status === 404 && !opts.strict) {
     return { status: "not-found" };
   }
   if (response.status === 429 || response.status >= 500) {
     throw new RetryableError(DOWN);
   }
-  if (!response.ok) {
+  if (!response.ok && response.status !== 404) {
     throw new UserFacingError(DOWN);
   }
 
@@ -150,12 +183,144 @@ export async function lookupOpenFoodFacts(
   } catch {
     // Not JSON at all (a proxy's error page): handled with the other unreadable replies.
   }
-  if (body?.status === "success" && body.product) {
+  // v3 also answers "success_with_warnings" and the like, with the product.
+  if (
+    typeof body?.status === "string" &&
+    /^success(_with_\w+)?$/.test(body.status) &&
+    body.product
+  ) {
     return { status: "found", product: toProduct(body.product) };
   }
-  if (body?.status === "failure" && body.result?.id === "product_not_found") {
+  if (
+    (body?.status === "failure" || response.status === 404) &&
+    body?.result?.id === "product_not_found"
+  ) {
     return { status: "not-found" };
   }
+  // A 404 with any other body (a proxy's page, a removed endpoint) is not
+  // "no such product".
   console.warn(`Open Food Facts: unreadable reply for ${barcode}`);
+  if (opts.strict) {
+    throw new RetryableError("Open Food Facts gave a reply we couldn't read.");
+  }
   return { status: "not-found" };
+}
+
+/** The app's own Open Food Facts account, which lets us add products. */
+export type OffAccount = { userId: string; password: string };
+
+/** Contributing is on only when both variables are set. */
+export function offAccount(
+  env: Record<string, string | undefined> = process.env
+): OffAccount | null {
+  const userId = env.OFF_USER_ID?.trim();
+  const password = env.OFF_PASSWORD;
+  return userId && password ? { userId, password } : null;
+}
+
+/**
+ * A stable id for one person that Open Food Facts can block without blocking
+ * the app. Salted with the auth secret, so it can't be traced to the user id.
+ */
+export const offAppUuid = (userId: string, secret: string): string =>
+  createHmac("sha256", secret)
+    .update(`off:${userId}`)
+    .digest("hex")
+    .slice(0, 32);
+
+const WRITE_URL = "https://world.openfoodfacts.org/cgi/product_jqm2.pl";
+const WRITE_TIMEOUT_MS = 15000;
+const RETRY_DELAY_MS = 2000;
+const MAX_ERROR = 200;
+
+/** A write Open Food Facts didn't take. The message is safe to store and show. */
+export class OffWriteError extends Error {
+  name = "OffWriteError";
+}
+
+type Attempt = { error?: undefined } | { error: OffWriteError; retry: boolean };
+
+/**
+ * Sends `fields` to Open Food Facts as `account`. One retry after a pause for
+ * a network error, a timeout, a 429 or a 5xx; a 4xx or a refusal is final.
+ * Throws OffWriteError; the password never appears in its message.
+ */
+export async function writeOpenFoodFacts(
+  fields: OffFields,
+  account: OffAccount,
+  appUuid: string,
+  opts: {
+    fetch?: typeof fetch;
+    sleep?: (ms: number) => Promise<void>;
+  } = {}
+): Promise<void> {
+  const body = new URLSearchParams({
+    ...fields,
+    user_id: account.userId,
+    password: account.password,
+    app_name: "ScrappyMeals",
+    app_version: APP_VERSION,
+    app_uuid: appUuid,
+  });
+  const sleep =
+    opts.sleep ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)));
+
+  const send = async (): Promise<Attempt> => {
+    let response: Response;
+    try {
+      response = await (opts.fetch ?? fetch)(WRITE_URL, {
+        method: "POST",
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+        // The credentials are in the body: never send them on to a redirect.
+        redirect: "error",
+        signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+      });
+    } catch {
+      return {
+        error: new OffWriteError("Open Food Facts could not be reached"),
+        retry: true,
+      };
+    }
+    if (!response.ok) {
+      return {
+        error: new OffWriteError(`Open Food Facts answered ${response.status}`),
+        retry: response.status === 429 || response.status >= 500,
+      };
+    }
+    const reply = (await response.json().catch(() => null)) as {
+      status?: unknown;
+      status_verbose?: unknown;
+    } | null;
+    if (reply?.status === 1) {
+      return {};
+    }
+    // A refusal (wrong login, bad data) won't change on a retry.
+    const why =
+      typeof reply?.status_verbose === "string"
+        ? `: ${reply.status_verbose}`
+        : "";
+    return {
+      error: new OffWriteError(
+        `Open Food Facts didn't save it${why}`
+          .split(account.password)
+          .join("***")
+          .slice(0, MAX_ERROR)
+      ),
+      retry: false,
+    };
+  };
+
+  let result = await send();
+  if (result.error && result.retry) {
+    await sleep(RETRY_DELAY_MS);
+    result = await send();
+  }
+  if (result.error) {
+    throw result.error;
+  }
 }

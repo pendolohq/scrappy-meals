@@ -229,10 +229,15 @@ Milk record), what we type from the pack goes to OFF too, so the next scan anywh
   `nutriment_energy-kcal`, `nutriment_proteins`, `nutriment_carbohydrates`, `nutriment_fat`,
   `nutriment_fiber` (each with a `_unit`), and `app_name`, `app_version` and `app_uuid`.
   OFF asks for `app_uuid` to be a salted random id per user, so a moderator can block one
-  person without blocking the app; we derive it from the user's id and `AUTH_SECRET`.
+  person without blocking the app; it is `HMAC-SHA256(AUTH_SECRET, "off:" + user.id)`,
+  hex, first 32 characters.
 - **Per 100 g, as printed.** UK packs always print per 100 g, so the sheet's manual entry (PR 1) asks
   for that column plus the serving size, and we work out per serving ourselves. That's also
   what OFF wants.
+- **Nutrition only where it can't clash.** A record with no nutrition at all gets the whole
+  table per 100 g; one already per 100 g as sold gets just its missing values. Any other
+  state (per serving, prepared-only like the Huel bar, "no nutrition data" ticked) is left
+  alone, deliberately: filling values from the pack next to data on another basis is risky.
 - **Only fill gaps, never correct.** We send new products and fields OFF has empty. We never
   overwrite a value OFF already has, even one that looks wrong (the Kind bar's kJ): a household
   app shouldn't make public corrections without a photo to back them. The change stays in our
@@ -243,7 +248,8 @@ Milk record), what we type from the pack goes to OFF too, so the next scan anywh
 - **Not on the critical path.** The Mealie save happens first; the OFF write runs after the
   response (`after()`), with one retry on a network error, 429 or 5xx, as OFF recommends. The
   outcome is kept in an `off_contributions` row (barcode, status, error, time). A failed one
-  shows "Not sent to Open Food Facts yet: retry" on the product's recipe page.
+  shows "Not sent to Open Food Facts yet: retry" on the product's recipe page. A retry
+  looks at Open Food Facts again and drops the fields it has gained meanwhile.
 - **Photos, later.** OFF moderators trust products with a front and a nutrition-table photo
   more. Taking those two photos (uploaded with `/api/v3.3/product/<code>/images`) is a
   follow-up. Reading nutrition from the photo stays out of scope.
@@ -306,13 +312,14 @@ existing review page cover that.
 
 ### PR 3: contributing to Open Food Facts
 
-- [ ] `OFF_USER_ID` / `OFF_PASSWORD` (optional) in `.env.example`, `docker-compose.yml` and
+- [x] `OFF_USER_ID` / `OFF_PASSWORD` (optional) in `.env.example`, `docker-compose.yml` and
       `docs/deploy.md`.
-- [ ] The write in `server/openfoodfacts.ts` (gaps only, per 100 g, `app_uuid` per user),
+- [x] The write in `server/openfoodfacts.ts` (gaps only, per 100 g, `app_uuid` per user),
       the `off_contributions` table, the run after the response with one retry, and "retry"
-      on the recipe page. Unit tests with an injected `fetch`. Try it once by hand against
-      staging.
-- [ ] The tick box on the sheet (the per-100 g manual entry it sends shipped in PR 1).
+      on the recipe page. Unit tests with an injected `fetch`.
+- [ ] Try it once by hand against staging (`world.openfoodfacts.net`); this needs an OFF
+      staging account, which the tests and the implementation never used.
+- [x] The tick box on the sheet (the per-100 g manual entry it sends shipped in PR 1).
 
 ### PR 4: follow-ups
 
