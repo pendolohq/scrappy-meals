@@ -65,7 +65,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   const week = weekStartOf(today());
   await signIn(page, USERS.alex);
 
-  // Plan today's lunch from Mealie, on the Plan page.
+  // Plan today's lunch from Mealie, on the Planner.
   await page.goto(`/plan/${week}`);
   const planDay = page.locator(`section[aria-label="${formatDay(today())}"]`);
   await planDay.getByRole("button", { name: "Add lunch" }).click();

@@ -67,6 +67,7 @@ export const MealRow = ({
     ...members.filter((m) => m.id !== currentUserId),
   ];
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
+  const href = `/week/${weekStart}/meals/${meal.id}`;
 
   return (
     <li
@@ -74,20 +75,20 @@ export const MealRow = ({
       data-testid="meal"
     >
       <div className="flex items-start gap-3">
-        <RecipeImage mealieId={photo} className="size-16 sm:size-20" />
+        {/* On a phone the photo is the obvious thing to tap. It repeats the
+            name's link, so it stays out of the tab order and the a11y tree. */}
+        <Link href={href} tabIndex={-1} aria-hidden className="shrink-0">
+          <RecipeImage mealieId={photo} className="size-16 sm:size-20" />
+        </Link>
         <div className="min-w-0 flex-1 pt-0.5">
-          <p className="line-clamp-2 font-serif text-[1.0625rem] leading-snug font-semibold">
-            {meal.recipe ? (
-              <Link
-                href={`/week/${weekStart}/meals/${meal.id}`}
-                className="underline-offset-2 hover:underline"
-              >
-                {name}
-              </Link>
-            ) : (
-              name
-            )}
-          </p>
+          {/* The meal page works without the recipe too (it shows the
+              slug), so the link is there even when Mealie is unreachable. */}
+          <Link
+            href={href}
+            className="line-clamp-2 font-serif text-[1.0625rem] leading-snug font-semibold underline-offset-2 hover:underline"
+          >
+            {name}
+          </Link>
           <RecipeFlags recipe={meal.recipe} slug={meal.slug} />
         </div>
         <IconButton

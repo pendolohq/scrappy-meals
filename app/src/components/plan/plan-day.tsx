@@ -10,7 +10,7 @@ import { DayMacros, dayTotals } from "./person-totals";
 import { PlanMeal } from "./plan-meal";
 
 /**
- * One day of the Plan page: a column of its slots, each with its meals and an
+ * One day of the Planner: a column of its slots, each with its meals and an
  * Add tile, and the viewer's totals at the foot.
  */
 export const PlanDay = ({

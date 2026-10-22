@@ -45,7 +45,7 @@ const useItems = (currentWeek: string): Item[] => {
       active: pathname === "/week" || (Boolean(match) && !onPlan && sub === ""),
     },
     {
-      label: "Plan",
+      label: "Planner",
       href: match ? `/plan/${week}` : "/plan",
       icon: ClipboardList,
       active: onPlan,

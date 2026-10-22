@@ -25,7 +25,7 @@ import { RecipeFlags } from "./recipe-flags";
 import { Stepper } from "./stepper";
 
 /**
- * A meal on the Plan page, with everyone's portions as a line of text; the
+ * A meal on the Planner, with everyone's portions as a line of text; the
  * steppers, servings, Move and Remove sit behind the options button, as on
  * the Week page (which has no Move). `compact` is the desktop grid's cell: no photo, the name links
  * to the meal, and the options float over the grid.
@@ -66,6 +66,7 @@ export const PlanMeal = ({
 
   const name = meal.recipe?.name ?? meal.slug;
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
+  const href = `/week/${weekStartOf(meal.date)}/meals/${meal.id}`;
 
   // Portions are nearly always 1× each: the steppers wait behind the options
   // button, and the portions only show when someone's differs.
@@ -195,7 +196,7 @@ export const PlanMeal = ({
       >
         <div className="flex items-start gap-1">
           <Link
-            href={`/week/${weekStartOf(meal.date)}/meals/${meal.id}`}
+            href={href}
             className="line-clamp-2 min-w-0 flex-1 font-serif text-sm leading-snug font-semibold hover:text-accent-ink"
           >
             {name}
@@ -233,11 +234,18 @@ export const PlanMeal = ({
       data-testid="meal"
     >
       <div className="flex items-start gap-2.5">
-        <RecipeImage mealieId={photo} className="size-11" />
+        {/* Repeats the name's link for a bigger target, so it's hidden from
+            the tab order and the a11y tree. */}
+        <Link href={href} tabIndex={-1} aria-hidden className="shrink-0">
+          <RecipeImage mealieId={photo} className="size-11" />
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 font-serif text-[0.9375rem] leading-snug font-semibold">
+          <Link
+            href={href}
+            className="line-clamp-2 font-serif text-[0.9375rem] leading-snug font-semibold underline-offset-2 hover:underline"
+          >
             {name}
-          </p>
+          </Link>
           <RecipeFlags recipe={meal.recipe} slug={meal.slug} />
         </div>
         <IconButton
