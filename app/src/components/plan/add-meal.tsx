@@ -207,6 +207,7 @@ export const AddMeal = ({
   text,
   initialMode = "recipes",
   controlled,
+  alreadyHad = false,
 }: {
   date: string;
   slot: SlotType;
@@ -222,6 +223,8 @@ export const AddMeal = ({
   initialMode?: "recipes" | "product";
   /** Opened from elsewhere (no trigger button of its own): the parent owns `open`. */
   controlled?: { open: boolean; onClose: () => void };
+  /** Logs what someone had instead of the plan: a recipe picked here is eaten off-plan, by them alone. */
+  alreadyHad?: boolean;
 }) => {
   // Starts on the slot's meal tag, as "Add to meal plan" starts on the slot
   // the tags name; one tap on the chip clears it. A tag Mealie doesn't have
@@ -326,13 +329,12 @@ export const AddMeal = ({
         return;
       }
       const res = await attempt(() =>
-        // Logging what someone had instead is eaten off-plan, by them alone.
         addMealAction({
           date,
           slot,
           snackIndex,
           slug,
-          ...(controlled ? { alreadyHad: true } : {}),
+          ...(alreadyHad ? { alreadyHad: true } : {}),
         })
       );
       if (res.error) {

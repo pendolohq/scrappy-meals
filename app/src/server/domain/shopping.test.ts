@@ -7,12 +7,19 @@ import {
   buildShoppingList,
   coverMax,
   formatAmounts,
-  formatProductLine,
+  formatProductAmount,
   type MealForShopping,
   type ShoppingAmount,
   stillNeeded,
   type WeekIngredients,
 } from "./shopping";
+
+// How the shopping list shows a product: its name, then the amount.
+const productLine = (p: {
+  name: string;
+  count: number;
+  unitLabel: string | null;
+}) => `${p.name} ${formatProductAmount(p)}`;
 
 const unit = (
   id: string,
@@ -363,9 +370,7 @@ describe("buildShoppingList", () => {
       expect(list.lines).toEqual([]);
       expect(list.freeText).toEqual([]);
       expect(list.unscaled).toEqual([]);
-      expect(list.products.map(formatProductLine)).toEqual([
-        "Grenade Carb Killa ×1",
-      ]);
+      expect(list.products.map(productLine)).toEqual(["Grenade Carb Killa ×1"]);
     });
 
     it("adds up servings across days and people, then rounds up", () => {
@@ -412,14 +417,14 @@ describe("buildShoppingList", () => {
         buildShoppingList([
           meal(pot, { a: 2 }),
           meal(pot, { a: 2.5 }),
-        ]).products.map(formatProductLine)
+        ]).products.map(productLine)
       ).toEqual(["FAGE Total 0% fat ×1 (450 g)"]);
       expect(buildShoppingList([meal(pot, { a: 5 })]).products[0].count).toBe(
         2
       );
       // Four bars of a 3 × 60 g box need two boxes.
       expect(
-        buildShoppingList([meal(box, { a: 4 })]).products.map(formatProductLine)
+        buildShoppingList([meal(box, { a: 4 })]).products.map(productLine)
       ).toEqual(["Grenade box ×2 (180 g)"]);
     });
 
@@ -434,6 +439,26 @@ describe("buildShoppingList", () => {
       ).toBe(2);
     });
 
+    it("buys a pack for a small share of it", () => {
+      const cereal = product("c", "Cereal", {
+        servingGrams: 30,
+        packGrams: 750,
+      });
+      expect(
+        buildShoppingList([meal(cereal, { a: 0.2 })]).products.map(productLine)
+      ).toEqual(["Cereal ×1 (750 g)"]);
+    });
+
+    it("doesn't buy a second bar for floating-point dust", () => {
+      expect(
+        buildShoppingList([
+          meal(bar, { a: 0.33 }),
+          meal(bar, { a: 0.56 }),
+          meal(bar, { a: 0.11 }),
+        ]).products[0].count
+      ).toBe(1);
+    });
+
     it("counts servings when the pack is unknown or about one serving", () => {
       const unknown = product("u", "Mystery", { packGrams: null });
       const almost = product("a", "Can", { servingGrams: 330, packGrams: 500 });
@@ -441,7 +466,7 @@ describe("buildShoppingList", () => {
         buildShoppingList([
           meal(unknown, { a: 3 }),
           meal(almost, { a: 2 }),
-        ]).products.map(formatProductLine)
+        ]).products.map(productLine)
       ).toEqual(["Can ×2", "Mystery ×3"]);
     });
 

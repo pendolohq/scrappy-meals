@@ -280,12 +280,12 @@ describe("buildShopItems", () => {
       buildShopItems(plan([], [], [product(3, "450 g")]), tick)[0]
     ).toMatchObject({
       checked: false,
-      amount: "×2 more",
+      amount: "×2 (450 g) more",
       detail: "×3 (450 g) in all",
     });
     expect(
       buildShopItems(plan([], [], [product(1, "500 g")]), tick)[0]
-    ).toMatchObject({ checked: false, amount: "×1 more" });
+    ).toMatchObject({ checked: false, amount: "×1 (500 g) more" });
   });
 
   it("puts extras after the plan's lines, in the order given, with the plan's order kept in position", () => {

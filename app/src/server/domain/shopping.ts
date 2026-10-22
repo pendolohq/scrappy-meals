@@ -218,7 +218,11 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
   };
 }
 
-const PACK_TOLERANCE = 0.01;
+// A hair over a whole number (3 × 70 g from a 210 g box, or portions of
+// 0.33 + 0.56 + 0.11, in floating point) is still that number; a planned
+// share, however small, still means buying one.
+const TOLERANCE = 0.01;
+const toBuy = (n: number) => Math.max(1, Math.ceil(n - TOLERANCE));
 
 function productLine({
   id,
@@ -237,24 +241,17 @@ function productLine({
   if (info.packGrams !== null && info.packGrams / info.servingGrams >= 2) {
     return {
       ...base,
-      // A hair under a whole pack (3 × 70 g from a 210 g box, in floating
-      // point) is still that pack.
-      count: Math.ceil(
-        (servings * info.servingGrams) / info.packGrams - PACK_TOLERANCE
-      ),
+      count: toBuy((servings * info.servingGrams) / info.packGrams),
       unitLabel: `${info.packGrams} ${info.servingUnit}`,
     };
   }
-  return { ...base, count: Math.ceil(servings), unitLabel: null };
+  return { ...base, count: toBuy(servings), unitLabel: null };
 }
 
 /** "×3", "×1 (450 g)": how many to buy, in servings or in packs. */
-export const formatProductAmount = (p: ProductLine) =>
-  `×${p.count}${p.unitLabel ? ` (${p.unitLabel})` : ""}`;
-
-/** "Grenade Carb Killa ×3", "FAGE Total 0% fat ×1 (450 g)". */
-export const formatProductLine = (p: ProductLine) =>
-  `${p.name} ${formatProductAmount(p)}`;
+export const formatProductAmount = (
+  p: Pick<ProductLine, "count" | "unitLabel">
+) => `×${p.count}${p.unitLabel ? ` (${p.unitLabel})` : ""}`;
 
 function addAmount(food: Sums, ing: Ingredient, quantity: number) {
   const measured = ing.unit ? measure(quantity, ing.unit) : null;

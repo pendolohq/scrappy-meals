@@ -58,8 +58,6 @@ export const DayCard = ({
   snackSlots,
   fasting,
   currentUserId,
-  isToday,
-  isPastOrToday,
   today,
 }: {
   date: string;
@@ -68,10 +66,10 @@ export const DayCard = ({
   snackSlots: number;
   fasting: Record<string, boolean>;
   currentUserId: string;
-  isToday: boolean;
-  isPastOrToday: boolean;
+  /** The viewer's today. */
   today: string;
 }) => {
+  const isToday = date === today;
   // The week shows the viewer's own numbers; the Plan page has everyone's portions.
   const viewer = members.find((m) => m.id === currentUserId);
 
@@ -150,7 +148,7 @@ export const DayCard = ({
                         weekStart={weekStartOf(date)}
                         members={members}
                         currentUserId={currentUserId}
-                        canLog={isPastOrToday}
+                        canLog={date <= today}
                         today={today}
                       />
                     ))}

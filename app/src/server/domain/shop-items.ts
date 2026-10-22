@@ -101,7 +101,7 @@ export function buildShopItems(
       source: "plan",
       text: p.name,
       amount: outgrown
-        ? `×${seen.more[0]?.quantity} more`
+        ? `${formatProductAmount({ count: seen.more[0]?.quantity ?? 0, unitLabel: p.unitLabel })} more`
         : formatProductAmount(p),
       detail: outgrown ? `${formatProductAmount(p)} in all` : null,
       aisle: "Products",

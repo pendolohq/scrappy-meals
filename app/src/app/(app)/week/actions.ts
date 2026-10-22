@@ -150,10 +150,12 @@ export const saveProductAction = userAction(
     // Before anything is created in Mealie.
     await checkNewMeal(getDb(), meal);
     const { slug, photoUrl } = await saveProduct(product);
-    await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    // Before the meal is added: if that fails, the retry finds the product
+    // already in Mealie and has no photo to attach.
     if (photoUrl) {
       after(() => attachProductPhoto(slug, photoUrl));
     }
+    await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
     const barcode = parseBarcode(product.barcode);
     if (contribute && barcode) {
       // After the response: a slow or failing Open Food Facts must not delay

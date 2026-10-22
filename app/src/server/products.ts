@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getDb } from "./db/client";
 import { parseBarcode } from "./domain/barcode";
 import { offHasGaps } from "./domain/off-contribution";
 import {
@@ -25,6 +26,7 @@ import { getRecipe, type Recipe } from "./mealie/recipes";
 import { contributionEnabled } from "./off-contribute";
 import { lookupOpenFoodFacts, type OffResult } from "./openfoodfacts";
 import { createRateLimiter } from "./rate-limit";
+import { loadRecipes } from "./recipe-cache";
 
 export class ProductError extends UserFacingError {
   name = "ProductError";
@@ -220,18 +222,30 @@ export async function saveProduct(
 /**
  * Has Mealie fetch a new product's photo. Meant to run after the response
  * (`after()`): Mealie can take seconds to give up on an unreachable image, and
- * the product is saved without it. Failures are only logged. The recipe cache
- * is warmed before the photo lands, so it shows after the next hourly refresh.
+ * the product is saved without it. Failures are only logged.
  */
 export async function attachProductPhoto(
   slug: string,
   url: string,
-  deps: { setImage?: (slug: string, url: string) => Promise<void> } = {}
+  deps: {
+    setImage?: (slug: string, url: string) => Promise<void>;
+    refresh?: (slug: string) => Promise<unknown>;
+  } = {}
 ): Promise<void> {
   const setImage = deps.setImage ?? setRecipeImageFromUrl;
+  // Adding the meal cached the recipe without the photo; without this it
+  // would only show after the hourly refresh.
+  const refresh =
+    deps.refresh ?? ((s: string) => loadRecipes(getDb(), [s], { force: true }));
   try {
     await setImage(slug, url);
   } catch (err) {
     console.warn(`Product ${slug}: could not fetch its image`, err);
+    return;
+  }
+  try {
+    await refresh(slug);
+  } catch (err) {
+    console.warn(`Product ${slug}: could not refresh its cached recipe`, err);
   }
 }

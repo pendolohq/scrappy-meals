@@ -89,6 +89,19 @@ describe("saveProductAction", () => {
     expect(attachProductPhoto).toHaveBeenCalledWith("chocolate-bar", photo);
   });
 
+  it("still fetches the photo when adding the meal fails", async () => {
+    const photo = "https://images.openfoodfacts.org/images/products/front.jpg";
+    saveProduct.mockResolvedValueOnce({
+      slug: "chocolate-bar",
+      photoUrl: photo,
+    });
+    addCheckedMeal.mockRejectedValueOnce(new Error("slot taken"));
+    await saveProductAction(input);
+    expect(after).toHaveBeenCalledTimes(1);
+    await after.mock.calls[0][0]();
+    expect(attachProductPhoto).toHaveBeenCalledWith("chocolate-bar", photo);
+  });
+
   it("contributes after the save, as the signed-in user, with product data only", async () => {
     await expect(
       saveProductAction({

@@ -62,8 +62,6 @@ export default async function WeekPage({
             snackSlots={plan.snackSlots}
             fasting={day.fasting}
             currentUserId={user.id}
-            isToday={day.date === now}
-            isPastOrToday={day.date <= now}
             today={now}
           />
         ))}

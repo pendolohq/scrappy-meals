@@ -131,6 +131,7 @@ export const AdherenceButtons = ({
             label={slotLabel(at.slot, at.snackIndex)}
             today={today}
             initialMode="product"
+            alreadyHad
             controlled={{ open: adding, onClose: () => setAdding(false) }}
           />
         </>

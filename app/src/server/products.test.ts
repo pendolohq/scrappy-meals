@@ -358,9 +358,41 @@ describe("saveProduct", () => {
 
   it("only logs when a product's photo can't be fetched", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const refresh = vi.fn<(slug: string) => Promise<void>>(async () => {});
     await expect(
       attachProductPhoto("grenade", "https://images.openfoodfacts.org/x.jpg", {
         setImage: () => Promise.reject(new Error("no route to host")),
+        refresh,
+      })
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("refreshes the cached recipe once the photo is in Mealie", async () => {
+    const calls: string[] = [];
+    await attachProductPhoto(
+      "grenade",
+      "https://images.openfoodfacts.org/x.jpg",
+      {
+        setImage: async () => {
+          calls.push("setImage");
+        },
+        refresh: async (slug) => {
+          calls.push(`refresh ${slug}`);
+        },
+      }
+    );
+    expect(calls).toEqual(["setImage", "refresh grenade"]);
+  });
+
+  it("only logs when the cached recipe can't be refreshed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      attachProductPhoto("grenade", "https://images.openfoodfacts.org/x.jpg", {
+        setImage: async () => {},
+        refresh: () => Promise.reject(new Error("Mealie down")),
       })
     ).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
