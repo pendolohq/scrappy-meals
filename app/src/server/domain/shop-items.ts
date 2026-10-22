@@ -75,9 +75,9 @@ export function buildShopItems(
         : l.amounts.length > 0
           ? formatAmounts(l.amounts)
           : null,
-      detail: outgrown
-        ? `${formatAmounts(l.amounts)} in all`
-        : l.recipes.map((r) => r.name).join(", "),
+      // Only the partly-bought total: naming the recipes cost more room on a
+      // phone than it was worth while shopping.
+      detail: outgrown ? `${formatAmounts(l.amounts)} in all` : null,
       aisle: l.aisle,
       checked: seen === "ticked",
       amounts: l.amounts.map((a) => ({ quantity: a.quantity, unit: a.unit })),
@@ -100,7 +100,7 @@ export function buildShopItems(
       source: "plan",
       text: f.times > 1 ? `${f.text} (×${f.times})` : f.text,
       amount: outgrown ? `×${seen.more[0]?.quantity} more` : null,
-      detail: f.recipeName,
+      detail: null,
       aisle: "Other",
       checked: seen === "ticked",
       amounts: [{ quantity: f.times, unit: null }],

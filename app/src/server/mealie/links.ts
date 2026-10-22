@@ -20,19 +20,32 @@ export const groupSlug = () => {
 export const mealieRecipeUrl = (base: string, group: string, slug: string) =>
   `${base.replace(/\/$/, "")}/g/${group}/r/${slug}`;
 
+/** Mealie v3's "Create recipe" page, which starts a recipe from its name. */
+export const mealieNewRecipeUrl = (base: string, group: string) =>
+  mealieRecipeUrl(base, group, "create/new");
+
 /**
- * The recipe's page in Mealie, at `MEALIE_PUBLIC_URL`. Null when that isn't
- * set, or Mealie can't be asked for the group right now.
+ * A page in Mealie, at `MEALIE_PUBLIC_URL`. Null when that isn't set, or
+ * Mealie can't be asked for the group right now.
  */
-export async function recipeLinkInMealie(slug: string): Promise<string | null> {
+async function linkInMealie(
+  url: (base: string, group: string) => string
+): Promise<string | null> {
   const base = process.env.MEALIE_PUBLIC_URL;
   if (!base) {
     return null;
   }
   try {
-    return mealieRecipeUrl(base, await groupSlug(), slug);
+    return url(base, await groupSlug());
   } catch (err) {
     console.warn("no link to Mealie: group lookup failed", err);
     return null;
   }
 }
+
+/** The recipe's page in Mealie, or null (see `linkInMealie`). */
+export const recipeLinkInMealie = (slug: string) =>
+  linkInMealie((base, group) => mealieRecipeUrl(base, group, slug));
+
+/** Mealie's page for writing a new recipe, or null (see `linkInMealie`). */
+export const newRecipeLinkInMealie = () => linkInMealie(mealieNewRecipeUrl);

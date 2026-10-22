@@ -2,8 +2,8 @@ import { ChevronRight } from "lucide-react";
 
 import { cx } from "@/lib/cx";
 import { formatAmount } from "@/lib/format";
-import type { PersonDayTotals } from "@/server/domain/macros";
-import type { Member } from "@/server/plan";
+import { type PersonDayTotals, personDayTotals } from "@/server/domain/macros";
+import type { Member, PlannedMeal } from "@/server/plan";
 
 import { FastingToggle } from "./fasting-toggle";
 
@@ -13,6 +13,19 @@ const MACROS = [
   { key: "carbs", label: "Carbs" },
   { key: "fat", label: "Fat" },
 ] as const;
+
+/** One person's totals for a day's planned meals. */
+export const dayTotals = (meals: PlannedMeal[], userId: string) =>
+  personDayTotals(
+    meals.map((m) => ({
+      nutrition: m.recipe?.nutrition ?? null,
+      recipeName: m.recipe?.name ?? m.slug,
+      estimated: m.recipe?.nutritionSource === "estimated",
+      baseServings: m.baseServings,
+      portions: m.portions,
+    })),
+    userId
+  );
 
 const tone = (total: number, target: number) => {
   const ratio = total / target;
@@ -187,6 +200,67 @@ export const PersonTotals = ({
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * The viewer's day at the foot of a Plan column: kcal and protein, carbs and
+ * fat, so the day can be balanced while it's planned. Logging and fasting
+ * stay on the Week page.
+ */
+export const DayMacros = ({
+  member,
+  totals,
+  fasting,
+}: {
+  member: Member;
+  totals: PersonDayTotals;
+  fasting: boolean;
+}) => {
+  const targets = fasting ? NO_TARGETS : member.targets;
+  const kcal = totals.macros.kcal;
+  return (
+    <div
+      className="min-w-0 space-y-2 border-t border-border/70 pt-3"
+      data-testid="day-macros"
+    >
+      <p className="flex items-baseline justify-between gap-2 text-sm tabular-nums">
+        <span>
+          <span className="font-semibold" data-testid="kcal">
+            {formatAmount(kcal)}
+          </span>
+          <span className="text-muted">
+            {targets.kcal ? ` / ${targets.kcal} kcal` : " kcal"}
+          </span>
+        </span>
+        {(totals.incomplete || totals.estimatedRecipes.length > 0) && (
+          <span
+            className={cx(
+              "text-xs",
+              totals.incomplete ? "text-danger" : "text-muted"
+            )}
+            title={
+              totals.incomplete
+                ? `Missing nutrition: ${totals.incompleteRecipes.join(", ")}`
+                : `Estimated nutrition: ${totals.estimatedRecipes.join(", ")}`
+            }
+          >
+            {totals.incomplete ? "⚠ incomplete" : "≈ estimated"}
+          </span>
+        )}
+      </p>
+      {targets.kcal ? <Bar total={kcal} target={targets.kcal} /> : null}
+      <dl className="grid grid-cols-3 gap-x-3 text-xs tabular-nums">
+        {MACROS.map(({ key, label }) => (
+          <Macro
+            key={key}
+            label={label}
+            total={totals.macros[key]}
+            target={targets[key]}
+          />
+        ))}
+      </dl>
     </div>
   );
 };

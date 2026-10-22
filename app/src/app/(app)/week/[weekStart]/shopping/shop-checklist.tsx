@@ -264,7 +264,7 @@ const ShopRow = ({
   };
   return (
     <li className="flex items-center gap-2" data-testid="shop-item">
-      <label className="flex min-h-14 flex-1 cursor-pointer items-center gap-3 py-2">
+      <label className="flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 py-2">
         {/* A round check like a paper list; still a real checkbox underneath. */}
         <span className="relative flex size-6 shrink-0 items-center justify-center">
           <input
