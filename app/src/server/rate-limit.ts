@@ -49,11 +49,44 @@ export function createRateLimiter(opts: {
 
 const WINDOW_MS = 15 * 60 * 1000;
 
+const IPV4_MAPPED = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i;
+
+/**
+ * The address to count sign-in attempts by. An IPv6 subscriber usually gets a
+ * whole /64 and can pick any address in it, so those count as one.
+ */
+export function ipBucket(ip: string): string {
+  const mapped = IPV4_MAPPED.exec(ip);
+  if (mapped) {
+    return mapped[1];
+  }
+  if (!ip.includes(":")) {
+    return ip;
+  }
+  const [head, tail] = ip.toLowerCase().split("::");
+  const front = head ? head.split(":") : [];
+  const back = tail ? tail.split(":") : [];
+  const groups =
+    tail === undefined
+      ? front
+      : [
+          ...front,
+          ...Array.from({ length: 8 - front.length - back.length }, () => "0"),
+          ...back,
+        ];
+  const prefix = groups
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ""))
+    .join(":");
+  return `${prefix}::/64`;
+}
+
 /**
  * Sign-in limits, counting failed attempts only, per 15 minutes: 30 per IP,
- * 10 per email from one IP, and 50 per email overall. Someone who knows a
- * member's email can't lock them out from their own device: that takes 50
- * failures, from at least 5 IP addresses.
+ * 10 per email from one IP, and 50 per email overall. The per-email cap
+ * doesn't apply on a device the member has signed in on before (see
+ * `known-device.ts`), so someone who knows their email can't lock them out of
+ * it from elsewhere. `ip` is expected to be an `ipBucket`.
  *
  * `attempt` counts before the (slow) password check and `succeeded` gives it
  * back, so a burst of simultaneous requests can't all pass `allowed`.
@@ -64,11 +97,11 @@ export function createSignInLimits(now?: () => number) {
   const perEmail = createRateLimiter({ limit: 50, windowMs: WINDOW_MS, now });
   const pair = (email: string, ip: string) => `${email}|${ip}`;
   return {
-    allowed(email: string, ip: string): boolean {
+    allowed(email: string, ip: string, knownDevice = false): boolean {
       return !(
         perIp.blocked(ip) ||
         perPair.blocked(pair(email, ip)) ||
-        perEmail.blocked(email)
+        (!knownDevice && perEmail.blocked(email))
       );
     },
     attempt(email: string, ip: string): void {

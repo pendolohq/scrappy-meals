@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
+import { ESTIMATE_LIMITS } from "@/server/domain/nutrition-estimate";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { reviewInputSchema } from "@/server/domain/review-input";
 import { estimateForReview } from "@/server/nutrition-estimate";
@@ -45,9 +46,12 @@ export const saveReviewAction = userAction(
 );
 
 const estimateSchema = z.object({
-  name: z.string().max(300),
+  name: z.string().max(ESTIMATE_LIMITS.name),
   servings: z.number().positive().max(1000).nullable(),
-  ingredients: z.array(z.string().max(500)).min(1).max(200),
+  ingredients: z
+    .array(z.string().max(ESTIMATE_LIMITS.lineLength))
+    .min(1)
+    .max(ESTIMATE_LIMITS.lines),
 });
 
 // Nothing is saved: the form shows the numbers and the review saves them.

@@ -1,11 +1,20 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { getDb } from "@/server/db/client";
-import { createSignInLimits } from "@/server/rate-limit";
+import {
+  isKnownDevice,
+  KNOWN_DEVICE_MAX_AGE,
+  knownDeviceCookie,
+  type Member,
+  rememberDevice,
+} from "@/server/known-device";
+import { createSignInLimits, ipBucket } from "@/server/rate-limit";
 import { refreshToken } from "@/server/session-token";
 import {
+  findUserByEmail,
   findUserById,
   normaliseEmail,
   verifyCredentials,
@@ -43,9 +52,42 @@ const credentialsSchema = z.object({
 
 function clientIp(request: Request): string {
   // Caddy sets X-Forwarded-For; the app port is not published, so it can't be spoofed from outside.
-  return (
+  return ipBucket(
     request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown"
   );
+}
+
+const authSecret = () => process.env.AUTH_SECRET ?? "";
+// As Auth.js decides for its own cookies.
+const secureCookies = () => process.env.AUTH_URL?.startsWith("https:") ?? false;
+
+async function knownDevice(email: string): Promise<boolean> {
+  const secret = authSecret();
+  const cookie = (await cookies()).get(
+    knownDeviceCookie(secureCookies())
+  )?.value;
+  if (!secret || !cookie) {
+    return false;
+  }
+  const user = await findUserByEmail(getDb(), email);
+  return user !== undefined && isKnownDevice(cookie, user, secret);
+}
+
+async function rememberThisDevice(member: Member): Promise<void> {
+  const secret = authSecret();
+  if (!secret) {
+    return;
+  }
+  const secure = secureCookies();
+  const name = knownDeviceCookie(secure);
+  const jar = await cookies();
+  jar.set(name, rememberDevice(jar.get(name)?.value, member, secret), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
+    path: "/",
+    maxAge: KNOWN_DEVICE_MAX_AGE,
+  });
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -63,7 +105,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = normaliseEmail(parsed.data.email);
 
         const ip = clientIp(request);
-        if (!limits.allowed(email, ip)) {
+        if (!limits.allowed(email, ip, await knownDevice(email))) {
           throw new RateLimitedError();
         }
         limits.attempt(email, ip);
@@ -77,6 +119,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
         limits.succeeded(email, ip);
+        await rememberThisDevice({
+          email,
+          sessionVersion: user.sessionVersion,
+        });
         return {
           id: user.id,
           name: user.name,

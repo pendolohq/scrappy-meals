@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkEstimate,
+  ESTIMATE_LIMITS,
   type EstimateReply,
   estimatePrompt,
 } from "./nutrition-estimate";
@@ -66,6 +67,18 @@ describe("estimatePrompt", () => {
     expect(prompt).toContain("Recipe: Lentil soup");
     expect(prompt).toContain("makes 4 servings");
     expect(prompt).toContain("- 200 g lentils\n- 1 onion");
+  });
+
+  it("cuts a huge recipe down to size", () => {
+    const prompt = estimatePrompt({
+      name: "n".repeat(1000),
+      servings: 4,
+      ingredients: Array.from({ length: 5000 }, () => "x".repeat(2000)),
+    });
+    expect(prompt.length).toBeLessThan(
+      (ESTIMATE_LIMITS.lines + 5) * (ESTIMATE_LIMITS.lineLength + 3) +
+        ESTIMATE_LIMITS.name
+    );
   });
 
   it("asks for a number of servings when the recipe has none", () => {

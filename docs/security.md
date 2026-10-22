@@ -87,8 +87,18 @@ which is fine.
 - Auth.js sets the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` when
   `AUTH_URL` is https. Caddy terminates TLS; the app port isn't published.
 - Sign-in failures are rate-limited per IP, per email from one IP, and per
-  email overall (`createSignInLimits` in `src/server/rate-limit.ts`), so
-  guessing someone's password can't lock them out of their own device.
+  email overall (`createSignInLimits` in `src/server/rate-limit.ts`). IPv6
+  addresses count per /64, which one subscriber can roam freely. The
+  per-email cap would let anyone who knows a member's email lock them out, so
+  it doesn't apply on a device they've signed in on before: signing in sets a
+  `known-device` cookie (`__Host-known-device` over https), an HMAC of the
+  email and session version with `AUTH_SECRET` (`src/server/known-device.ts`).
+  It outlives sign-out on purpose, grants nothing else, and stops counting when
+  the member's password changes.
+- The nutrition estimate cuts every prompt to `ESTIMATE_LIMITS`, at import as
+  on the review page, so a huge page can't run up the API bill.
+- `/api/health` is public for uptime monitors; hits within 5 seconds share one
+  check, so it can't be used to load the database or Mealie.
 
 ## Outbound writes to Open Food Facts
 
