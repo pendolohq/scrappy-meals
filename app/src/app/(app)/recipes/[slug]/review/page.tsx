@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { buttonClass } from "@/components/ui/button";
 import { RecipeImage } from "@/components/ui/recipe-image";
+import { recipeSlug } from "@/server/domain/recipe-slug";
 import { estimatingEnabled } from "@/server/nutrition-estimate";
 import { loadReview } from "@/server/recipe-review";
 import { requireUser } from "@/server/session";
@@ -16,6 +17,9 @@ export default async function ReviewPage({
 }) {
   await requireUser();
   const { slug } = await params;
+  if (!recipeSlug.safeParse(slug).success) {
+    notFound();
+  }
   const draft = await loadReview(slug);
   if (!draft) {
     notFound();

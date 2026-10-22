@@ -28,8 +28,7 @@ async function mealieStatus() {
   }
 }
 
-// Public (used by the container healthcheck), so it reports only booleans.
-export async function GET() {
+async function check() {
   const [db, mealie] = await Promise.all([
     getDb()
       .execute(sql`select 1`)
@@ -37,6 +36,21 @@ export async function GET() {
       .catch(() => false),
     mealieStatus(),
   ]);
+  return { db, mealie };
+}
+
+// Anyone can call this, so hits within a few seconds share one check rather
+// than each costing a database query and a call to Mealie.
+const FRESH_MS = 5000;
+let last: { at: number; result: ReturnType<typeof check> } | null = null;
+
+// Public (used by the container healthcheck), so it reports only booleans.
+export async function GET() {
+  const now = Date.now();
+  if (!last || now - last.at >= FRESH_MS) {
+    last = { at: now, result: check() };
+  }
+  const { db, mealie } = await last.result;
 
   // Only the database decides liveness; the plan is still readable while Mealie is down.
   return Response.json({ ok: db, db, mealie }, { status: db ? 200 : 503 });

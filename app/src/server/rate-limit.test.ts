@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createRateLimiter, createSignInLimits } from "./rate-limit";
+import { createRateLimiter, createSignInLimits, ipBucket } from "./rate-limit";
 
 describe("createRateLimiter", () => {
   it("allows up to the limit per window, then blocks until it resets", () => {
@@ -23,6 +23,23 @@ describe("createRateLimiter", () => {
     expect(rl.hit("a")).toBe(false);
     rl.reset("a");
     expect(rl.hit("a")).toBe(true);
+  });
+});
+
+describe("ipBucket", () => {
+  it("keeps IPv4 addresses as they are", () => {
+    expect(ipBucket("1.2.3.4")).toBe("1.2.3.4");
+    expect(ipBucket("::ffff:1.2.3.4")).toBe("1.2.3.4");
+    expect(ipBucket("unknown")).toBe("unknown");
+  });
+
+  it("groups IPv6 addresses by their /64, which one subscriber usually has", () => {
+    const a = ipBucket("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+    expect(a).toBe("2001:db8:1:2::/64");
+    expect(ipBucket("2001:DB8:1:2::1")).toBe(a);
+    expect(ipBucket("2001:db8:1:3::1")).not.toBe(a);
+    expect(ipBucket("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipBucket("::1")).toBe("0:0:0:0::/64");
   });
 });
 
@@ -80,6 +97,17 @@ describe("createSignInLimits", () => {
       return ok;
     });
     expect(passed.filter(Boolean)).toHaveLength(10);
+  });
+
+  it("lets a member's known device past the per-email cap", () => {
+    const limits = createSignInLimits(() => 0);
+    for (let n = 0; n < 5; n++) {
+      fail(limits, "alex@example.test", `6.6.6.${n}`, 10);
+    }
+    expect(limits.allowed("alex@example.test", "1.2.3.4")).toBe(false);
+    expect(limits.allowed("alex@example.test", "1.2.3.4", true)).toBe(true);
+    // Still limited from one address, known device or not.
+    expect(limits.allowed("alex@example.test", "6.6.6.0", true)).toBe(false);
   });
 
   it("lets everyone in again after the window", () => {
