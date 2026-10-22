@@ -176,10 +176,11 @@ Snickers, Grenade, Huel, Kind and Fage ones above make good fixtures):
 - **Adherence leaves unplanned entries out entirely:** they are neither *unlogged* nor scored
   (`summariseAdherence` skips them; the week grid shows an "Unplanned" pill instead of the log
   buttons). They count in `personDayTotals` like any meal.
-- **Who ate it:** a product entry, and any unplanned entry (a recipe too), gives a portion of 1
-  to the person who added it and 0 to everyone else; a planned product does the same. Portions stay editable by anyone, as now. It keys on the
-  session's `user.id`, never an id from the input. If that person is fasting that day, the
-  entry is still added at 1, since they ate it; the sheet says so.
+- **Who ate it:** any unplanned entry (a product or a recipe) gives a portion of 1 to the person
+  who added it and 0 to everyone else, even if they fast that day, since they ate it. A planned
+  product gives 1 to the person who added it and 0 to everyone else, but 0 to them too on their
+  fast, like any planned meal. A planned recipe gives everyone 1 unless they fast. Portions stay
+  editable by anyone, as now. It keys on the session's `user.id`, never an id from the input.
 - **Swaps:** a swapped log offers "Log what you had", which opens the Add dialog on the
   Product tab; whatever is picked (a product, or a recipe from search) is added as an
   unplanned entry for the person who swapped. The swapped meal keeps its log.

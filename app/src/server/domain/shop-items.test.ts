@@ -64,7 +64,7 @@ const plan = (
 const none = { ticks: [], hidden: [], extras: [] };
 
 describe("buildShopItems", () => {
-  it("lists plan lines with their amount, recipes and aisle", () => {
+  it("lists plan lines with their amount and aisle, without the recipes", () => {
     const items = buildShopItems(
       plan([line("lentils", "lentils", [grams(150)])]),
       none
@@ -75,7 +75,7 @@ describe("buildShopItems", () => {
         source: "plan",
         text: "lentils",
         amount: "150 g",
-        detail: "Lentil soup, Dal",
+        detail: null,
         aisle: "Pasta, rice & grains",
         checked: false,
         amounts: [{ quantity: 150, unit: "g" }],
@@ -228,7 +228,7 @@ describe("buildShopItems", () => {
     expect(items.map((i) => i.id)).toEqual(["rice"]);
   });
 
-  it("keys free text by recipe and text, in the Other aisle with the recipe as detail", () => {
+  it("keys free text by recipe and text, in the Other aisle", () => {
     const [item] = buildShopItems(
       plan([], [freeText("a handful of parsley")]),
       none
@@ -238,7 +238,7 @@ describe("buildShopItems", () => {
       source: "plan",
       text: "a handful of parsley",
       amount: null,
-      detail: "Lentil soup",
+      detail: null,
       aisle: "Other",
       checked: false,
       amounts: [{ quantity: 1, unit: null }],

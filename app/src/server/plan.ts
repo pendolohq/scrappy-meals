@@ -421,33 +421,45 @@ const checkHadIt = (date: string, today: string | undefined) => {
   }
 };
 
+type NewMeal = {
+  date: string;
+  slot: SlotType;
+  snackIndex?: number;
+  slug: string;
+  createdBy: string;
+  baseServings?: number;
+  unplanned?: boolean;
+  today?: string;
+};
+
 /**
  * Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone
- * fasting that day. A product, or anything already eaten off-plan, is one
- * person's: 1 for whoever added it (even on a fast, since they ate it) and 0
- * for everyone else.
+ * fasting that day. Anything already eaten off-plan is one person's: 1 for
+ * whoever added it (even on a fast, since they ate it) and 0 for everyone else.
+ * A planned product is the adder's snack: 1 for them unless they fast that day,
+ * 0 for everyone else.
  *
  * `unplanned` marks something already eaten off-plan, so it needs `today` (the
  * viewer's) and can't be a later day.
  */
 export async function addMeal(
   db: Db,
-  input: {
-    date: string;
-    slot: SlotType;
-    snackIndex?: number;
-    slug: string;
-    createdBy: string;
-    baseServings?: number;
-    unplanned?: boolean;
-    today?: string;
-  },
+  input: NewMeal,
+  opts: { fetch?: RecipeFetcher } = {}
+): Promise<string> {
+  await checkNewMeal(db, input);
+  return addCheckedMeal(db, input, opts);
+}
+
+/** `addMeal` for a meal that has just passed `checkNewMeal`. */
+export async function addCheckedMeal(
+  db: Db,
+  input: NewMeal,
   opts: { fetch?: RecipeFetcher } = {}
 ): Promise<string> {
   const snackIndex = input.snackIndex ?? 0;
   const baseServings = input.baseServings ?? 1;
   const unplanned = input.unplanned ?? false;
-  await checkNewMeal(db, input);
   // Fetch fresh so we only plan recipes that exist, and the cache is warm for rendering.
   const recipes = await loadRecipes(db, [input.slug], {
     ...opts,
@@ -493,16 +505,19 @@ export async function addMeal(
       .returning({ id: mealSlots.id });
     if (members.length > 0) {
       await tx.insert(slotPortions).values(
-        members.map((m) => ({
-          mealSlotId: slot.id,
-          userId: m.id,
-          multiplier:
-            recipe.product || unplanned
-              ? Number(m.id === input.createdBy)
-              : isFasting(m.days, input.date, override.get(m.id))
-                ? 0
-                : 1,
-        }))
+        members.map((m) => {
+          const fasting = isFasting(m.days, input.date, override.get(m.id));
+          const eats = unplanned
+            ? m.id === input.createdBy
+            : recipe.product
+              ? m.id === input.createdBy && !fasting
+              : !fasting;
+          return {
+            mealSlotId: slot.id,
+            userId: m.id,
+            multiplier: Number(eats),
+          };
+        })
       );
     }
     return slot.id;
@@ -765,6 +780,14 @@ export async function setAdherence(
         and(eq(adherence.mealSlotId, mealSlotId), eq(adherence.userId, userId))
       );
     return;
+  }
+  const [meal] = await db
+    .select({ unplanned: mealSlots.unplanned })
+    .from(mealSlots)
+    .where(eq(mealSlots.id, mealSlotId));
+  // Eaten off-plan, so there is no plan to have stuck to.
+  if (meal?.unplanned) {
+    throw new PlanError("Something you had off-plan isn't logged");
   }
   const clean = note?.trim().slice(0, 500) || null;
   if (status === "swapped" && !clean) {

@@ -30,7 +30,8 @@ import type { OrganizerCount, RecipeListItem } from "@/server/mealie/recipes";
 import type { ProductLookup } from "@/server/products";
 
 import { attempt, failureText } from "./attempt";
-import { ProductTab } from "./product-tab";
+import { ProductTab } from "./product/product-tab";
+import { searchRecipes } from "./use-recipe-list";
 
 type Page = {
   items: RecipeListItem[];
@@ -57,19 +58,10 @@ const EMPTY: Results = {
   categories: [],
 };
 
-const fetchPage = async (
+const fetchPage = (
   query: Parameters<typeof pickerSearch>[0],
   signal: AbortSignal
-): Promise<Page> => {
-  const res = await fetch(`/api/recipes/search?${pickerSearch(query)}`, {
-    signal,
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body.error ?? "Search failed");
-  }
-  return body;
-};
+) => searchRecipes<Page>(pickerSearch(query), signal);
 
 /**
  * The picker's results for a search and filters, a page at a time. A new

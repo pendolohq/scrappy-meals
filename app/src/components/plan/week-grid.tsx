@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import { dayParts, formatAmount, formatDay, formatPortion } from "@/lib/format";
-import { personDayTotals } from "@/server/domain/macros";
 import { daySlots } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal, WeekPlan } from "@/server/plan";
@@ -13,6 +12,7 @@ import { AddMeal } from "./add-meal";
 import { AdherenceButtons } from "./adherence-cell";
 import { SLOT_ICON } from "./day-card";
 import { FastingToggle } from "./fasting-toggle";
+import { dayTotals } from "./person-totals";
 import { PlanMeal } from "./plan-meal";
 
 /**
@@ -77,8 +77,8 @@ const WeekMeal = ({
 /**
  * The week on wide screens: a row per day, a column per meal slot, so the
  * same slot lines up down the week. The Plan page fills empty cells with
- * "Add"; the Week page links them to the Plan page and heads each day with
- * the viewer's calories and fasting toggle.
+ * "Add"; the Week page links them to the Plan page. Both head each day with
+ * the viewer's calories; the Week page adds their fasting toggle.
  */
 export const WeekGrid = ({
   plan,
@@ -89,11 +89,10 @@ export const WeekGrid = ({
 }: {
   plan: Pick<WeekPlan, "days" | "members" | "snackSlots">;
   today: string;
+  mode: "plan" | "week";
+  currentUserId: string;
   className?: string;
-} & (
-  | { mode: "plan"; currentUserId?: undefined }
-  | { mode: "week"; currentUserId: string }
-)) => {
+}) => {
   // Snack columns past the household's count show while any day uses them.
   const columns = daySlots(
     plan.snackSlots,
@@ -138,19 +137,7 @@ export const WeekGrid = ({
         {plan.days.map(({ date, meals, fasting }) => {
           const isToday = date === today;
           const { day, weekday } = dayParts(date);
-          const macros =
-            mode === "week"
-              ? personDayTotals(
-                  meals.map((m) => ({
-                    nutrition: m.recipe?.nutrition ?? null,
-                    recipeName: m.recipe?.name ?? m.slug,
-                    estimated: m.recipe?.nutritionSource === "estimated",
-                    baseServings: m.baseServings,
-                    portions: m.portions,
-                  })),
-                  currentUserId
-                ).macros
-              : null;
+          const { macros } = dayTotals(meals, currentUserId);
           return (
             <tr key={date} data-testid="grid-day">
               <th
@@ -184,7 +171,7 @@ export const WeekGrid = ({
                     Today
                   </span>
                 )}
-                {macros && macros.kcal > 0 && (
+                {macros.kcal > 0 && (
                   <span className="mt-0.5 block text-xs text-muted tabular-nums">
                     <span className="block">
                       {formatAmount(macros.kcal)} kcal

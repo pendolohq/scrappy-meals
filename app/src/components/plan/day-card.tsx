@@ -4,13 +4,12 @@ import Link from "next/link";
 import { Pill } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
 import { dayParts, formatDay } from "@/lib/format";
-import { personDayTotals } from "@/server/domain/macros";
 import { daySlots, type SlotType } from "@/server/domain/slots";
 import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal } from "@/server/plan";
 
 import { MealRow } from "./meal-row";
-import { PersonTotals } from "./person-totals";
+import { dayTotals, PersonTotals } from "./person-totals";
 
 export const SLOT_ICON: Record<SlotType, LucideIcon> = {
   breakfast: Sunrise,
@@ -73,13 +72,6 @@ export const DayCard = ({
   isPastOrToday: boolean;
   today: string;
 }) => {
-  const forMacros = meals.map((m) => ({
-    nutrition: m.recipe?.nutrition ?? null,
-    recipeName: m.recipe?.name ?? m.slug,
-    estimated: m.recipe?.nutritionSource === "estimated",
-    baseServings: m.baseServings,
-    portions: m.portions,
-  }));
   // The week shows the viewer's own numbers; the Plan page has everyone's portions.
   const viewer = members.find((m) => m.id === currentUserId);
 
@@ -103,7 +95,7 @@ export const DayCard = ({
         <div className="mb-4 rounded-control bg-sunken/70 p-3">
           <PersonTotals
             member={viewer}
-            totals={personDayTotals(forMacros, viewer.id)}
+            totals={dayTotals(meals, viewer.id)}
             date={date}
             fasting={fasting[viewer.id] ?? false}
             plannedPortions={

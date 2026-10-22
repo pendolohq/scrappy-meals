@@ -4,17 +4,29 @@ import { useEffect, useState } from "react";
 
 import type { RecipeListItem } from "@/server/mealie/recipes";
 
+/** A page from the recipe search route, or its message when it refuses. */
+export const searchRecipes = async <T extends { items: RecipeListItem[] }>(
+  query: string,
+  signal: AbortSignal
+): Promise<T> => {
+  const res = await fetch(`/api/recipes/search?${query}`, { signal });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body.error ?? "Search failed");
+  }
+  return body;
+};
+
 export type RecipeListState = {
-  status: "idle" | "loading" | "done" | "error";
+  status: "idle" | "done" | "error";
   items: RecipeListItem[];
   error?: string;
 };
 
-/** Fetches `{ items }` from the recipe search route, after `delayMs` (typing). */
+/** One page of the recipe search for `query`, fetched while `enabled`. */
 export const useRecipeList = (
-  url: string,
-  enabled: boolean,
-  delayMs = 0
+  query: string,
+  enabled: boolean
 ): RecipeListState => {
   const [state, setState] = useState<RecipeListState>({
     status: "idle",
@@ -25,29 +37,15 @@ export const useRecipeList = (
       return;
     }
     const ctrl = new AbortController();
-    const timer = setTimeout(async () => {
-      setState((s) => ({ ...s, status: "loading" }));
-      try {
-        const res = await fetch(url, { signal: ctrl.signal });
-        const body = await res.json();
-        if (!res.ok) {
-          throw new Error(body.error ?? "Search failed");
-        }
-        setState({ status: "done", items: body.items });
-      } catch (err) {
+    searchRecipes(query, ctrl.signal).then(
+      ({ items }) => setState({ status: "done", items }),
+      (err: Error) => {
         if (!ctrl.signal.aborted) {
-          setState({
-            status: "error",
-            items: [],
-            error: (err as Error).message,
-          });
+          setState({ status: "error", items: [], error: err.message });
         }
       }
-    }, delayMs);
-    return () => {
-      clearTimeout(timer);
-      ctrl.abort();
-    };
-  }, [url, enabled, delayMs]);
+    );
+    return () => ctrl.abort();
+  }, [query, enabled]);
   return state;
 };

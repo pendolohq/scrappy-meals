@@ -206,7 +206,9 @@ export async function listProducts(
       },
     })
   );
-  return { items: page.items.map(toListItem) };
+  // Mealie drops a filter on a tag that doesn't exist yet (no product saved
+  // so far) and returns every recipe.
+  return { items: page.items.map(toListItem).filter((r) => r.isProduct) };
 }
 
 export type OrganizerCount = Organizer & { recipeCount: number };

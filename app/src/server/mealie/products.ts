@@ -8,6 +8,7 @@ import { getRawRecipe, patchRecipe } from "./import";
 import { withImportState } from "./import-state";
 import { MACRO_KEYS, type Macros, NUTRITION_FIELDS } from "./nutrition";
 import { PRODUCT_EXTRAS, withProductState } from "./product-state";
+import { type Recipe, toRecipe } from "./recipes";
 
 export type ProductRecipeInput = {
   name: string;
@@ -53,6 +54,33 @@ export async function createProductRecipe(
   const slug = unwrap(
     await client.POST("/api/recipes", { body: { name: input.name } })
   );
+  try {
+    await fillProductRecipe(slug, input, client);
+  } catch (err) {
+    // Half made, it would be an untagged recipe with Mealie's sample
+    // ingredient that the barcode can't find, so a retry would make another.
+    await client
+      .DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
+      .catch(() => undefined);
+    throw err;
+  }
+  if (input.imageUrl) {
+    // The photo is a nicety: Mealie may not reach the image, and the product
+    // is saved either way, so a failure here must not delete the recipe.
+    await setRecipeImageFromUrl(slug, input.imageUrl, { client }).catch(
+      (err: unknown) => {
+        console.warn(`Product ${slug}: could not fetch its image`, err);
+      }
+    );
+  }
+  return slug;
+}
+
+async function fillProductRecipe(
+  slug: string,
+  input: ProductRecipeInput,
+  client: MealieClient
+): Promise<void> {
   const { servingGrams, servingUnit } = input.info;
   await patchRecipe(
     slug,
@@ -80,30 +108,20 @@ export async function createProductRecipe(
     },
     { client }
   );
-  if (input.imageUrl) {
-    // The photo is a nicety: Mealie may not reach the image, and the product
-    // is saved either way.
-    await setRecipeImageFromUrl(slug, input.imageUrl, { client }).catch(
-      (err: unknown) => {
-        console.warn(`Product ${slug}: could not fetch its image`, err);
-      }
-    );
-  }
-  return slug;
 }
-
-const MAX_CANDIDATES = 5;
 
 /**
  * The product recipe with this barcode (canonical form), if any. Mealie's
  * filter on `extras.key_name = X AND extras.value = Y` can match two
  * different extras of one recipe, so it filters on the value alone and the
- * recipe's own `scrappyProduct` has the last word.
+ * recipe's own `scrappyProduct` has the last word. Every match is checked, so
+ * other recipes sharing the value can't hide the product. Its `product` is
+ * null when the rest of its extras are unreadable.
  */
 export async function findProductByBarcode(
   barcode: string,
   opts: { client?: MealieClient } = {}
-): Promise<{ slug: string; name: string } | null> {
+): Promise<Recipe | null> {
   // The filter syntax has no escape for quotes; digits never need one.
   if (!/^\d+$/.test(barcode)) {
     throw new Error("barcode must be digits only");
@@ -114,19 +132,19 @@ export async function findProductByBarcode(
       params: {
         query: {
           queryFilter: `extras.value = "${barcode}"`,
-          perPage: MAX_CANDIDATES,
+          // -1 is Mealie's "everything"; a barcode is rarely another value.
+          perPage: -1,
         },
       },
     })
   );
-  for (const hit of page.items) {
-    if (!hit.slug) {
-      continue;
-    }
-    const recipe = await getRawRecipe(hit.slug, { client });
-    if (recipe?.extras?.[PRODUCT_EXTRAS.barcode] === barcode) {
-      return { slug: hit.slug, name: recipe.name || hit.slug };
-    }
-  }
-  return null;
+  const candidates = await Promise.all(
+    page.items.flatMap((hit) =>
+      hit.slug ? [getRawRecipe(hit.slug, { client })] : []
+    )
+  );
+  const match = candidates.find(
+    (recipe) => recipe?.extras?.[PRODUCT_EXTRAS.barcode] === barcode
+  );
+  return match ? toRecipe(match) : null;
 }

@@ -6,23 +6,32 @@ import type { Member, PlannedMeal } from "@/server/plan";
 
 import { AddMeal } from "./add-meal";
 import { DayTitle, SLOT_ICON } from "./day-card";
+import { DayMacros, dayTotals } from "./person-totals";
 import { PlanMeal } from "./plan-meal";
 
-/** One day of the Plan page: a column of its slots, each with its meals and an Add tile. */
+/**
+ * One day of the Plan page: a column of its slots, each with its meals and an
+ * Add tile, and the viewer's totals at the foot.
+ */
 export const PlanDay = ({
   date,
   meals,
   members,
   snackSlots,
   today,
+  fasting,
+  currentUserId,
 }: {
   date: string;
   meals: PlannedMeal[];
   members: Member[];
   snackSlots: number;
   today: string;
+  fasting: Record<string, boolean>;
+  currentUserId: string;
 }) => {
   const isToday = date === today;
+  const viewer = members.find((m) => m.id === currentUserId);
   return (
     <section
       id={date}
@@ -90,6 +99,15 @@ export const PlanDay = ({
           }
         )}
       </div>
+      {viewer && (
+        <div className="mt-4">
+          <DayMacros
+            member={viewer}
+            totals={dayTotals(meals, viewer.id)}
+            fasting={fasting[viewer.id] ?? false}
+          />
+        </div>
+      )}
     </section>
   );
 };

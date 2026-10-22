@@ -1,4 +1,7 @@
 const OFFLINE = "No signal: try again when you're back online.";
+// Anything else that throws (an action a new deploy no longer has, a bug) won't
+// go away by retrying the same page.
+const BROKEN = "Something went wrong: reload the page and try again.";
 
 type Failure = { error: string; retry?: true };
 
@@ -8,11 +11,16 @@ type Failure = { error: string; retry?: true };
  */
 export async function attempt<R extends { error?: string }>(
   work: () => Promise<R>
-): Promise<R | { error: string; retry: true }> {
+): Promise<R | Failure> {
   try {
     return await work();
-  } catch {
-    return { error: OFFLINE, retry: true };
+  } catch (err) {
+    // fetch rejects with a TypeError when the request gets no answer.
+    if (!navigator.onLine || err instanceof TypeError) {
+      return { error: OFFLINE, retry: true };
+    }
+    console.error(err);
+    return { error: BROKEN };
   }
 }
 
