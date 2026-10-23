@@ -180,4 +180,33 @@ describe.skipIf(!testDbUrl)("recipe cache (Postgres)", () => {
       await jobs[1]!();
     });
   });
+
+  it("keeps a stale recipe as it is when asked not to refresh it", async () => {
+    await loadRecipes(db, ["soup"], { fetch: async () => recipe() });
+    let fetches = 0;
+    const defer = (_work: () => Promise<void>) => {
+      throw new Error("nothing should be queued");
+    };
+
+    const rows = await loadRecipes(db, ["soup"], {
+      fetch: async () => {
+        fetches += 1;
+        return recipe({ name: "Soup, refreshed" });
+      },
+      defer,
+      refreshStale: false,
+      now: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    });
+
+    expect(rows.get("soup")?.name).toBe("Soup");
+    expect(fetches).toBe(0);
+  });
+
+  it("still fetches a recipe that isn't cached yet", async () => {
+    const rows = await loadRecipes(db, ["soup"], {
+      fetch: async () => recipe(),
+      refreshStale: false,
+    });
+    expect(rows.get("soup")?.name).toBe("Soup");
+  });
 });

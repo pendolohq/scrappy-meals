@@ -1,7 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { after } from "next/server";
 
 import { buttonClass } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -73,7 +72,7 @@ export default async function NutritionCheckFoodsPage() {
   if (!usdaEnabled()) {
     notFound();
   }
-  const foods = await loadFoods(getDb(), after);
+  const foods = await loadFoods(getDb());
   const toMatch = foods.filter((f) => !f.match);
   const suggested = foods.filter((f) => f.match?.status === "suggested");
   const confirmed = foods.filter((f) => f.match?.status === "confirmed");
