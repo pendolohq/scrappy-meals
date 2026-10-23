@@ -287,9 +287,10 @@ recipe by `createFoodRecipe` (`src/server/mealie/food-recipes.ts`): `POST
 - One `recipeIngredient`: the Mealie food, the amount and a unit. Pieces have
   **no unit** ("2 kiwi"), so the USDA check weighs them with the food's match's
   piece weight and the shopping list counts them like any "2 kiwis". Grams and
-  millilitres use Mealie's own unit found by abbreviation (`g`, `ml`), else one
-  created as `gram` / `milliliter`, which Mealie gives a standard so the line
-  converts.
+  millilitres use a Mealie unit whose standard is exactly 1 `gram` /
+  `milliliter` (`GET /api/units?perPage=-1`, the one abbreviated `g` / `ml`
+  first), else one created as `gram` / `milliliter`. The serving is counted
+  with that very unit, so the check weighs the line the same way.
 - `recipeServings: 1`, `recipeYield: "1 serving (1 piece (69 g))"`, nutrition
   per that serving. A food counted by the piece is saved as one piece and
   planned as that many servings.
@@ -311,6 +312,14 @@ recipe by `createFoodRecipe` (`src/server/mealie/food-recipes.ts`): `POST
   estimate for the serving (`estimated`), or values typed in (`reviewed`). No
   match is saved, so the check lists the food under "Can't check yet" until it
   is matched on the foods page.
+- **Saving again reuses the recipe:** a food recipe with the same name (Mealie
+  names a second one "Kiwi (1)"), food, serving and nutrition is found through
+  `GET /api/recipes?tags=food&search=` and planned instead of a new one, so a
+  retry after a failed add doesn't leave duplicates. The recipe is created
+  before the match is saved, and deleted if saving the match fails.
+- A food whose match is values typed in from a label (a negative id) is counted
+  from that stored match, with no USDA call; so is any food already matched,
+  which works without `USDA_FDC_API_KEY`.
 - In the plan, a single food is the adder's alone, like a product.
 
 ## Reviewing a recipe

@@ -205,6 +205,10 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
       const matches = await listMatches(db);
       expect([...matches.keys()].sort()).toEqual([FOOD_A, FOOD_B]);
       expect(matches.get(FOOD_B)?.fdcId).toBe(EGG);
+
+      // Only the foods asked for, when given.
+      expect([...(await listMatches(db, [FOOD_B])).keys()]).toEqual([FOOD_B]);
+      expect((await listMatches(db, [])).size).toBe(0);
     });
 
     it("moves updated_at forward when a match is replaced", async () => {

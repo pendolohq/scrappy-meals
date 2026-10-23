@@ -15,7 +15,13 @@ import {
   MealieError,
   unwrap,
 } from "./client";
-import { createFoodRecipe, getFood, searchFoods } from "./food-recipes";
+import {
+  createFoodRecipe,
+  findFoodRecipe,
+  findLineUnit,
+  getFood,
+  searchFoods,
+} from "./food-recipes";
 import { readFoodState } from "./food-state";
 import {
   findOrCreateFood,
@@ -601,6 +607,8 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           {
             name: `${name} ${unit}`,
             food,
+            unit:
+              unit === "piece" ? null : await findLineUnit(unit, { client }),
             serving: servings[unit],
             perServing: { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 },
             nutrition: unit === "ml" ? "estimated" : "source",
@@ -657,6 +665,73 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(millilitres?.importState.nutrition).toBe("estimated");
       const raw = await getRawRecipe(slugs.ml, { client });
       expect(readFoodState(raw?.extras)?.grams).toBeNull();
+    });
+
+    it("finds Mealie's gram and millilitre, with their standard sizes", async () => {
+      expect(await findLineUnit("g", { client })).toMatchObject({
+        standardUnit: "gram",
+        standardQuantity: 1,
+      });
+      expect(await findLineUnit("ml", { client })).toMatchObject({
+        standardUnit: "milliliter",
+        standardQuantity: 1,
+      });
+    });
+
+    it("finds a food saved before by its name, serving and nutrition", async () => {
+      const state = {
+        foodId: food.id,
+        amount: 2,
+        unit: "piece",
+        grams: 138,
+      } as const;
+      const values = { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 };
+      expect(
+        await findFoodRecipe(`${name} PIECE`, state, values, { client })
+      ).toBe(slugs.piece);
+      // Mealie names a second recipe of the same name "… (1)".
+      const again = await createFoodRecipe(
+        {
+          name: `${name} piece`,
+          food,
+          unit: null,
+          serving: { ...state, grams: 140 },
+          perServing: values,
+          nutrition: "source",
+        },
+        { client }
+      );
+      cleanup.push(() =>
+        admin.DELETE("/api/recipes/{slug}", {
+          params: { path: { slug: again } },
+        })
+      );
+      expect(
+        await findFoodRecipe(
+          `${name} piece`,
+          { ...state, grams: 140 },
+          values,
+          { client }
+        )
+      ).toBe(again);
+      expect(
+        await findFoodRecipe(
+          `${name} piece`,
+          { ...state, grams: 150 },
+          values,
+          {
+            client,
+          }
+        )
+      ).toBeNull();
+      expect(
+        await findFoodRecipe(
+          `${name} piece`,
+          state,
+          { ...values, kcal: 90 },
+          { client }
+        )
+      ).toBeNull();
     });
 
     it("finds foods and single foods by name", async () => {

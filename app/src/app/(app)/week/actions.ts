@@ -230,11 +230,18 @@ export const saveFoodAction = userAction(
     pieceGrams: grams.nullable(),
     pieceLabel: z.string().trim().max(100).nullable(),
     nutrition: z.discriminatedUnion("from", [
-      z.object({ from: z.literal("usda"), fdcId: z.number().int().positive() }),
+      // A food's match to values typed in from a label has a negative id.
+      z.object({
+        from: z.literal("usda"),
+        fdcId: z
+          .number()
+          .int()
+          .refine((n) => n !== 0),
+      }),
       z.object({
         from: z.literal("own"),
         perServing: z.object({
-          kcal: macroAmount(5000),
+          kcal: z.number().min(0).max(5000),
           protein: macroAmount(500),
           carbs: macroAmount(500),
           fat: macroAmount(500),
@@ -265,10 +272,15 @@ export const saveFoodAction = userAction(
     await checkNewMeal(getDb(), meal);
     const slug = await saveFood(food, user.id);
     await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    // Saving from USDA confirms the food's match, which the checks count with.
+    revalidatePath("/recipes/nutrition-check", "layout");
     refreshWeek(date);
     return { slug };
   },
-  { invalid: () => "Amounts and values must be numbers above 0." }
+  {
+    invalid: () =>
+      "Amounts must be numbers above 0, and the calories are needed.",
+  }
 );
 
 // The plan is shared: either person can set anyone's portion.

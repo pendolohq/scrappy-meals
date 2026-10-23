@@ -22,7 +22,7 @@ import {
   servingLabel,
   servingNutrition,
 } from "@/server/domain/food";
-import type { UsdaFood, UsdaHit } from "@/server/domain/usda";
+import { OWN_VALUES, type UsdaFood, type UsdaHit } from "@/server/domain/usda";
 import { roundMacro } from "@/server/domain/usda-check";
 import type { FoodCandidate, FoodSearch, KnownFood } from "@/server/foods";
 import {
@@ -34,6 +34,7 @@ import {
 import { attempt, failureText } from "../attempt";
 
 import { AlreadyHad } from "./already-had";
+import { Notice } from "./notice";
 import { MACROS, nutritionLine } from "./nutrition";
 import type { SheetProps } from "./sheet-props";
 
@@ -259,6 +260,20 @@ export const FoodSheet = ({
       if (!ready || !picked || !serving || !source) {
         return;
       }
+      const { kcal } = ownValues;
+      const values =
+        source.kind === "usda"
+          ? ({ from: "usda", fdcId: source.food.fdcId } as const)
+          : kcal === undefined
+            ? null
+            : ({
+                from: "own",
+                perServing: { ...ownValues, kcal },
+                estimated,
+              } as const);
+      if (!values) {
+        return;
+      }
       // A food counted by the piece is saved as one piece and planned as
       // that many servings, so adding it again starts from one.
       const pieces = serving.unit === "piece";
@@ -273,10 +288,7 @@ export const FoodSheet = ({
           serving: pieces ? { amount: 1, unit: "piece" } : serving,
           pieceGrams: unit === "piece" ? piece : null,
           pieceLabel: unit === "piece" ? pieceLabel : null,
-          nutrition:
-            source.kind === "usda"
-              ? { from: "usda", fdcId: source.food.fdcId }
-              : { from: "own", perServing: ownValues, estimated },
+          nutrition: values,
           baseServings: pieces ? serving.amount : 1,
           alreadyHad: alreadyHad && !future,
         })
@@ -287,6 +299,18 @@ export const FoodSheet = ({
         onAdded();
       }
     });
+
+  // Another USDA food than the one this Mealie food is matched to.
+  const confirmed =
+    picked && "food" in picked && picked.food.match?.status === "confirmed"
+      ? picked.food
+      : null;
+  const replacing =
+    confirmed &&
+    source?.kind === "usda" &&
+    source.food.fdcId !== confirmed.match!.fdcId
+      ? confirmed.name
+      : null;
 
   const exact = found?.foods.some(
     (f) => f.name.trim().toLowerCase() === found.name.toLowerCase()
@@ -378,7 +402,9 @@ export const FoodSheet = ({
                   </span>
                   <span className="block text-xs text-muted">
                     {match?.status === "confirmed"
-                      ? `USDA: ${match.food.description}`
+                      ? match.food.dataType === OWN_VALUES
+                        ? "Matched to values from its label"
+                        : `USDA: ${match.food.description}`
                       : "food" in option
                         ? "Not matched to USDA yet"
                         : "Added to Mealie's foods"}
@@ -456,7 +482,11 @@ export const FoodSheet = ({
         <div className="space-y-4">
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
             <span className="text-muted">
-              {source.kind === "usda" ? "USDA:" : "Nutrition:"}
+              {source.kind === "own"
+                ? "Nutrition:"
+                : source.food.dataType === OWN_VALUES
+                  ? "Values from its label:"
+                  : "USDA:"}
             </span>
             <span className="font-medium">
               {source.kind === "usda"
@@ -465,16 +495,24 @@ export const FoodSheet = ({
                   ? "estimated or typed in"
                   : "typed in"}
             </span>
-            {found?.usda && (
+            {(found?.usda || source.kind === "usda") && (
               <button
                 type="button"
                 className="text-accent-ink underline underline-offset-2"
-                onClick={() => setSource(undefined)}
+                // Without USDA there is nothing to search: the other way is
+                // an estimate or values typed in.
+                onClick={() =>
+                  setSource(found?.usda ? undefined : { kind: "own" })
+                }
               >
                 Change
               </button>
             )}
           </p>
+
+          {replacing && (
+            <Notice>{`Saving changes the USDA match of ${replacing} for every recipe that uses it.`}</Notice>
+          )}
 
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
             <Field label="How much">

@@ -61,16 +61,18 @@ export function servingLabel(serving: FoodServing): string {
 /**
  * The recipe's one ingredient line. Pieces have no unit ("2 Kiwi"), which is
  * how the USDA check weighs them (the match's piece weight) and how the
- * shopping list counts them.
+ * shopping list counts them. Grams and millilitres are in `mealieUnit`, the
+ * unit the recipe will have, else an ideal one for a preview.
  */
 export function foodLine(
   serving: Pick<FoodServing, "amount" | "unit">,
-  food: LineFood
+  food: LineFood,
+  mealieUnit?: Ingredient["unit"]
 ): Ingredient {
   const unit =
     serving.unit === "piece"
       ? null
-      : { id: serving.unit, ...LINE_UNITS[serving.unit] };
+      : (mealieUnit ?? { id: serving.unit, ...LINE_UNITS[serving.unit] });
   return {
     quantity: serving.amount,
     food,
@@ -93,9 +95,10 @@ export type ServingNutrition =
 export function servingNutrition(
   serving: Pick<FoodServing, "amount" | "unit">,
   food: LineFood,
-  match: FoodMatch
+  match: FoodMatch,
+  mealieUnit?: Ingredient["unit"]
 ): ServingNutrition {
-  const result = lineResult(foodLine(serving, food), match);
+  const result = lineResult(foodLine(serving, food, mealieUnit), match);
   if (result.kind !== "counted") {
     return {
       problem: serving.unit === "ml" ? "no volume weight" : "no piece weight",

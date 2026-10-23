@@ -9,15 +9,22 @@ import {
 import { FOOD_TAG } from "../domain/taxonomy";
 
 import { type MealieClient, mealie, unwrap } from "./client";
-import { withFoodState } from "./food-state";
-import { findOrCreateUnit, findUnit, patchRecipe } from "./import";
+import { type FoodState, readFoodState, withFoodState } from "./food-state";
+import { getRawRecipe, patchRecipe } from "./import";
 import { withImportState } from "./import-state";
-import { MACRO_KEYS, type Macros, NUTRITION_FIELDS } from "./nutrition";
-import { foodDensity } from "./recipes";
+import {
+  MACRO_KEYS,
+  type Macros,
+  normaliseNutrition,
+  NUTRITION_FIELDS,
+} from "./nutrition";
+import { foodDensity, type Ingredient, listFoodRecipes } from "./recipes";
 
 export type FoodRecipeInput = {
   name: string;
   food: { id: string; name: string };
+  /** Mealie's gram or millilitre unit (`findLineUnit`); null for pieces. */
+  unit: { id: string; name: string } | null;
   serving: FoodServing;
   /** Nutrition for one serving, only the macros that are known. */
   perServing: Partial<Macros>;
@@ -63,18 +70,105 @@ export async function getFood(
 }
 
 /**
- * The unit for grams or millilitres: the one Mealie already has by its
- * abbreviation ("g"; ours locally is named "millilitre"), else one created by
- * the name Mealie knows the standard of, so the line converts.
+ * Mealie's unit for grams or millilitres: one whose standard is exactly a gram
+ * (or millilitre), the one with the usual abbreviation first ("g"; ours
+ * locally is named "millilitre"). Else one is created by the name Mealie knows
+ * the standard of. Null when even that one has no standard: the line wouldn't
+ * convert.
  */
-async function lineUnit(
+export async function findLineUnit(
   unit: "g" | "ml",
-  client: MealieClient
-): Promise<{ id: string; name: string }> {
-  const { abbreviation, name } = LINE_UNITS[unit];
-  return (
-    (await findUnit(abbreviation, { client })) ??
-    (await findOrCreateUnit(name, { client }))
+  opts: { client?: MealieClient } = {}
+): Promise<NonNullable<Ingredient["unit"]> | null> {
+  const client = opts.client ?? mealie();
+  const { abbreviation, name, standardUnit } = LINE_UNITS[unit];
+  const exact = (u: MealieUnit) =>
+    u.standardUnit === standardUnit && u.standardQuantity === 1;
+  const all = unwrap(
+    await client.GET("/api/units", { params: { query: { perPage: -1 } } })
+  ).items.filter(exact);
+  const found =
+    all.find((u) => u.abbreviation?.trim().toLowerCase() === abbreviation) ??
+    all[0];
+  if (found) {
+    return toUnit(found);
+  }
+  const created = unwrap(
+    await client.POST("/api/units", { body: { name, abbreviation } })
+  );
+  return exact(created) ? toUnit(created) : null;
+}
+
+type MealieUnit = {
+  id: string;
+  name: string;
+  abbreviation?: string;
+  standardQuantity?: number | null;
+  standardUnit?: string | null;
+};
+
+const toUnit = (u: MealieUnit): NonNullable<Ingredient["unit"]> => ({
+  id: u.id,
+  name: u.name,
+  abbreviation: u.abbreviation ?? "",
+  standardQuantity: u.standardQuantity ?? null,
+  standardUnit: u.standardUnit ?? null,
+});
+
+/** "Kiwi (2)" is how Mealie names a second recipe called "Kiwi". */
+const baseName = (name: string) =>
+  name
+    .replace(/\s*\(\d+\)\s*$/, "")
+    .trim()
+    .toLowerCase();
+
+/**
+ * A single food recipe named `name` (any case, or as Mealie renames a second
+ * one: "Kiwi (2)") with this serving of this food
+ * and this nutrition per serving; its slug, or null. Saving the same food
+ * again reuses it, so a retry or a second add doesn't make "Kiwi (1)".
+ */
+export async function findFoodRecipe(
+  name: string,
+  state: FoodState,
+  perServing: Partial<Macros>,
+  opts: { client?: MealieClient } = {}
+): Promise<string | null> {
+  const client = opts.client ?? mealie();
+  const wanted = baseName(name);
+  const { items } = await listFoodRecipes({
+    search: name,
+    perPage: 10,
+    client,
+  });
+  for (const item of items) {
+    if (baseName(item.name) !== wanted) {
+      continue;
+    }
+    const raw = await getRawRecipe(item.slug, { client });
+    const found = readFoodState(raw?.extras);
+    const values = normaliseNutrition(raw?.nutrition).perServing;
+    if (
+      found &&
+      MACRO_KEYS.every((m) => values[m] === perServing[m]) &&
+      found.foodId === state.foodId &&
+      found.unit === state.unit &&
+      found.amount === state.amount &&
+      found.grams === state.grams
+    ) {
+      return item.slug;
+    }
+  }
+  return null;
+}
+
+export async function deleteRecipe(
+  slug: string,
+  opts: { client?: MealieClient } = {}
+): Promise<void> {
+  const client = opts.client ?? mealie();
+  unwrap(
+    await client.DELETE("/api/recipes/{slug}", { params: { path: { slug } } })
   );
 }
 
@@ -88,10 +182,7 @@ export async function createFoodRecipe(
   opts: { client?: MealieClient } = {}
 ): Promise<string> {
   const client = opts.client ?? mealie();
-  const unit =
-    input.serving.unit === "piece"
-      ? null
-      : await lineUnit(input.serving.unit, client);
+  const unit = input.unit && { id: input.unit.id, name: input.unit.name };
   const slug = unwrap(
     await client.POST("/api/recipes", { body: { name: input.name } })
   );
