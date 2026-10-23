@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowLeft, Check, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, Scale, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { Button, buttonClass } from "@/components/ui/button";
@@ -24,7 +24,9 @@ import {
   RECIPE_CATEGORIES,
   RECIPE_TAGS,
 } from "@/server/domain/taxonomy";
+import { isOutside } from "@/server/domain/usda-check";
 import type { ReviewDraft } from "@/server/recipe-review";
+import type { ReviewUsda } from "@/server/usda/check";
 
 import { estimateNutritionAction, saveReviewAction } from "./actions";
 
@@ -160,13 +162,19 @@ const lineText = (line: {
         .filter(Boolean)
         .join(" ");
 
+const usdaFigure = (key: MacroKey, value: number) =>
+  key === "kcal" ? `${Math.round(value)} kcal` : `${value} g ${key}`;
+
 export const ReviewForm = ({
   draft,
   canEstimate,
+  usda,
 }: {
   draft: ReviewDraft;
   /** False when the server has no API key for estimating. */
   canEstimate: boolean;
+  /** The USDA check of the recipe as Mealie has it; null when it's off. */
+  usda: ReviewUsda | null;
 }) => {
   const [servings, setServings] = useState(String(draft.servings ?? ""));
   const [totalMinutes, setTotalMinutes] = useState(
@@ -244,6 +252,35 @@ export const ReviewForm = ({
       ),
     }));
     setNutritionServings(servingsNow);
+  };
+
+  // USDA's figures per serving at the servings in the form now.
+  const usdaNow =
+    usda?.perServing && usda.servings && servingsNow && servingsNow > 0
+      ? rescalePerServing(usda.perServing, usda.servings, servingsNow)
+      : (usda?.perServing ?? null);
+  const current = macroValues(nutrition);
+  const usdaOutside = usdaNow
+    ? MACROS.filter(
+        (m) =>
+          usdaNow[m.key] !== undefined &&
+          isOutside(m.key, current[m.key] ?? undefined, usdaNow[m.key]!)
+      ).map((m) => m.key)
+    : [];
+
+  const useUsda = () => {
+    if (!usdaNow) {
+      return;
+    }
+    setNutrition((n) => ({
+      ...n,
+      ...Object.fromEntries(
+        MACROS.flatMap((m) =>
+          usdaNow[m.key] === undefined ? [] : [[m.key, String(usdaNow[m.key])]]
+        )
+      ),
+    }));
+    setNutritionServings(servingsNow ?? usda?.servings ?? null);
   };
 
   const nutritionLabel = !anyMacro
@@ -448,6 +485,69 @@ export const ReviewForm = ({
               </span>
             ))}
           </output>
+        )}
+        {usda && (
+          <div className="mt-4 space-y-2 rounded-control bg-sunken/70 px-4 py-3 text-sm">
+            {usdaNow ? (
+              <>
+                <p>
+                  <span className="font-medium">USDA per serving:</span>{" "}
+                  {MACROS.filter((m) => usdaNow[m.key] !== undefined)
+                    .map((m) => usdaFigure(m.key, usdaNow[m.key]!))
+                    .join(" · ")}
+                </p>
+                <p
+                  className={usdaOutside.length ? "text-danger" : "text-muted"}
+                >
+                  {usdaOutside.length
+                    ? `Far from the figures above: ${MACROS.filter((m) =>
+                        usdaOutside.includes(m.key)
+                      )
+                        .map((m) =>
+                          m.label.replace(/ \(.*\)/, "").toLowerCase()
+                        )
+                        .join(", ")}.`
+                    : "Close to the figures above."}
+                  {(usda.notCounted > 0 || usda.assumed > 0) &&
+                    " Some lines aren't counted or have an assumed amount; see the check."}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {usdaOutside.length > 0 && (
+                    <Button variant="secondary" size="sm" onClick={useUsda}>
+                      <Scale className="size-3.5" aria-hidden />
+                      Use USDA&rsquo;s figures
+                    </Button>
+                  )}
+                  <Link
+                    href={`/recipes/nutrition-check/${draft.slug}`}
+                    className={buttonClass({ variant: "ghost", size: "sm" })}
+                  >
+                    See the check
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted">
+                USDA can&rsquo;t check this recipe yet
+                {usda.unmatchedFoods.length > 0 &&
+                  `: ${usda.unmatchedFoods.join(", ")} ${usda.unmatchedFoods.length === 1 ? "needs" : "need"} a match`}
+                {usda.unmatchedFoods.length === 0 &&
+                  usda.unweighed > 0 &&
+                  `: ${usda.unweighed} ${usda.unweighed === 1 ? "line needs" : "lines need"} a weight`}
+                .{" "}
+                <Link
+                  href="/recipes/nutrition-check/foods"
+                  className="text-accent-ink underline"
+                >
+                  Match foods
+                </Link>
+              </p>
+            )}
+            <p className="text-xs text-muted">
+              Worked out from the ingredients as saved in Mealie; save to update
+              it.
+            </p>
+          </div>
         )}
         {canEstimate && (
           <div className="mt-4 space-y-2">

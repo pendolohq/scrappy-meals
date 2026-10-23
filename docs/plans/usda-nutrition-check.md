@@ -154,3 +154,13 @@ the cache).
 - Portions from a second FDC food (SR Legacy's "1 fruit = 69 g" beside Foundation kiwi
   nutrients). For now, pick the SR Legacy or FNDDS food, or type the piece weight.
 - CREA Italian tables as a second source.
+
+## On the import review
+
+When `USDA_FDC_API_KEY` is set, the review page (`/recipes/[slug]/review`) also shows the
+recipe's USDA check, worked out from the recipe as Mealie has it (fetched fresh, from the
+cached USDA foods; no FDC call). It shows USDA's figures per serving at the servings in the
+form, says which macros are far from the figures being entered, and "Use USDA's figures" fills
+them in, to be saved with the review. When the recipe can't be checked yet it names the foods
+to match. A failed check never blocks the review.
+
