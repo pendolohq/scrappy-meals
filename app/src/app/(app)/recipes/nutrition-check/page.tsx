@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { after } from "next/server";
 
 import { buttonClass } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -84,7 +83,7 @@ export default async function NutritionCheckPage() {
   if (!usdaEnabled()) {
     notFound();
   }
-  const { recipes, foods } = await loadOverview(getDb(), after);
+  const { recipes, foods } = await loadOverview(getDb());
   const toMatch = foods.filter((f) => !f.match).length;
   const suggested = foods.filter((f) => f.match?.status === "suggested").length;
 

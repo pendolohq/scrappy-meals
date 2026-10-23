@@ -34,6 +34,8 @@ const QUEUED_FOR_MS = 5 * 60 * 1000;
  *   response, so a slow Mealie never holds up a page. Only recipes not cached
  *   at all are fetched before returning.
  * - `force`: every slug is fetched now, and a failed fetch throws.
+ * - `refreshStale: false`: stale entries are returned as they are and not
+ *   refreshed at all, for pages that read every recipe at once.
  */
 export async function loadRecipes(
   db: Db,
@@ -43,6 +45,7 @@ export async function loadRecipes(
     now?: Date;
     force?: boolean;
     defer?: Defer;
+    refreshStale?: boolean;
   } = {}
 ): Promise<Map<string, CachedRecipe | null>> {
   const unique = [...new Set(slugs)];
@@ -122,6 +125,7 @@ export async function loadRecipes(
   const stale = unique.filter((slug) => {
     const row = cached.get(slug);
     return (
+      opts.refreshStale !== false &&
       row &&
       !missing.includes(slug) &&
       now.getTime() - row.fetchedAt.getTime() > MAX_AGE_MS

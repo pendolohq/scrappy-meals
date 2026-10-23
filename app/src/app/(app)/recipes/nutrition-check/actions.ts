@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
@@ -22,7 +21,7 @@ const BASE = "/recipes/nutrition-check";
 export const suggestMatchesAction = userAction(
   z.object({}),
   async (_, user) => {
-    const result = await suggestNext(getDb(), user.id, after);
+    const result = await suggestNext(getDb(), user.id);
     revalidatePath(BASE, "layout");
     return result;
   }

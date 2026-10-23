@@ -56,22 +56,20 @@ const requireClient = () => {
 type Load = typeof loadRecipes;
 
 /**
- * The recipes by slug, 20 at a time. Stale ones are refreshed after the
- * response, all in one deferred job that goes chunk by chunk, so a page load
- * never sends Mealie a burst of requests.
+ * The recipes by slug from our cache, 20 at a time. Only recipes not cached
+ * yet are fetched from Mealie. Stale ones are used as they are: these pages
+ * read every recipe and reload after each click, and a cached copy is enough
+ * to count ingredients. Other pages keep the cache fresh.
  */
 export async function loadInChunks(
   db: Db,
   slugs: string[],
-  defer?: Defer,
   load: Load = loadRecipes
 ): Promise<CachedRecipe[]> {
-  const jobs: (() => Promise<void>)[] = [];
-  const collect: Defer | undefined = defer && ((work) => void jobs.push(work));
   const recipes: CachedRecipe[] = [];
   for (let i = 0; i < slugs.length; i += CHUNK) {
     const loaded = await load(db, slugs.slice(i, i + CHUNK), {
-      defer: collect,
+      refreshStale: false,
     });
     for (const recipe of loaded.values()) {
       if (recipe && !isProduct(recipe)) {
@@ -79,23 +77,15 @@ export async function loadInChunks(
       }
     }
   }
-  if (defer && jobs.length > 0) {
-    defer(async () => {
-      for (const job of jobs) {
-        await job();
-      }
-    });
-  }
   return recipes;
 }
 
-/** Every recipe but the products, from our cache, 20 at a time. */
-async function loadAllRecipes(db: Db, defer?: Defer): Promise<CachedRecipe[]> {
+/** Every recipe Mealie lists, but the products, from our cache. */
+async function loadAllRecipes(db: Db): Promise<CachedRecipe[]> {
   const list = await whenMealieAnswers(() => listAllRecipes());
   return loadInChunks(
     db,
-    list.map((r) => r.slug),
-    defer
+    list.map((r) => r.slug)
   );
 }
 
@@ -212,9 +202,9 @@ export function foodUsage(
 }
 
 /** Foods the recipes use, most-used first. */
-export async function loadFoods(db: Db, defer?: Defer): Promise<FoodUsage[]> {
+export async function loadFoods(db: Db): Promise<FoodUsage[]> {
   const [recipes, matches] = await Promise.all([
-    loadAllRecipes(db, defer),
+    loadAllRecipes(db),
     listMatches(db),
   ]);
   return foodUsage(recipes, matches);
@@ -222,11 +212,10 @@ export async function loadFoods(db: Db, defer?: Defer): Promise<FoodUsage[]> {
 
 /** Every recipe with its check, and the foods they use, from one load of the recipes. */
 export async function loadOverview(
-  db: Db,
-  defer?: Defer
+  db: Db
 ): Promise<{ recipes: CheckedRecipe[]; foods: FoodUsage[] }> {
   const [recipes, matches, reviews] = await Promise.all([
-    loadAllRecipes(db, defer),
+    loadAllRecipes(db),
     listMatches(db),
     // Every review: there are at most as many as recipes, and fetching them
     // alongside saves waiting on the recipes first.
@@ -341,8 +330,7 @@ export async function confirmMatch(
  */
 export async function suggestNext(
   db: Db,
-  userId: string,
-  defer?: Defer
+  userId: string
 ): Promise<{ tried: number; suggested: number }> {
   const client = requireClient();
   const deps = claudeDeps((query, pageSize) => client.search(query, pageSize));
@@ -350,7 +338,7 @@ export async function suggestNext(
     throw new UserFacingError("Suggesting matches isn't set up.");
   }
   const [all, misses] = await Promise.all([
-    loadFoods(db, defer),
+    loadFoods(db),
     listSuggestMisses(db),
   ]);
   const foods = all
