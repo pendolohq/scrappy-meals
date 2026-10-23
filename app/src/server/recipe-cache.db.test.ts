@@ -133,4 +133,51 @@ describe.skipIf(!testDbUrl)("recipe cache (Postgres)", () => {
       packGrams: 100,
     });
   });
+
+  describe("refreshing stale recipes after the response", () => {
+    const later = new Date(Date.now() + 2 * 60 * 60 * 1000);
+
+    const cacheSoup = () =>
+      loadRecipes(db, ["soup"], { fetch: async () => recipe() });
+
+    it("queues a stale recipe once, however many times it's loaded meanwhile", async () => {
+      await cacheSoup();
+      const jobs: (() => Promise<void>)[] = [];
+      const defer = (work: () => Promise<void>) => void jobs.push(work);
+      let fetches = 0;
+      const fetch = async () => {
+        fetches += 1;
+        return recipe({ name: "Soup, refreshed" });
+      };
+
+      for (let i = 0; i < 3; i++) {
+        const rows = await loadRecipes(db, ["soup"], {
+          fetch,
+          defer,
+          now: later,
+        });
+        expect(rows.get("soup")?.name).toBe("Soup");
+      }
+      expect(jobs).toHaveLength(1);
+
+      await jobs[0]!();
+      expect(fetches).toBe(1);
+    });
+
+    it("queues it again once the refresh has run", async () => {
+      await cacheSoup();
+      const jobs: (() => Promise<void>)[] = [];
+      const defer = (work: () => Promise<void>) => void jobs.push(work);
+      const fetch = async () => recipe();
+
+      await loadRecipes(db, ["soup"], { fetch, defer, now: later });
+      await jobs[0]!();
+      // The refresh stamped it with `later`; an hour after that it's stale again.
+      const evenLater = new Date(later.getTime() + 2 * 60 * 60 * 1000);
+      await loadRecipes(db, ["soup"], { fetch, defer, now: evenLater });
+
+      expect(jobs).toHaveLength(2);
+      await jobs[1]!();
+    });
+  });
 });

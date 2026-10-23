@@ -15,6 +15,17 @@ const MAX_AGE_MS = 60 * 60 * 1000;
 export type Defer = (work: () => Promise<void>) => void;
 
 /**
+ * Stale recipes already queued for a refresh after a response, with when they
+ * were queued. A page loaded meanwhile leaves them to that refresh instead of
+ * queuing the same Mealie requests again: otherwise a page that reloads after
+ * every click (the USDA foods list) piles up enough requests to exhaust
+ * Mealie's database connections. An entry older than this lets a refresh that
+ * never ran be queued again.
+ */
+const queued = new Map<string, number>();
+const QUEUED_FOR_MS = 5 * 60 * 1000;
+
+/**
  * Recipes by slug, served from our cache and refreshed from Mealie when older
  * than an hour. If Mealie is unreachable, a stale entry is better than
  * nothing, so it is kept. A recipe deleted in Mealie maps to null.
@@ -118,9 +129,23 @@ export async function loadRecipes(
   });
   const { defer } = opts;
   if (defer && stale.length > 0) {
-    defer(async () => {
-      await Promise.all(stale.map(refresh));
-    });
+    const toQueue = stale.filter(
+      (slug) => now.getTime() - (queued.get(slug) ?? 0) > QUEUED_FOR_MS
+    );
+    for (const slug of toQueue) {
+      queued.set(slug, now.getTime());
+    }
+    if (toQueue.length > 0) {
+      defer(async () => {
+        try {
+          await Promise.all(toQueue.map(refresh));
+        } finally {
+          for (const slug of toQueue) {
+            queued.delete(slug);
+          }
+        }
+      });
+    }
     await Promise.all(missing.map(refresh));
   } else {
     await Promise.all([...missing, ...stale].map(refresh));
