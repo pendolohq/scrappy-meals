@@ -27,8 +27,12 @@ export type FoodMatch = {
 
 export type LineResult =
   | { kind: "skipped" }
-  /** No amount ("olive oil, to taste"): left out of the total and listed. */
-  | { kind: "notCounted" }
+  /**
+   * Left out of the total and listed: a line with no amount ("olive oil, to
+   * taste"), or one Mealie couldn't parse, which is mostly a serving
+   * suggestion or another recipe ("½ batch", "carb source of choice").
+   */
+  | { kind: "notCounted"; reason: "no amount" | "not parsed" }
   | { kind: "needsAmount"; reason: string }
   | { kind: "unmatched"; foodId: string; foodName: string }
   | {
@@ -149,7 +153,8 @@ const needsAmount = (reason: string): LineResult => ({
 /**
  * What one ingredient line adds, from grams: its weight or volume, the
  * match's weight for its unit or a USDA portion for it, or the match's piece
- * weight. Nothing is guessed: a line with no amount isn't counted at all.
+ * weight. Nothing is guessed: a line with no amount, or one Mealie couldn't
+ * parse, isn't counted at all.
  */
 export function lineResult(
   line: Ingredient,
@@ -159,7 +164,7 @@ export function lineResult(
   if (!food) {
     return line.display.trim() === ""
       ? { kind: "skipped" }
-      : needsAmount("not parsed");
+      : { kind: "notCounted", reason: "not parsed" };
   }
   const { quantity, unit } = line;
   // Nothing to weigh: a food with next to no nutrients (salt, water) counts
@@ -167,7 +172,7 @@ export function lineResult(
   // other line is left out, matched or not.
   if (quantity === null) {
     if (match?.status !== "confirmed") {
-      return { kind: "notCounted" };
+      return { kind: "notCounted", reason: "no amount" };
     }
     if (isNegligible(match.food.per100g)) {
       return { kind: "counted", grams: 0, macros: scale(match.food, 0) };
@@ -179,7 +184,7 @@ export function lineResult(
           macros: scale(match.food, match.defaultGrams),
           assumed: true,
         }
-      : { kind: "notCounted" };
+      : { kind: "notCounted", reason: "no amount" };
   }
   if (match?.status !== "confirmed") {
     return { kind: "unmatched", foodId: food.id, foodName: food.name };
@@ -235,8 +240,8 @@ export type RecipeCheck = {
   noServings: boolean;
   /** Every line is matched and weighed, but none of them weighs anything. */
   nothingToCount: boolean;
-  /** Lines with no amount, left out of the total. */
-  notCounted: string[];
+  /** Lines left out of the total, with why. */
+  notCounted: { display: string; reason: "no amount" | "not parsed" }[];
   /** Lines with no amount, counted at their food's default amount. */
   assumed: { display: string; grams: number }[];
   unmatchedFoods: { id: string; name: string }[];
@@ -270,7 +275,7 @@ export function checkRecipe(
 
   const unmatched = new Map<string, string>();
   const missingAmount: RecipeCheck["needsAmount"] = [];
-  const notCounted: string[] = [];
+  const notCounted: RecipeCheck["notCounted"] = [];
   const assumed: RecipeCheck["assumed"] = [];
   const total: Partial<Macros> = {};
   const unknown = new Set<MacroKey>();
@@ -279,7 +284,7 @@ export function checkRecipe(
     if (result.kind === "unmatched") {
       unmatched.set(result.foodId, result.foodName);
     } else if (result.kind === "notCounted") {
-      notCounted.push(display);
+      notCounted.push({ display, reason: result.reason });
     } else if (result.kind === "needsAmount") {
       missingAmount.push({ display, reason: result.reason });
     } else if (result.kind === "counted") {
