@@ -47,6 +47,8 @@ const Outcome = ({ result }: { result: LineResult }) => {
       return <span className="text-sm text-danger">{result.reason}</span>;
     case "unmatched":
       return <span className="text-sm text-danger">food not matched</span>;
+    case "notCounted":
+      return <span className="text-sm text-muted">no amount, not counted</span>;
     case "skipped":
       return null;
   }
@@ -163,6 +165,12 @@ export default async function NutritionCheckRecipePage({
               ))}
             </tbody>
           </table>
+          {check.notCounted.length > 0 && (
+            <p className="text-sm text-muted">
+              Not counted, as they have no amount: {check.notCounted.join(", ")}
+              .
+            </p>
+          )}
           {(check.status === "mismatch" || check.status === "reviewed") && (
             <DecisionForm slug={recipe.slug} usda={check.usdaPerServing} />
           )}

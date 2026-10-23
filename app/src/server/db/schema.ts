@@ -317,6 +317,11 @@ export const usdaFoodMatches = pgTable(
       mode: "number",
     }),
     pieceLabel: text("piece_label"),
+    /** What one clove, bunch, pinch… of it weighs, by unit (see `unitKey`). */
+    unitGrams: jsonb("unit_grams")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
     updatedBy: uuid("updated_by").references(() => users.id, {
       onDelete: "set null",
     }),

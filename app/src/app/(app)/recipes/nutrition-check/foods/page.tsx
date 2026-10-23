@@ -46,6 +46,7 @@ const Group = ({
               name: food.name,
               uses: food.uses,
               lines: food.lines,
+              units: food.units,
             }}
             match={
               food.match && {
@@ -57,6 +58,7 @@ const Group = ({
                 portions: food.match.food.portions,
                 pieceGrams: food.match.pieceGrams,
                 pieceLabel: food.match.pieceLabel,
+                unitGrams: food.match.unitGrams,
               }
             }
           />

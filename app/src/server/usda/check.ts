@@ -5,11 +5,13 @@ import "server-only";
 import { type Db, getDb } from "../db/client";
 import { recipeCache, usdaRecipeReviews } from "../db/schema";
 import { PRODUCT_TAG } from "../domain/taxonomy";
+import { measure } from "../domain/units";
 import type { UsdaHit } from "../domain/usda";
 import {
   checkRecipe,
   type CheckStatus,
   type RecipeCheck,
+  unitKey,
 } from "../domain/usda-check";
 import { UserFacingError } from "../errors";
 import { getRawRecipe, patchRecipe } from "../mealie/import";
@@ -163,10 +165,12 @@ export type FoodUsage = {
   uses: number;
   /** A few of those lines, to tell what the food is. */
   lines: string[];
+  /** Units its lines use that are neither a weight nor a volume, by `unitKey`. */
+  units: { key: string; name: string }[];
   match: StoredMatch | null;
 };
 
-function foodUsage(
+export function foodUsage(
   recipes: CachedRecipe[],
   matches: Map<string, StoredMatch>
 ): FoodUsage[] {
@@ -181,9 +185,17 @@ function foodUsage(
         name: line.food.name,
         uses: 0,
         lines: [],
+        units: [],
         match: matches.get(line.food.id) ?? null,
       };
       food.uses += 1;
+      const { quantity, unit } = line;
+      if (quantity !== null && unit && !measure(quantity, unit)) {
+        const key = unitKey(unit);
+        if (key && !food.units.some((u) => u.key === key)) {
+          food.units.push({ key, name: unit.name.trim() });
+        }
+      }
       if (
         food.lines.length < 3 &&
         line.display &&
@@ -293,6 +305,7 @@ export async function confirmMatch(
     fdcId: number;
     pieceGrams: number | null;
     pieceLabel: string | null;
+    unitGrams: Record<string, number>;
   },
   userId: string
 ): Promise<void> {
@@ -315,6 +328,7 @@ export async function confirmMatch(
       status: "confirmed",
       pieceGrams: input.pieceGrams,
       pieceLabel: input.pieceLabel,
+      unitGrams: input.unitGrams,
     },
     userId
   );

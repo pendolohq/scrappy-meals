@@ -65,9 +65,18 @@ const detail = ({ check }: CheckedRecipe): string => {
     }
     return parts.join(", ");
   }
-  return check.outside.length > 0
-    ? `Outside: ${check.outside.map((m) => MACRO_LABELS[m].toLowerCase()).join(", ")}`
-    : "";
+  const parts = [];
+  if (check.outside.length > 0) {
+    parts.push(
+      `Outside: ${check.outside.map((m) => MACRO_LABELS[m].toLowerCase()).join(", ")}`
+    );
+  }
+  if (check.notCounted.length > 0) {
+    parts.push(
+      `${check.notCounted.length} ${check.notCounted.length === 1 ? "line" : "lines"} not counted`
+    );
+  }
+  return parts.join(" · ");
 };
 
 export default async function NutritionCheckPage() {
