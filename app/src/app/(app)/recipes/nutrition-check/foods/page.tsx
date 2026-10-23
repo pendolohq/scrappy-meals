@@ -54,6 +54,7 @@ const Group = ({
                 description: food.match.food.description,
                 dataType: food.match.food.dataType,
                 kcalPer100g: food.match.food.per100g.kcal ?? null,
+                per100g: food.match.food.per100g,
                 portions: food.match.food.portions,
                 pieceGrams: food.match.pieceGrams,
                 pieceLabel: food.match.pieceLabel,

@@ -6,7 +6,8 @@ import { recipeCache, usdaRecipeReviews } from "../db/schema";
 import { UserFacingError } from "../errors";
 import { createUser } from "../users";
 
-import { cachedFoodName, saveDecision } from "./check";
+import { cachedFoodName, saveDecision, saveOwnValues } from "./check";
+import { listMatches } from "./foods";
 
 type Deps = NonNullable<Parameters<typeof saveDecision>[3]>;
 type Raw = NonNullable<Awaited<ReturnType<NonNullable<Deps["getRecipe"]>>>>;
@@ -307,5 +308,87 @@ describe.skipIf(!testDbUrl)("cachedFoodName (Postgres)", () => {
 
     expect(await cachedFoodName(db, OIL)).toBeNull();
     expect(await cachedFoodName(db, BAR)).toBeNull();
+  });
+});
+
+describe.skipIf(!testDbUrl)("saveOwnValues (Postgres)", () => {
+  const db = useTestDb();
+  const YEAST = "00000000-0000-4000-8000-0000000000c1";
+  const MISO = "00000000-0000-4000-8000-0000000000c2";
+  const VALUES = { kcal: 320, protein: 50, carbs: 36, fat: 5, fibre: 27 };
+  const newUser = () =>
+    createUser(db, {
+      name: "Alex",
+      email: "alex@example.com",
+      password: "hunter2-secret",
+    });
+  const input = (over = {}) => ({
+    foodId: YEAST,
+    per100g: VALUES,
+    gramsPerTbsp: 5,
+    pieceGrams: null,
+    unitGrams: {},
+    ...over,
+  });
+
+  it("confirms the food against the values, weighing a tablespoon", async () => {
+    const user = await newUser();
+    await db
+      .insert(recipeCache)
+      .values([
+        row("a", [
+          line(YEAST, "nutritional yeast", "2 tbsp nutritional yeast"),
+        ]),
+      ]);
+
+    await saveOwnValues(db, input(), user.id);
+
+    const match = (await listMatches(db)).get(YEAST);
+    expect(match).toMatchObject({
+      status: "confirmed",
+      foodName: "nutritional yeast",
+      food: {
+        description: "nutritional yeast (own values)",
+        dataType: "Own values",
+        per100g: VALUES,
+        portions: [{ label: "1 tbsp", measure: "tbsp", grams: 5 }],
+      },
+    });
+    expect(match!.fdcId).toBeLessThan(0);
+  });
+
+  it("updates the same values when saved again, and gives another food its own", async () => {
+    const user = await newUser();
+    await db
+      .insert(recipeCache)
+      .values([
+        row("a", [
+          line(YEAST, "nutritional yeast", "2 tbsp nutritional yeast"),
+          line(MISO, "miso", "1 tbsp miso"),
+        ]),
+      ]);
+
+    await saveOwnValues(db, input(), user.id);
+    const first = (await listMatches(db)).get(YEAST)!.fdcId;
+    await saveOwnValues(
+      db,
+      input({ per100g: { ...VALUES, kcal: 380 }, gramsPerTbsp: null }),
+      user.id
+    );
+    await saveOwnValues(db, input({ foodId: MISO }), user.id);
+
+    const matches = await listMatches(db);
+    expect(matches.get(YEAST)).toMatchObject({
+      fdcId: first,
+      food: { per100g: { kcal: 380 }, portions: [] },
+    });
+    expect(matches.get(MISO)!.fdcId).toBe(first - 1);
+  });
+
+  it("refuses a food no recipe uses", async () => {
+    const user = await newUser();
+    await expect(saveOwnValues(db, input(), user.id)).rejects.toThrow(
+      UserFacingError
+    );
   });
 });

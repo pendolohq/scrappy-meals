@@ -25,6 +25,8 @@ import { usdaClient } from "./client";
 import {
   ensureFoods,
   listMatches,
+  OWN_VALUES,
+  saveOwnFood,
   listSuggestMisses,
   saveMatch,
   saveSuggestion,
@@ -317,6 +319,52 @@ export async function confirmMatch(
       status: "confirmed",
       pieceGrams: input.pieceGrams,
       pieceLabel: input.pieceLabel,
+      unitGrams: input.unitGrams,
+    },
+    userId
+  );
+}
+
+/**
+ * Matches a food to values typed in from a label, for a food USDA's generic
+ * data doesn't have (nutritional yeast). `gramsPerTbsp` lets spoon amounts be
+ * weighed. Needs no USDA call.
+ */
+export async function saveOwnValues(
+  db: Db,
+  input: {
+    foodId: string;
+    per100g: Macros;
+    gramsPerTbsp: number | null;
+    pieceGrams: number | null;
+    unitGrams: Record<string, number>;
+  },
+  userId: string
+): Promise<void> {
+  usdaLimits.confirm(userId);
+  const foodName = await cachedFoodName(db, input.foodId);
+  if (foodName === null) {
+    throw new UserFacingError("No recipe uses that food any more.");
+  }
+  const current = (await listMatches(db)).get(input.foodId);
+  const fdcId = await saveOwnFood(db, {
+    current: current?.food.dataType === OWN_VALUES ? current.fdcId : null,
+    description: `${foodName} (${OWN_VALUES.toLowerCase()})`,
+    per100g: input.per100g,
+    portions:
+      input.gramsPerTbsp === null
+        ? []
+        : [{ label: "1 tbsp", measure: "tbsp", grams: input.gramsPerTbsp }],
+  });
+  await saveMatch(
+    db,
+    {
+      mealieFoodId: input.foodId,
+      foodName,
+      fdcId,
+      status: "confirmed",
+      pieceGrams: input.pieceGrams,
+      pieceLabel: null,
       unitGrams: input.unitGrams,
     },
     userId
