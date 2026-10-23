@@ -9,7 +9,11 @@ import {
 } from "react";
 import { Clock, Plus, Search, X } from "lucide-react";
 
-import { addMealAction, loadProductAction } from "@/app/(app)/week/actions";
+import {
+  addMealAction,
+  loadFoodAction,
+  loadProductAction,
+} from "@/app/(app)/week/actions";
 import { FilterChips } from "@/components/recipe/filter-chips";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -26,6 +30,7 @@ import {
 } from "@/server/domain/discover";
 import type { SlotType } from "@/server/domain/slots";
 import { formatMinutes, tagForSlot } from "@/server/domain/taxonomy";
+import type { KnownFood } from "@/server/foods";
 import type { OrganizerCount, RecipeListItem } from "@/server/mealie/recipes";
 import type { ProductLookup } from "@/server/products";
 
@@ -181,6 +186,8 @@ const RecipeOption = ({
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
         {recipe.isProduct ? (
           <Pill tone="accent">Product</Pill>
+        ) : recipe.isFood ? (
+          <Pill tone="accent">Food</Pill>
         ) : recipe.servings ? (
           <span>{recipe.servings} servings</span>
         ) : (
@@ -243,6 +250,8 @@ export const AddMeal = ({
   const [mode, setMode] = useState(initialMode);
   // A product picked from the results: its sheet opens in the Product tab.
   const [picked, setPicked] = useState<ProductLookup>();
+  // Likewise a single food added before.
+  const [pickedFood, setPickedFood] = useState<KnownFood>();
   // The slot's meal tag lifted by typing a search; see `onSearch`.
   const liftedTag = useRef(false);
   const [query, setQuery] = useState("");
@@ -271,6 +280,7 @@ export const AddMeal = ({
     setFilters(startFilters());
     setMode(initialMode);
     setPicked(undefined);
+    setPickedFood(undefined);
     liftedTag.current = false;
     controlled?.onClose();
   };
@@ -313,9 +323,21 @@ export const AddMeal = ({
     scroller.current?.scrollTo({ top: 0 });
   };
 
-  const pick = ({ slug, isProduct }: RecipeListItem) =>
+  const pick = ({ slug, isProduct, isFood }: RecipeListItem) =>
     startTransition(async () => {
       setError(undefined);
+      if (isFood) {
+        // How many servings and "Already had it?" are chosen on its sheet.
+        const res = await attempt(() => loadFoodAction({ slug }));
+        if (res.error === undefined) {
+          setPickedFood(res);
+          setMode("product");
+        } else {
+          setError(failureText(res));
+          scroller.current?.scrollTo({ top: 0 });
+        }
+        return;
+      }
       if (isProduct) {
         // Portion and "Already had it?" are chosen on the product's sheet.
         const res = await attempt(() => loadProductAction({ slug }));
@@ -433,6 +455,7 @@ export const AddMeal = ({
                   aria-selected={mode === id}
                   onClick={() => {
                     setPicked(undefined);
+                    setPickedFood(undefined);
                     setMode(id);
                   }}
                   className={cx(
@@ -483,6 +506,7 @@ export const AddMeal = ({
                 future={future}
                 onAdded={close}
                 initial={picked}
+                initialFood={pickedFood}
               />
             </div>
           )}

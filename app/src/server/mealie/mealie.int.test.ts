@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { measure } from "../domain/units";
 import { attachProductPhoto } from "../products";
 
 import {
@@ -14,6 +15,8 @@ import {
   MealieError,
   unwrap,
 } from "./client";
+import { createFoodRecipe, getFood, searchFoods } from "./food-recipes";
+import { readFoodState } from "./food-state";
 import {
   findOrCreateFood,
   findOrCreateUnit,
@@ -34,6 +37,7 @@ import {
   discoverRecipes,
   getRecipe,
   listAllRecipes,
+  listFoodRecipes,
   listOrganizers,
 } from "./recipes";
 
@@ -564,6 +568,136 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(await all({ ...none, search: name })).toContain(slug);
       // The tag filter combines with the quick filter's query.
       expect(await all({ ...none, quick: true })).not.toContain(slug);
+    });
+  });
+
+  describe("single foods", () => {
+    const foodName = `it-kiwi-${run}`;
+    const name = `IT Kiwi ${run}`;
+    let food = { id: "", name: "" };
+    const slugs: Record<"piece" | "g" | "ml", string> = {
+      piece: "",
+      g: "",
+      ml: "",
+    };
+
+    beforeAll(async () => {
+      const created = unwrap(
+        await admin.POST("/api/foods", { body: { name: foodName } })
+      );
+      food = { id: created.id, name: created.name };
+      cleanup.push(() =>
+        admin.DELETE("/api/foods/{item_id}", {
+          params: { path: { item_id: created.id } },
+        })
+      );
+      const servings = {
+        piece: { amount: 2, unit: "piece", grams: 138 },
+        g: { amount: 150, unit: "g", grams: 150 },
+        ml: { amount: 200, unit: "ml", grams: null },
+      } as const;
+      for (const unit of ["piece", "g", "ml"] as const) {
+        slugs[unit] = await createFoodRecipe(
+          {
+            name: `${name} ${unit}`,
+            food,
+            serving: servings[unit],
+            perServing: { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 },
+            nutrition: unit === "ml" ? "estimated" : "source",
+          },
+          { client }
+        );
+        cleanup.push(() =>
+          admin.DELETE("/api/recipes/{slug}", {
+            params: { path: { slug: slugs[unit] } },
+          })
+        );
+      }
+    });
+
+    it("makes a one-line recipe of one serving, tagged Food", async () => {
+      const recipe = await getRecipe(slugs.piece, { client });
+      expect(recipe).toMatchObject({
+        name: `${name} piece`,
+        servings: 1,
+        tags: [{ name: "Food", slug: "food" }],
+        nutrition: {
+          perServing: { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 },
+        },
+        importState: { review: "done", nutrition: "source" },
+        instructions: [],
+        product: null,
+      });
+      expect(recipe?.ingredients).toHaveLength(1);
+      expect(recipe?.ingredients[0]).toMatchObject({
+        quantity: 2,
+        unit: null,
+        food: { id: food.id },
+      });
+      const raw = await getRawRecipe(slugs.piece, { client });
+      expect(readFoodState(raw?.extras)).toEqual({
+        foodId: food.id,
+        amount: 2,
+        unit: "piece",
+        grams: 138,
+      });
+      expect(raw?.recipeYield).toBe("1 serving (2 pieces (138 g))");
+    });
+
+    it("writes grams and millilitres in units that convert", async () => {
+      const grams = await getRecipe(slugs.g, { client });
+      const [g] = grams!.ingredients;
+      expect(measure(g.quantity!, g.unit)).toEqual({ per: "g", amount: 150 });
+      const millilitres = await getRecipe(slugs.ml, { client });
+      const [ml] = millilitres!.ingredients;
+      expect(measure(ml.quantity!, ml.unit)).toEqual({
+        per: "ml",
+        amount: 200,
+      });
+      expect(millilitres?.importState.nutrition).toBe("estimated");
+      const raw = await getRawRecipe(slugs.ml, { client });
+      expect(readFoodState(raw?.extras)?.grams).toBeNull();
+    });
+
+    it("finds foods and single foods by name", async () => {
+      await expect(getFood(food.id, { client })).resolves.toEqual({
+        ...food,
+        gramsPerMl: null,
+      });
+      await expect(
+        getFood("00000000-0000-4000-8000-000000000000", { client })
+      ).resolves.toBeNull();
+      expect(
+        (await searchFoods(foodName, { client })).map((f) => f.id)
+      ).toContain(food.id);
+      const found = await listFoodRecipes({ search: name, client });
+      expect(found.items.map((r) => r.slug).toSorted()).toEqual(
+        Object.values(slugs).toSorted()
+      );
+      expect(found.items.every((r) => r.isFood && !r.isProduct)).toBe(true);
+    });
+
+    it("leaves single foods out of Discover unless the Food tag is chosen or searched", async () => {
+      const none = { tags: [], categories: [], quick: false };
+      const all = async (filters: Parameters<typeof discoverRecipes>[0]) => {
+        const found: string[] = [];
+        for (let page: number | null = 1; page !== null;) {
+          const result = await discoverRecipes(filters, { client, page });
+          found.push(...result.items.map((r) => r.slug));
+          page = result.nextPage;
+        }
+        return found;
+      };
+      const plain = await all(none);
+      expect(plain).toContain(ids.bareSlug);
+      expect(plain).not.toContain(slugs.piece);
+      expect(await all({ ...none, tags: ["food"] })).toContain(slugs.piece);
+      expect(await all({ ...none, search: name })).toContain(slugs.piece);
+    });
+
+    it("still lists them for the USDA check", async () => {
+      const slugsListed = (await listAllRecipes({ client })).map((r) => r.slug);
+      expect(slugsListed).toContain(slugs.g);
     });
   });
 

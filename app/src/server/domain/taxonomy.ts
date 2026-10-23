@@ -30,6 +30,23 @@ export const PRODUCT_TAG = {
   slug: "product",
 } as const satisfies Organizer;
 
+/**
+ * Marks a single food added by name: a kiwi, a glass of milk, a cappuccino
+ * (see `mealie/food-recipes.ts`). Like the Product tag, it's outside
+ * `RECIPE_TAGS`, and Discover leaves these out unless it is chosen.
+ */
+export const FOOD_TAG = {
+  name: "Food",
+  slug: "food",
+} as const satisfies Organizer;
+
+/** A single food added by name, going by its tags. */
+export const isFoodRecipe = (tags: Organizer[] | null | undefined) =>
+  (tags ?? []).some((t) => t.slug === FOOD_TAG.slug);
+
+/** Tags whose recipes Discover leaves out until the tag is chosen or a search is typed. */
+export const SET_ASIDE_TAGS = [PRODUCT_TAG, FOOD_TAG] as const;
+
 /** What's in it. Mostly one per recipe, so every recipe falls somewhere. */
 export const RECIPE_CATEGORIES = [
   { name: "Vegan", slug: "vegan" },

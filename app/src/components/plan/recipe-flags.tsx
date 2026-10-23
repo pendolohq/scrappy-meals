@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { pillClass, type PillTone } from "@/components/ui/pill";
 import { cx } from "@/lib/cx";
+import { isFoodRecipe } from "@/server/domain/taxonomy";
 import type { PlannedMeal } from "@/server/plan";
 
 const reviewHref = (slug: string) =>
@@ -37,12 +38,14 @@ export const RecipeFlags = ({
     }
   }
   const product = Boolean(recipe?.product);
+  const food = isFoodRecipe(recipe?.tags);
   const estimated = recipe?.nutritionSource === "estimated";
   const needsReview = recipe?.reviewState === "pending";
   if (
     flags.length === 0 &&
     !nutritionFlag &&
     !product &&
+    !food &&
     !estimated &&
     !needsReview
   ) {
@@ -51,6 +54,7 @@ export const RecipeFlags = ({
   return (
     <ul className="mt-1.5 flex flex-wrap gap-1.5">
       {product && <li className={pillClass("accent")}>Product</li>}
+      {food && <li className={pillClass("accent")}>Food</li>}
       {nutritionFlag &&
         (product ? (
           <li className={pillClass("danger")}>⚠ {nutritionFlag}</li>

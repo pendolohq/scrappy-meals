@@ -17,6 +17,7 @@ import { Pill } from "@/components/ui/pill";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { cx } from "@/lib/cx";
 import { formatPortion } from "@/lib/format";
+import { isFoodRecipe } from "@/server/domain/taxonomy";
 import { weekStartOf } from "@/server/domain/week";
 import type { Member, PlannedMeal } from "@/server/plan";
 
@@ -65,6 +66,7 @@ export const PlanMeal = ({
     });
 
   const name = meal.recipe?.name ?? meal.slug;
+  const food = isFoodRecipe(meal.recipe?.tags);
   const photo = meal.recipe?.imagePath ? meal.recipe.mealieId : null;
   const href = `/week/${weekStartOf(meal.date)}/meals/${meal.id}`;
 
@@ -210,9 +212,10 @@ export const PlanMeal = ({
             <Ellipsis className="size-4" aria-hidden />
           </IconButton>
         </div>
-        {(meal.recipe?.product || meal.unplanned) && (
+        {(meal.recipe?.product || food || meal.unplanned) && (
           <p className="flex flex-wrap gap-1">
             {meal.recipe?.product && <Pill tone="accent">Product</Pill>}
+            {food && <Pill tone="accent">Food</Pill>}
             {meal.unplanned && <Pill>Unplanned</Pill>}
           </p>
         )}

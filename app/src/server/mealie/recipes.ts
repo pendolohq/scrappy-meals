@@ -5,9 +5,11 @@ import { nextDiscoverPage } from "../domain/discover";
 import type { ProductInfo } from "../domain/product";
 import {
   categoryFilter,
+  FOOD_TAG,
   type Organizer,
   PRODUCT_TAG,
   QUICK_MAX_MINUTES,
+  SET_ASIDE_TAGS,
 } from "../domain/taxonomy";
 
 import { type MealieClient, mealie, unwrap } from "./client";
@@ -36,6 +38,8 @@ type RecipeSummaryFields = {
 export type RecipeListItem = RecipeSummaryFields & {
   /** Carries the Product tag: a packaged product rather than a dish. */
   isProduct: boolean;
+  /** Carries the Food tag: a single food added by name (a kiwi). */
+  isFood: boolean;
 };
 
 export type Ingredient = {
@@ -116,10 +120,11 @@ export type DiscoverFilters = {
 export const DISCOVER_PAGE_SIZE = 48;
 
 /**
- * Products are in Mealie as recipes tagged Product. Browsing with no tags and
- * no search leaves them out of the grid, so snack bars don't bury the recipes;
- * a tag filter or a search brings them back to where they can be found. (Mealie's
- * `NOT IN` also matches recipes with no tags at all.)
+ * Products and single foods are in Mealie as recipes tagged Product or Food.
+ * Browsing with no tags and no search leaves them out of the grid, so snack
+ * bars and kiwis don't bury the recipes; a tag filter or a search brings them
+ * back to where they can be found. (Mealie's `NOT IN` also matches recipes
+ * with no tags at all.)
  */
 function discoverQueryFilter(
   filters: DiscoverFilters,
@@ -132,7 +137,8 @@ function discoverQueryFilter(
     );
   }
   if (filters.tags.length === 0 && !search) {
-    clauses.push(`tags.slug NOT IN ["${PRODUCT_TAG.slug}"]`);
+    const slugs = SET_ASIDE_TAGS.map((t) => `"${t.slug}"`).join(", ");
+    clauses.push(`tags.slug NOT IN [${slugs}]`);
   }
   return clauses.length > 1
     ? clauses.map((c) => `(${c})`).join(" AND ")
@@ -209,6 +215,31 @@ export async function listProducts(
   // Mealie drops a filter on a tag that doesn't exist yet (no product saved
   // so far) and returns every recipe.
   return { items: page.items.map(toListItem).filter((r) => r.isProduct) };
+}
+
+/** Single foods whose name has the words; the newest first without any. */
+export async function listFoodRecipes(
+  opts: { search?: string; perPage?: number; client?: MealieClient } = {}
+): Promise<RecipePage> {
+  const client = opts.client ?? mealie();
+  const search = opts.search?.trim();
+  const page = unwrap(
+    await client.GET("/api/recipes", {
+      params: {
+        query: {
+          tags: [FOOD_TAG.slug],
+          search: search || undefined,
+          ...(search
+            ? {}
+            : { orderBy: "dateAdded", orderDirection: "desc" as const }),
+          page: 1,
+          perPage: opts.perPage ?? 5,
+        },
+      },
+    })
+  );
+  // As for products: a tag Mealie doesn't have yet is dropped from the filter.
+  return { items: page.items.map(toListItem).filter((r) => r.isFood) };
 }
 
 /** Every recipe in Mealie, products left out; perPage -1 is Mealie's "everything". */
@@ -304,6 +335,7 @@ const toOrganizer = (o: { name: string; slug: string }): Organizer => ({
 const toListItem = (r: MealieSummary | MealieRecipe): RecipeListItem => ({
   ...toSummaryFields(r),
   isProduct: (r.tags ?? []).some((t) => t.slug === PRODUCT_TAG.slug),
+  isFood: (r.tags ?? []).some((t) => t.slug === FOOD_TAG.slug),
 });
 
 function toSummaryFields(r: MealieSummary | MealieRecipe): RecipeSummaryFields {
@@ -339,6 +371,11 @@ function readDensity(value: unknown): number | null {
   return n !== null && n > 0 && n < 25 ? n : null;
 }
 
+/** A food's grams per millilitre, from its `scrappyGramsPerMl` extra. */
+export const foodDensity = (
+  extras: Record<string, unknown> | null | undefined
+): number | null => readDensity(extras?.[DENSITY_EXTRA]);
+
 function toIngredient(i: MealieIngredient): Ingredient {
   const food =
     i.food && "id" in i.food && i.food.id
@@ -346,7 +383,7 @@ function toIngredient(i: MealieIngredient): Ingredient {
           id: i.food.id,
           name: i.food.name,
           label: "label" in i.food ? (i.food.label?.name ?? null) : null,
-          gramsPerMl: readDensity(i.food.extras?.[DENSITY_EXTRA]),
+          gramsPerMl: foodDensity(i.food.extras),
         }
       : null;
   const unit =

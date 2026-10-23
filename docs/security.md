@@ -136,7 +136,10 @@ read only in that file and sent in the `X-Api-Key` header, never in a URL, so it
 stays out of logs. Requests go to `api.nal.usda.gov` only, with a 15 s timeout, and
 carry search words (typed, or written by Claude from food names) and FDC ids,
 nothing about people. They run only from `userAction`s (search, confirm a match,
-suggest matches); a page load reads the Postgres cache and never calls FDC.
+suggest matches, and the Add dialog's food sheet: `usdaFoodAction` and
+`saveFoodAction`, which count as confirmations); a page load reads the Postgres
+cache and never calls FDC. A food saved from USDA gets the figures the server
+counts from its match, never numbers from the browser.
 Hand searches and confirmed matches are each limited to 120 an hour per person
 (`src/server/usda/limits.ts`), next to the 10 suggest runs an hour, so one person
 can't use up the key's roughly 1,000 requests an hour. "Use USDA's" writes the

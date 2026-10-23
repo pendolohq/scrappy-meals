@@ -254,14 +254,14 @@ export async function findOrCreateFood(
   return { id: created.id, name: created.name };
 }
 
-/** An existing unit with this name, plural or abbreviation, else a new one. */
-export async function findOrCreateUnit(
+/** An existing unit with this name, plural or abbreviation; null when there is none. */
+export async function findUnit(
   name: string,
   opts: { client?: MealieClient } = {}
-): Promise<{ id: string; name: string }> {
+): Promise<{ id: string; name: string } | null> {
   const client = opts.client ?? mealie();
   const wanted = normalise(name);
-  const found = await searchAll(
+  return searchAll(
     async (page) =>
       unwrap(
         await client.GET("/api/units", {
@@ -278,6 +278,15 @@ export async function findOrCreateUnit(
     wanted,
     ["name", "pluralName", "abbreviation", "pluralAbbreviation"]
   );
+}
+
+/** An existing unit with this name, plural or abbreviation, else a new one. */
+export async function findOrCreateUnit(
+  name: string,
+  opts: { client?: MealieClient } = {}
+): Promise<{ id: string; name: string }> {
+  const client = opts.client ?? mealie();
+  const found = await findUnit(name, { client });
   if (found) {
     return found;
   }
