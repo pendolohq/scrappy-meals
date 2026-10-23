@@ -7,6 +7,10 @@ What the planner relies on, checked against a running instance
 
 - Types: `app/src/server/mealie/schema.d.ts`, generated from the committed
   `openapi.json` snapshot by `bun run mealie:types` (`MEALIE_URL=... bun run mealie:types`).
+  The generator (`app/scripts/mealie-types/`) has its own `package.json` and lockfile:
+  openapi-typescript needs TypeScript 5's API, which the app's TypeScript 7 doesn't have, so
+  that folder pins TypeScript 5.9 and the script installs it before running. Update its two
+  packages by hand there; `bun run update-packages` only covers `app/package.json`.
   Fields that have a server default are optional in the types.
 - Wrapper: `client.ts` (auth, 10 s timeout, `MealieError`,
   `MealieUnavailableError`; `mealieImporter()` waits 60 s), `recipes.ts`,
