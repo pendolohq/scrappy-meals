@@ -46,10 +46,9 @@ One VPS runs everything with Docker Compose (`docker-compose.yml`):
 ## From a commit to the server
 
 1. **Pull request:** CI (`.github/workflows/ci.yml`) runs format, lint, typecheck, unit/db/
-   integration tests, the e2e journeys and a secret scan. PRs that touch what goes into the
-   image (listed in `.github/image-paths`; a unit test keeps the list complete) also build and
-   smoke-test it; PRs that touch the compose file, Caddyfile or backups validate them and run a
-   backup and restore round trip. Nothing is published.
+   integration tests, the e2e journeys and a secret scan. PRs that touch the compose file,
+   Caddyfile or backups also validate them and run a backup and restore round trip. The image
+   isn't built, and nothing is published.
 2. **Merge to `main`:** the same checks, and the image is always built and smoke-tested. Still
    nothing is published.
 3. **Release:** tagging `vX.Y.Z` runs CI again and publishes `:X.Y.Z`, `:X.Y` and `:latest`.

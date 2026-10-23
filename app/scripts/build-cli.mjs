@@ -3,10 +3,7 @@
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 
-/**
- * Also used by src/cli/bundle.test.ts to list what goes into the bundle.
- * @type {import("esbuild").BuildOptions}
- */
+/** @type {import("esbuild").BuildOptions} */
 export const options = {
   entryPoints: { cli: "src/cli/index.ts", migrate: "src/cli/migrate.ts" },
   outdir: "dist",
