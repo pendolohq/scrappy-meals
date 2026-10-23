@@ -225,6 +225,66 @@ describe("fitDay", () => {
     expect(fit.people.a.incomplete).toBe(true);
   });
 
+  it("says an eaten entry lacking any macro makes the totals a lower bound", () => {
+    const fit = fitDay(
+      [entry({ perServing: { kcal: 500, protein: 30, carbs: 50 } }), entry()],
+      [person("a")]
+    );
+    expect(fit.people.a.incomplete).toBe(true);
+  });
+
+  it("ignores a skipped entry's missing or estimated nutrition", () => {
+    const skipped = (over: Partial<FitEntry>) =>
+      entry({ logged: { a: "skipped" }, ...over });
+    const fit = fitDay(
+      [
+        skipped({ perServing: null }),
+        skipped({ perServing: { kcal: 300 } }),
+        skipped({ estimated: true }),
+        entry(),
+      ],
+      [person("a")]
+    );
+    expect(fit.people.a).toMatchObject({
+      incomplete: false,
+      estimated: false,
+    });
+  });
+
+  it("doesn't score a carbs, fat or fibre target an eaten entry doesn't report", () => {
+    const noFibre = entry({
+      perServing: { kcal: 500, protein: 30, carbs: 50, fat: 20 },
+      portions: { a: 1 },
+    });
+    const lunch = entry({ portions: { a: 1 } });
+    const fit = fitDay(
+      [noFibre, lunch],
+      [
+        person("a", {
+          targets: targets({ kcal: 1000, protein: 60, fibre: 40 }),
+        }),
+      ]
+    );
+    // Counting the unknown fibre as 0 would push lunch up to chase it.
+    expect(fit.portions[lunch.id].a).toBe(1);
+    expect(fit.people.a).toMatchObject({ status: "fitted", misses: [] });
+  });
+
+  it("treats targets of 0 as no targets", () => {
+    const meal = entry({ portions: { a: 1.75 } });
+    const fit = fitDay(
+      [meal],
+      [person("a", { targets: targets({ kcal: 0 }) })]
+    );
+    expect(fit.portions[meal.id].a).toBe(1.75);
+    expect(fit.people.a).toMatchObject({ status: "no-targets", score: null });
+  });
+
+  it("treats a day where every meal was skipped as empty", () => {
+    const fit = fitDay([entry({ logged: { a: "skipped" } })], [person("a")]);
+    expect(fit.people.a).toMatchObject({ status: "empty", score: null });
+  });
+
   it("flags a day that can't reach its targets instead of forcing it", () => {
     const fit = fitDay(
       [entry({ perServing: { kcal: 600, protein: 10 } })],

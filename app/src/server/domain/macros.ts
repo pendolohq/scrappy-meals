@@ -38,26 +38,44 @@ export type PersonDayTotals = {
   mealsEaten: number;
 };
 
-const servingsEaten = (
-  meal: Pick<MealForMacros, "baseServings" | "portions" | "logged">,
-  userId: string
-) => {
-  const status = meal.logged?.[userId];
-  const share = status ? EATEN_SHARE[status] : 1;
-  return meal.baseServings * (meal.portions[userId] ?? 0) * share;
+export const emptyMacros = (): Macros => ({
+  kcal: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fibre: 0,
+});
+
+export const roundMacros = (macros: Macros): Macros => {
+  const out = emptyMacros();
+  for (const key of MACRO_KEYS) {
+    out[key] = Math.round(macros[key] * 10) / 10;
+  }
+  return out;
 };
+
+/** Servings a person eats of a meal at `multiplier`, after what they logged. */
+export const servingsEaten = (
+  baseServings: number,
+  multiplier: number,
+  logged: AdherenceStatus | undefined
+) => baseServings * multiplier * (logged ? EATEN_SHARE[logged] : 1);
 
 export function personDayTotals(
   meals: MealForMacros[],
   userId: string
 ): PersonDayTotals {
-  const macros: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 };
+  const macros = emptyMacros();
   const incompleteRecipes = new Set<string>();
   const estimatedRecipes = new Set<string>();
   let mealsEaten = 0;
 
   for (const meal of meals) {
-    const servings = servingsEaten(meal, userId);
+    const servings = servingsEaten(
+      meal.baseServings,
+      meal.portions[userId] ?? 0,
+      meal.logged?.[userId]
+    );
     if (servings <= 0) {
       continue;
     }
@@ -79,11 +97,8 @@ export function personDayTotals(
     }
   }
 
-  for (const key of MACRO_KEYS) {
-    macros[key] = Math.round(macros[key] * 10) / 10;
-  }
   return {
-    macros,
+    macros: roundMacros(macros),
     incomplete: incompleteRecipes.size > 0,
     incompleteRecipes: [...incompleteRecipes],
     estimatedRecipes: [...estimatedRecipes],

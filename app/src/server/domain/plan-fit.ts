@@ -1,6 +1,7 @@
 import { MACRO_KEYS, type MacroKey, type Macros } from "../mealie/nutrition";
 
-import { type AdherenceStatus, EATEN_SHARE } from "./adherence";
+import { type AdherenceStatus } from "./adherence";
+import { emptyMacros, roundMacros, servingsEaten } from "./macros";
 
 /** A person's daily targets; null means no target for that macro. */
 export type Targets = Record<MacroKey, number | null>;
@@ -53,7 +54,11 @@ export type PersonFit = {
   score: number | null;
   /** Macros outside their band; empty when the day lands. */
   misses: Miss[];
-  /** An eaten entry lacks kcal or protein, so it was left as it is and the totals are a lower bound. */
+  /**
+   * An eaten entry lacks some nutrition, so the totals are a lower bound. One
+   * lacking kcal or protein is left as it is; a carbs, fat or fibre target
+   * that an eaten entry doesn't report isn't scored.
+   */
   incomplete: boolean;
   /** An eaten entry's nutrition is an unchecked estimate. */
   estimated: boolean;
@@ -89,16 +94,9 @@ const MAX_ROUNDS = 50;
 /** Scores closer than this are a tie, so float noise doesn't decide the pick. */
 const EPSILON = 1e-9;
 
+/** A target of 0 or less can't be scored against, so it counts as none. */
 const hasTargets = (targets: Targets) =>
-  MACRO_KEYS.some((key) => targets[key] !== null);
-
-const zero = (): Macros => ({
-  kcal: 0,
-  protein: 0,
-  carbs: 0,
-  fat: 0,
-  fibre: 0,
-});
+  MACRO_KEYS.some((key) => (targets[key] ?? 0) > 0);
 
 /** Signed share off target; more fibre than planned isn't off. Null without a target. */
 const offTarget = (macro: MacroKey, total: number, target: number | null) => {
@@ -109,22 +107,29 @@ const offTarget = (macro: MacroKey, total: number, target: number | null) => {
   return macro === "fibre" ? Math.min(off, 0) : off;
 };
 
+const macroScore = (macro: MacroKey, off: number) => {
+  const { weight, band } = SCORING[macro];
+  const outside = Math.max(0, Math.abs(off) - band);
+  return weight * (off * off + OUTSIDE_BAND * outside * outside);
+};
+
 /**
- * `scoreDay`'s score on plain arrays in `MACRO_KEYS` order, since the search
- * calls it for every combination it tries.
+ * `scoreDay`'s score on plain arrays in `MACRO_KEYS` order, for the search,
+ * which scores every combination it tries: the macros without a target are
+ * dropped once rather than on every call.
  */
-const scoreOf = (totals: ArrayLike<number>, goals: (number | null)[]) => {
-  let score = 0;
-  for (let k = 0; k < MACRO_KEYS.length; k++) {
-    const off = offTarget(MACRO_KEYS[k], totals[k], goals[k]);
-    if (off === null) {
-      continue;
+const scorer = (goals: (number | null)[]) => {
+  const scored = MACRO_KEYS.flatMap((macro, k) => {
+    const goal = goals[k];
+    return goal !== null && goal > 0 ? [{ macro, k, goal }] : [];
+  });
+  return (totals: ArrayLike<number>) => {
+    let score = 0;
+    for (const { macro, k, goal } of scored) {
+      score += macroScore(macro, offTarget(macro, totals[k], goal)!);
     }
-    const { weight, band } = SCORING[MACRO_KEYS[k]];
-    const outside = Math.max(0, Math.abs(off) - band);
-    score += weight * (off * off + OUTSIDE_BAND * outside * outside);
-  }
-  return score;
+    return score;
+  };
 };
 
 /**
@@ -139,20 +144,19 @@ export function scoreDay(
   if (!hasTargets(targets)) {
     return null;
   }
+  let score = 0;
   const misses: Miss[] = [];
   for (const macro of MACRO_KEYS) {
     const off = offTarget(macro, totals[macro], targets[macro]);
-    if (off !== null && Math.abs(off) - SCORING[macro].band > EPSILON) {
+    if (off === null) {
+      continue;
+    }
+    score += macroScore(macro, off);
+    if (Math.abs(off) - SCORING[macro].band > EPSILON) {
       misses.push({ macro, off: Math.round(off * 1000) / 1000 });
     }
   }
-  return {
-    score: scoreOf(
-      MACRO_KEYS.map((key) => totals[key]),
-      MACRO_KEYS.map((key) => targets[key])
-    ),
-    misses,
-  };
+  return { score, misses };
 }
 
 /** "protein 18% under", for a day's summary. */
@@ -163,32 +167,13 @@ const knowsKcalAndProtein = (entry: FitEntry) =>
   entry.perServing?.kcal !== undefined &&
   entry.perServing.protein !== undefined;
 
-const share = (entry: FitEntry, userId: string) => {
-  const status = entry.logged?.[userId];
-  return status ? EATEN_SHARE[status] : 1;
-};
+const knowsAll = (entry: FitEntry) =>
+  MACRO_KEYS.every((key) => entry.perServing?.[key] !== undefined);
 
-const addTo = (
-  totals: Macros,
-  entry: FitEntry,
-  userId: string,
-  multiplier: number
-) => {
-  const servings = entry.baseServings * multiplier * share(entry, userId);
-  if (servings <= 0 || !entry.perServing) {
-    return;
-  }
+const addTo = (totals: Macros, entry: FitEntry, servings: number) => {
   for (const key of MACRO_KEYS) {
-    totals[key] += (entry.perServing[key] ?? 0) * servings;
+    totals[key] += (entry.perServing?.[key] ?? 0) * servings;
   }
-};
-
-const rounded = (totals: Macros): Macros => {
-  const out = zero();
-  for (const key of MACRO_KEYS) {
-    out[key] = Math.round(totals[key] * 10) / 10;
-  }
-  return out;
 };
 
 const nearestStep = (m: number) =>
@@ -219,6 +204,7 @@ const search = (
 ): number[] => {
   const n = units.length;
   const K = MACRO_KEYS.length;
+  const scoreOf = scorer(goals);
 
   if (n <= EXHAUSTIVE_MAX) {
     // Running totals per depth, so each combination costs one score.
@@ -228,7 +214,7 @@ const search = (
     const best = { score: Infinity, distance: Infinity, multipliers: chosen };
     const pick = (i: number, distance: number) => {
       if (i === n) {
-        const score = scoreOf(sums[n], goals);
+        const score = scoreOf(sums[n]);
         if (better(score, distance, best)) {
           Object.assign(best, { score, distance, multipliers: [...chosen] });
         }
@@ -255,21 +241,35 @@ const search = (
       }
       distance += Math.abs(multipliers[i] - current[i]);
     }
-    return { score: scoreOf(totals, goals), distance, multipliers };
+    return { score: scoreOf(totals), distance, multipliers, totals };
   };
   let best = evaluate(current.map(nearestStep));
+  const singles = PORTION_STEPS.map((s) => [s]);
+  const pairs = PORTION_STEPS.flatMap((s) => PORTION_STEPS.map((t) => [s, t]));
+  const scratch = new Float64Array(K);
+  // A candidate is scored from the best totals plus what the moved entries
+  // change, so a move costs one score rather than a rebuild of every entry.
   const tryMove = (indexes: number[]) => {
     let improved = false;
-    const combos = indexes.reduce<number[][]>(
-      (acc) => acc.flatMap((c) => PORTION_STEPS.map((s) => [...c, s])),
-      [[]]
-    );
-    for (const steps of combos) {
-      const multipliers = [...best.multipliers];
-      indexes.forEach((index, k) => (multipliers[index] = steps[k]));
-      const candidate = evaluate(multipliers);
-      if (better(candidate.score, candidate.distance, best)) {
-        best = candidate;
+    for (const steps of indexes.length === 1 ? singles : pairs) {
+      scratch.set(best.totals);
+      let distance = best.distance;
+      for (let j = 0; j < indexes.length; j++) {
+        const i = indexes[j];
+        const delta = steps[j] - best.multipliers[i];
+        for (let k = 0; k < K; k++) {
+          scratch[k] += units[i][k] * delta;
+        }
+        distance +=
+          Math.abs(steps[j] - current[i]) -
+          Math.abs(best.multipliers[i] - current[i]);
+      }
+      const score = scoreOf(scratch);
+      if (better(score, distance, best)) {
+        const multipliers = [...best.multipliers];
+        indexes.forEach((i, j) => (multipliers[i] = steps[j]));
+        // Rebuilt on accept, so float error doesn't pile up across moves.
+        best = evaluate(multipliers);
         improved = true;
       }
     }
@@ -310,34 +310,50 @@ const fitPerson = (
     }
   }
 
-  const eats = (entry: FitEntry) => multipliers.get(entry.id)! > 0;
-  const free = entries.filter(
+  // Free entries aren't logged, so their servings are base × multiplier and
+  // which entries are eaten doesn't change with the pick.
+  const servings = (entry: FitEntry) =>
+    servingsEaten(
+      entry.baseServings,
+      multipliers.get(entry.id)!,
+      entry.logged?.[userId]
+    );
+  const eaten = entries.filter((entry) => servings(entry) > 0);
+  const free = eaten.filter(
     (entry) =>
       !person.fasting &&
-      eats(entry) &&
       !unchangeable(entry) &&
       !entry.fixed &&
       knowsKcalAndProtein(entry)
   );
-  const eaten = entries.filter(eats);
+
+  // kcal and protein are scored even when an entry lacks them, as a lower
+  // bound, since they're what the plan is for. A missing carbs, fat or fibre
+  // value would read as 0 and push the other portions up to make up for it,
+  // so that macro isn't scored at all.
+  const targets: Targets = { ...person.targets };
+  for (const key of ["carbs", "fat", "fibre"] as const) {
+    if (eaten.some((entry) => entry.perServing?.[key] === undefined)) {
+      targets[key] = null;
+    }
+  }
 
   const status: PersonFit["status"] = person.fasting
     ? "fasting"
     : eaten.length === 0
       ? "empty"
-      : hasTargets(person.targets)
+      : hasTargets(targets)
         ? "fitted"
         : "no-targets";
 
   if (status === "fitted" && free.length > 0) {
-    const base = zero();
+    const base = emptyMacros();
     for (const entry of eaten) {
       if (!free.includes(entry)) {
-        addTo(base, entry, userId, multipliers.get(entry.id)!);
+        addTo(base, entry, servings(entry));
       }
     }
     const picked = search(
-      // Free entries aren't logged, so a multiplier of 1 is all of a base serving.
       free.map((entry) =>
         MACRO_KEYS.map(
           (key) => (entry.perServing![key] ?? 0) * entry.baseServings
@@ -345,24 +361,24 @@ const fitPerson = (
       ),
       free.map((e) => multipliers.get(e.id)!),
       MACRO_KEYS.map((key) => base[key]),
-      MACRO_KEYS.map((key) => person.targets[key])
+      MACRO_KEYS.map((key) => targets[key])
     );
     free.forEach((entry, i) => multipliers.set(entry.id, picked[i]));
   }
 
-  const totals = zero();
+  const totals = emptyMacros();
   for (const entry of eaten) {
-    addTo(totals, entry, userId, multipliers.get(entry.id)!);
+    addTo(totals, entry, servings(entry));
   }
-  const scored = status === "fitted" ? scoreDay(totals, person.targets) : null;
+  const scored = status === "fitted" ? scoreDay(totals, targets) : null;
   return {
     multipliers,
     fit: {
       status,
-      totals: rounded(totals),
+      totals: roundMacros(totals),
       score: scored?.score ?? null,
       misses: scored?.misses ?? [],
-      incomplete: eaten.some((e) => !knowsKcalAndProtein(e)),
+      incomplete: eaten.some((e) => !knowsAll(e)),
       estimated: eaten.some((e) => e.estimated && e.perServing !== null),
     },
   };
@@ -413,7 +429,7 @@ export function fitWeek(
       if (person.status !== "fitted") {
         continue;
       }
-      const sum = sums.get(userId) ?? { macros: zero(), days: 0 };
+      const sum = sums.get(userId) ?? { macros: emptyMacros(), days: 0 };
       for (const key of MACRO_KEYS) {
         sum.macros[key] += person.totals[key];
       }
@@ -426,7 +442,7 @@ export function fitWeek(
     const sum = sums.get(userId);
     averages[userId] = sum
       ? {
-          macros: rounded(
+          macros: roundMacros(
             Object.fromEntries(
               MACRO_KEYS.map((key) => [key, sum.macros[key] / sum.days])
             ) as Macros
