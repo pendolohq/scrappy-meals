@@ -6,7 +6,7 @@ import { type Db, getDb } from "../db/client";
 import { recipeCache, usdaRecipeReviews } from "../db/schema";
 import { PRODUCT_TAG } from "../domain/taxonomy";
 import { measure } from "../domain/units";
-import type { UsdaHit } from "../domain/usda";
+import { OWN_VALUES, type UsdaHit } from "../domain/usda";
 import {
   checkRecipe,
   type CheckStatus,
@@ -25,7 +25,6 @@ import { usdaClient } from "./client";
 import {
   ensureFoods,
   listMatches,
-  OWN_VALUES,
   saveOwnFood,
   listSuggestMisses,
   saveMatch,

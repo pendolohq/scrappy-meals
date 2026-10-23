@@ -9,7 +9,11 @@ import { Card } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { parseDecimal } from "@/server/domain/decimal";
-import type { UsdaHit, UsdaPortion } from "@/server/domain/usda";
+import {
+  OWN_VALUES,
+  type UsdaHit,
+  type UsdaPortion,
+} from "@/server/domain/usda";
 import { MACRO_KEYS, type Macros } from "@/server/mealie/nutrition";
 
 import {
@@ -60,7 +64,7 @@ export const FoodRow = ({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [searching, setSearching] = useState(false);
-  const own = match?.dataType === "Own values";
+  const own = match?.dataType === OWN_VALUES;
   const [entering, setEntering] = useState(false);
   const [ownText, setOwnText] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -307,7 +311,8 @@ export const FoodRow = ({
         >
           <p className="text-sm text-muted">
             For a food USDA doesn&rsquo;t have: copy the values per 100 g from
-            its label.
+            its label. Carbs without fibre, as UK and EU labels give them; a US
+            label&rsquo;s total carbohydrate includes it.
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {MACRO_KEYS.map((m) => (

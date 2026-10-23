@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { Macros } from "../mealie/nutrition";
 import type { Ingredient } from "../mealie/recipes";
 
-import type { UsdaFood } from "./usda";
+import { OWN_VALUES, type UsdaFood } from "./usda";
 import {
   CHECK_THRESHOLD,
   checkRecipe,
   type FoodMatch,
   isOutside,
   lineResult,
+  per100gCounted,
   unitKey,
 } from "./usda-check";
 
@@ -17,7 +18,8 @@ const usdaFood = (over: Partial<UsdaFood> = {}): UsdaFood => ({
   fdcId: 1,
   description: "Test food",
   dataType: "SR Legacy",
-  per100g: { kcal: 100, protein: 10, carbs: 20, fat: 5, fibre: 2 },
+  // USDA's carbs include fibre: 20 g are counted.
+  per100g: { kcal: 100, protein: 10, carbs: 22, fat: 5, fibre: 2 },
   portions: [],
   ...over,
 });
@@ -141,6 +143,29 @@ describe("lineResult", () => {
       expect(lineResult(line({ quantity: null }), match(usdaFood()))).toEqual({
         kind: "notCounted",
       });
+    });
+  });
+
+  describe("carbs", () => {
+    it("leaves the fibre out of USDA's carbs", () => {
+      const result = lineResult(grams(100, UNITS.g), match(usdaFood()));
+      expect(result.kind === "counted" && result.macros).toMatchObject({
+        carbs: 20,
+        fibre: 2,
+      });
+    });
+
+    it("takes values typed in from a label as they are", () => {
+      const own = usdaFood({ dataType: OWN_VALUES });
+      const result = lineResult(grams(100, UNITS.g), match(own));
+      expect(result.kind === "counted" && result.macros).toMatchObject({
+        carbs: 22,
+      });
+    });
+
+    it("never counts carbs below zero", () => {
+      const odd = usdaFood({ per100g: { kcal: 20, carbs: 1, fibre: 3 } });
+      expect(per100gCounted(odd).carbs).toBe(0);
     });
   });
 
@@ -386,9 +411,10 @@ describe("isOutside", () => {
 });
 
 describe("checkRecipe", () => {
-  // 200 g of a food at 50 kcal, 2 g protein, 10 g carbs, 1 g fat, 3 g fibre per 100 g.
+  // 200 g of a food at 50 kcal, 2 g protein, 10 g carbs (13 with the fibre,
+  // as USDA gives them), 1 g fat, 3 g fibre per 100 g.
   const flour = usdaFood({
-    per100g: { kcal: 50, protein: 2, carbs: 10, fat: 1, fibre: 3 },
+    per100g: { kcal: 50, protein: 2, carbs: 13, fat: 1, fibre: 3 },
   });
   const flourLine = grams(200, UNITS.g, {
     food: { id: "flour", name: "Flour" },

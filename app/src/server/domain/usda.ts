@@ -10,6 +10,9 @@ export type UsdaPortion = {
   grams: number;
 };
 
+/** The data type of a food whose values someone typed in from a label. */
+export const OWN_VALUES = "Own values";
+
 export type UsdaFood = {
   fdcId: number;
   description: string;
@@ -39,7 +42,8 @@ const str = (v: unknown): string | null =>
 
 // FDC nutrient numbers. Energy is 1008 (kcal; 1062 is kJ). Foundation foods
 // often have only the Atwater estimates. Carbohydrate "by difference" includes
-// fibre, as the app counts carbs.
+// fibre, the US way. It's stored as FDC gives it; `usda-check.ts` takes the
+// fibre out when it counts a line.
 const KCAL = [1008, 2047, 2048];
 const PROTEIN = [1003];
 const FAT = [1004];

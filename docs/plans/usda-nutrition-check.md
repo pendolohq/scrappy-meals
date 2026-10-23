@@ -71,7 +71,10 @@ For each recipe ingredient (the cached `Ingredient`), in order:
    else **needs an amount**, "no weight for <unit>".
 8. No unit: the match's `piece_grams`; else **needs an amount**, "no weight for one".
 
-Nothing else is guessed. Each line's contribution is `grams / 100 × per_100g` per macro. A
+Nothing else is guessed. Each line's contribution is `grams / 100 × per_100g` per macro,
+with carbs counted without fibre as on UK and EU labels and in the recipes' own figures
+(USDA's carbohydrate by difference includes it; values typed in from a label are taken as
+they are). A
 macro the USDA food doesn't have makes that macro unknown for the recipe, so it isn't
 compared (shown as "–").
 

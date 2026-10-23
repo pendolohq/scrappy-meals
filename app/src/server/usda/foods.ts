@@ -4,7 +4,7 @@ import "server-only";
 
 import type { Db } from "../db/client";
 import { usdaFoodMatches, usdaFoods, usdaSuggestMisses } from "../db/schema";
-import type { UsdaFood, UsdaPortion } from "../domain/usda";
+import { OWN_VALUES, type UsdaFood, type UsdaPortion } from "../domain/usda";
 import type { FoodMatch } from "../domain/usda-check";
 import type { Macros } from "../mealie/nutrition";
 
@@ -58,9 +58,6 @@ export async function ensureFoods(
   }
   return found;
 }
-
-/** The data type of a food whose values someone typed in, from a label. */
-export const OWN_VALUES = "Own values";
 
 /**
  * Saves values typed in by hand as a food alongside the cached USDA ones, with
