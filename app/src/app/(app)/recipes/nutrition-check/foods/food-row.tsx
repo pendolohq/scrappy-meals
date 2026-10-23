@@ -22,7 +22,17 @@ type Match = {
   portions: UsdaPortion[];
   pieceGrams: number | null;
   pieceLabel: string | null;
+  unitGrams: Record<string, number>;
 };
+
+type Unit = { key: string; name: string };
+
+// The USDA portion named like the unit ("1 clove"), shown as a hint.
+const usdaPortion = (portions: UsdaPortion[], unit: Unit) =>
+  portions.find((p) => {
+    const m = p.measure.trim().toLowerCase();
+    return m === unit.key || m === unit.name.toLowerCase();
+  });
 
 const grams = (n: number) => String(Math.round(n * 100) / 100);
 
@@ -30,7 +40,13 @@ export const FoodRow = ({
   food,
   match,
 }: {
-  food: { id: string; name: string; uses: number; lines: string[] };
+  food: {
+    id: string;
+    name: string;
+    uses: number;
+    lines: string[];
+    units: Unit[];
+  };
   match: Match | null;
 }) => {
   const router = useRouter();
@@ -45,15 +61,32 @@ export const FoodRow = ({
   // What the weight was picked from; typing a different one drops it.
   const [pieceLabel, setPieceLabel] = useState(match?.pieceLabel ?? null);
 
+  const [unitText, setUnitText] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      food.units.map((u) => {
+        const g = match?.unitGrams[u.key];
+        return [u.key, g ? grams(g) : ""];
+      })
+    )
+  );
+
   const piece =
     pieceText.trim() === "" ? null : parseDecimal(pieceText, "refuse");
   const pieceInvalid = pieceText.trim() !== "" && piece === null;
+  const unitValues = food.units.map((u) => {
+    const text = (unitText[u.key] ?? "").trim();
+    const value = text === "" ? null : parseDecimal(text, "refuse");
+    return { ...u, value, invalid: text !== "" && value === null };
+  });
 
   const confirm = (fdcId: number) => {
-    if (pieceInvalid) {
-      setError("The weight of one must be a number of grams.");
+    if (pieceInvalid || unitValues.some((u) => u.invalid)) {
+      setError("Each weight must be a number of grams.");
       return;
     }
+    const unitGrams = Object.fromEntries(
+      unitValues.flatMap((u) => (u.value === null ? [] : [[u.key, u.value]]))
+    );
     setError(undefined);
     // A weight picked from one USDA food's portions isn't another's.
     const carry = fdcId === match?.fdcId || pieceLabel === null;
@@ -63,6 +96,7 @@ export const FoodRow = ({
         fdcId,
         pieceGrams: carry ? piece : null,
         pieceLabel: carry && piece !== null ? pieceLabel : null,
+        unitGrams,
       });
       if (result.error !== undefined) {
         setError(result.error);
@@ -149,6 +183,28 @@ export const FoodRow = ({
           <p className="text-xs text-muted">
             Used for lines with no unit, like &ldquo;2 kiwis&rdquo;.
           </p>
+          {unitValues.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {unitValues.map((u) => {
+                const portion = usdaPortion(match.portions, u);
+                return (
+                  <Field key={u.key} label={`Weight of one ${u.name} (g)`}>
+                    <Input
+                      inputMode="decimal"
+                      value={unitText[u.key] ?? ""}
+                      placeholder={
+                        portion ? `USDA: ${grams(portion.grams)}` : undefined
+                      }
+                      aria-invalid={u.invalid || undefined}
+                      onChange={(e) =>
+                        setUnitText((t) => ({ ...t, [u.key]: e.target.value }))
+                      }
+                    />
+                  </Field>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -160,7 +216,7 @@ export const FoodRow = ({
             disabled={pending}
           >
             <Check className="size-4" aria-hidden />
-            {match.status === "suggested" ? "Confirm" : "Save weight"}
+            {match.status === "suggested" ? "Confirm" : "Save weights"}
           </Button>
         )}
         <Button

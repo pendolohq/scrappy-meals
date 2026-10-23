@@ -1,0 +1,1 @@
+ALTER TABLE "usda_food_matches" ADD COLUMN "unit_grams" jsonb DEFAULT '{}'::jsonb NOT NULL;

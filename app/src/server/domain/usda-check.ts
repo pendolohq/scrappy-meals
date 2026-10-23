@@ -10,11 +10,18 @@ export type FoodMatch = {
   status: "suggested" | "confirmed";
   /** What one of it weighs, for lines with no unit ("2 kiwis"). */
   pieceGrams: number | null;
+  /**
+   * What one of a unit weighs for this food ("clove": 3), by `unitKey`, for
+   * units that are neither a weight nor a volume.
+   */
+  unitGrams: Record<string, number>;
   food: UsdaFood;
 };
 
 export type LineResult =
   | { kind: "skipped" }
+  /** No amount ("olive oil, to taste"): left out of the total and listed. */
+  | { kind: "notCounted" }
   | { kind: "needsAmount"; reason: string }
   | { kind: "unmatched"; foodId: string; foodName: string }
   | { kind: "counted"; grams: number; macros: Partial<Macros> };
@@ -91,6 +98,9 @@ const canonical = (name: string) => {
   return UNIT_ALIASES[n] ?? n;
 };
 
+/** How a unit is stored in `unitGrams`: "Cloves" and "spicchi" are both "clove". */
+export const unitKey = (unit: { name: string }) => canonical(unit.name);
+
 const volumeMl = (p: UsdaPortion) => VOLUME_ML[p.measure.trim().toLowerCase()];
 
 function scale(food: UsdaFood, grams: number): Partial<Macros> {
@@ -110,8 +120,9 @@ const needsAmount = (reason: string): LineResult => ({
 });
 
 /**
- * What one ingredient line adds, from grams: its weight or volume, a USDA
- * portion for its unit, or the match's piece weight. Nothing is guessed.
+ * What one ingredient line adds, from grams: its weight or volume, the
+ * match's weight for its unit or a USDA portion for it, or the match's piece
+ * weight. Nothing is guessed: a line with no amount isn't counted at all.
  */
 export function lineResult(
   line: Ingredient,
@@ -123,6 +134,14 @@ export function lineResult(
       ? { kind: "skipped" }
       : needsAmount("not parsed");
   }
+  const { quantity, unit } = line;
+  // Matched or not, there's nothing to weigh; a food with next to no
+  // nutrients (salt, water) isn't worth listing.
+  if (quantity === null) {
+    return match?.status === "confirmed" && isNegligible(match.food.per100g)
+      ? { kind: "counted", grams: 0, macros: scale(match.food, 0) }
+      : { kind: "notCounted" };
+  }
   if (match?.status !== "confirmed") {
     return { kind: "unmatched", foodId: food.id, foodName: food.name };
   }
@@ -133,10 +152,6 @@ export function lineResult(
     macros: scale(usda, grams),
   });
 
-  const { quantity, unit } = line;
-  if (quantity === null) {
-    return isNegligible(usda.per100g) ? counted(0) : needsAmount("no amount");
-  }
   const measured = measure(quantity, unit);
   if (measured?.per === "g") {
     return counted(measured.amount);
@@ -151,6 +166,10 @@ export function lineResult(
       : needsAmount("no weight for this volume");
   }
   if (unit) {
+    const own = match.unitGrams[unitKey(unit)];
+    if (own) {
+      return counted(quantity * own);
+    }
     const names = [unit.name, unit.abbreviation].map(canonical).filter(Boolean);
     const portion = usda.portions.find((p) =>
       names.includes(canonical(p.measure))
@@ -177,6 +196,8 @@ export type RecipeCheck = {
   noServings: boolean;
   /** Every line is matched and weighed, but none of them weighs anything. */
   nothingToCount: boolean;
+  /** Lines with no amount, left out of the total. */
+  notCounted: string[];
   unmatchedFoods: { id: string; name: string }[];
   needsAmount: { display: string; reason: string }[];
 };
@@ -208,12 +229,15 @@ export function checkRecipe(
 
   const unmatched = new Map<string, string>();
   const missingAmount: RecipeCheck["needsAmount"] = [];
+  const notCounted: string[] = [];
   const total: Partial<Macros> = {};
   const unknown = new Set<MacroKey>();
   let grams = 0;
   for (const { display, result } of lines) {
     if (result.kind === "unmatched") {
       unmatched.set(result.foodId, result.foodName);
+    } else if (result.kind === "notCounted") {
+      notCounted.push(display);
     } else if (result.kind === "needsAmount") {
       missingAmount.push({ display, reason: result.reason });
     } else if (result.kind === "counted") {
@@ -238,6 +262,7 @@ export function checkRecipe(
     lines,
     noServings: recipe.servings === null,
     nothingToCount,
+    notCounted,
     unmatchedFoods: [...unmatched].map(([id, name]) => ({ id, name })),
     needsAmount: missingAmount,
   };

@@ -53,15 +53,18 @@ For each recipe ingredient (the cached `Ingredient`), in order:
 
 1. A heading or blank line (no food, empty text): skipped.
 2. No food but some text (unparsed): **needs an amount**, "not parsed".
-3. A food with no confirmed match: listed under the recipe's **unmatched foods**.
-4. No quantity: contributes 0 g when the USDA food is negligible (≤ 5 kcal and every macro
-   ≤ 0.5 g per 100 g: salt, water); otherwise **needs an amount**, "no amount".
+3. No quantity ("olive oil, to taste"): matched or not, **not counted**. The recipe is
+   still checked and lists the line, except for a confirmed food that is negligible (≤ 5
+   kcal and every macro ≤ 0.5 g per 100 g: salt, water), which counts as 0 g silently.
+4. A food with no confirmed match: listed under the recipe's **unmatched foods**.
 5. A weight unit (`measure()` in `domain/units.ts` gives g): those grams.
 6. A volume unit (`measure()` gives ml): × the food's `gramsPerMl` (Mealie extra), else ×
    grams-per-ml from the first USDA portion that is a volume (cup, tablespoon, teaspoon,
    fl oz, ml, litre, with US sizes as in `units.ts`); else **needs an amount**, "no weight for
    this volume".
-7. Any other unit (clove, slice, can…): a USDA portion whose measure is that unit (name,
+7. Any other unit (clove, bunch, pinch, can…): the match's own weight for that unit
+   (`unit_grams`, entered on the Foods page, keyed like the portion names below); else a
+   USDA portion whose measure is that unit (name,
    abbreviation or plural; trimmed, lowercase, trailing "s" dropped; plus a small Italian
    alias list: spicchio → clove, fetta → slice, foglia → leaf, rametto → sprig, mazzo →
    bunch, pizzico → pinch, pezzo → piece, scatola/lattina → can) gives grams per one;

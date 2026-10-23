@@ -95,6 +95,7 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
       status: "suggested" as const,
       pieceGrams: null,
       pieceLabel: null,
+      unitGrams: {},
     };
 
     it("saves a match and lists it with its USDA food, ready to use in any recipe", async () => {
@@ -111,6 +112,24 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
         pieceLabel: null,
         foodName: "Kiwi",
         food: fixtures.find((f) => f.fdcId === KIWI),
+      });
+    });
+
+    it("keeps the weight of a unit, and none until one is given", async () => {
+      const user = await newUser();
+      await ensureFoods(db, fakeClient(), [GARLIC]);
+      await saveMatch(db, { ...base, fdcId: GARLIC }, user.id);
+      expect((await listMatches(db)).get(FOOD_A)?.unitGrams).toEqual({});
+
+      await saveMatch(
+        db,
+        { ...base, fdcId: GARLIC, unitGrams: { clove: 4, bulb: 40 } },
+        user.id
+      );
+
+      expect((await listMatches(db)).get(FOOD_A)?.unitGrams).toEqual({
+        clove: 4,
+        bulb: 40,
       });
     });
 
@@ -236,6 +255,7 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
           status: "confirmed",
           pieceGrams: 5,
           pieceLabel: "1 clove",
+          unitGrams: { clove: 4 },
         },
         user.id
       );
@@ -247,6 +267,7 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
         status: "confirmed",
         pieceGrams: 5,
         pieceLabel: "1 clove",
+        unitGrams: { clove: 4 },
       });
     });
   });

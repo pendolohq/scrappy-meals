@@ -10,6 +10,7 @@ import {
   type FoodMatch,
   isOutside,
   lineResult,
+  unitKey,
 } from "./usda-check";
 
 const usdaFood = (over: Partial<UsdaFood> = {}): UsdaFood => ({
@@ -28,6 +29,7 @@ const match = (
   fdcId: food.fdcId,
   status: "confirmed",
   pieceGrams: null,
+  unitGrams: {},
   food,
   ...over,
 });
@@ -114,9 +116,9 @@ describe("lineResult", () => {
       });
     });
 
-    it("checks the match before the amount", () => {
-      expect(lineResult(grams(null, null), undefined)).toMatchObject({
-        kind: "unmatched",
+    it("doesn't need a match for a line with no amount", () => {
+      expect(lineResult(grams(null, null), undefined)).toEqual({
+        kind: "notCounted",
       });
     });
   });
@@ -135,10 +137,9 @@ describe("lineResult", () => {
       });
     });
 
-    it("needs an amount for any other food", () => {
+    it("leaves any other food out of the total", () => {
       expect(lineResult(line({ quantity: null }), match(usdaFood()))).toEqual({
-        kind: "needsAmount",
-        reason: "no amount",
+        kind: "notCounted",
       });
     });
   });
@@ -241,6 +242,27 @@ describe("lineResult", () => {
         { label: "1 slice", measure: "slice", grams: 7 },
         { label: "1 cup", measure: "cup", grams: 136 },
       ],
+    });
+
+    it("uses the match's own weight for the unit first", () => {
+      const result = lineResult(
+        grams(2, unit("Cloves")),
+        match(garlic, { unitGrams: { clove: 5 } })
+      );
+      expect(result).toMatchObject({ kind: "counted", grams: 10 });
+    });
+
+    it("weighs a unit USDA has no portion for", () => {
+      const result = lineResult(
+        grams(1, unit("thumb-sized piece")),
+        match(garlic, { unitGrams: { "thumb-sized piece": 10 } })
+      );
+      expect(result).toMatchObject({ kind: "counted", grams: 10 });
+    });
+
+    it("keys an Italian unit like its English one", () => {
+      expect(unitKey({ name: "spicchi" })).toBe("clove");
+      expect(unitKey({ name: " Cloves " })).toBe("clove");
     });
 
     it("uses the USDA portion for the unit: 3 cloves at 3 g each", () => {
@@ -585,9 +607,9 @@ describe("checkRecipe", () => {
         recipe({
           ingredients: [
             flourLine,
-            grams(null, null, {
+            grams(2, unit("bunch"), {
               food: { id: "flour", name: "Flour" },
-              display: "flour, as needed",
+              display: "2 bunches flour",
             }),
             line({ food: null, quantity: null, display: "a handful of basil" }),
           ],
@@ -596,7 +618,7 @@ describe("checkRecipe", () => {
       );
       expect(check.status).toBe("cantCheck");
       expect(check.needsAmount).toEqual([
-        { display: "flour, as needed", reason: "no amount" },
+        { display: "2 bunches flour", reason: "no weight for bunch" },
         { display: "a handful of basil", reason: "not parsed" },
       ]);
     });
@@ -649,9 +671,9 @@ describe("checkRecipe", () => {
           servings: null,
           ingredients: [
             grams(1, UNITS.g, { food: { id: "x", name: "X" } }),
-            grams(null, null, {
+            grams(2, unit("bunch"), {
               food: { id: "flour", name: "Flour" },
-              display: "flour",
+              display: "2 bunches flour",
             }),
           ],
         }),
@@ -660,7 +682,44 @@ describe("checkRecipe", () => {
       expect(check).toMatchObject({
         noServings: true,
         unmatchedFoods: [{ id: "x", name: "X" }],
-        needsAmount: [{ display: "flour", reason: "no amount" }],
+        needsAmount: [
+          { display: "2 bunches flour", reason: "no weight for bunch" },
+        ],
+      });
+    });
+  });
+
+  describe("lines with no amount", () => {
+    const oil = grams(null, null, {
+      food: { id: "oil", name: "Olive oil" },
+      display: "olive oil, to drizzle",
+    });
+    const pepper = grams(null, null, {
+      food: { id: "pepper", name: "Black pepper" },
+      display: "black pepper, to taste",
+    });
+
+    it("checks the recipe without them and lists them", () => {
+      const check = checkRecipe(
+        recipe({ ingredients: [flourLine, oil, pepper] }),
+        matches
+      );
+      expect(check).toMatchObject({
+        status: "match",
+        notCounted: ["olive oil, to drizzle", "black pepper, to taste"],
+        unmatchedFoods: [],
+      });
+      expect(check.usdaPerServing).toEqual(
+        checkRecipe(recipe(), matches).usdaPerServing
+      );
+    });
+
+    it("can't check a recipe that has nothing but them", () => {
+      const check = checkRecipe(recipe({ ingredients: [oil] }), matches);
+      expect(check).toMatchObject({
+        status: "cantCheck",
+        nothingToCount: true,
+        notCounted: ["olive oil, to drizzle"],
       });
     });
   });

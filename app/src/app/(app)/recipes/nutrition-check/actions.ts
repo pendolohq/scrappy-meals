@@ -34,19 +34,24 @@ export const searchUsdaAction = userAction(
   { invalid: () => "Type at least two letters to search." }
 );
 
+const weight = z.number().min(0.001).max(10_000);
+
 export const confirmMatchAction = userAction(
   z.object({
     foodId: z.uuid(),
     fdcId: z.number().int().positive(),
-    pieceGrams: z.number().min(0.001).max(10_000).nullable(),
+    pieceGrams: weight.nullable(),
     pieceLabel: z.string().trim().max(100).nullable(),
+    unitGrams: z
+      .record(z.string().trim().min(1).max(40), weight)
+      .refine((r) => Object.keys(r).length <= 20),
   }),
   async (input, user) => {
     await confirmMatch(getDb(), input, user.id);
     revalidatePath(BASE, "layout");
     return { saved: true as const };
   },
-  { invalid: () => "The weight of one must be a number of grams above 0." }
+  { invalid: () => "Each weight must be a number of grams above 0." }
 );
 
 const macro = z.number().min(0).max(100_000);

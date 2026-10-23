@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Db } from "../db/client";
 import type { CachedRecipe, Defer, loadRecipes } from "../recipe-cache";
 
-import { loadInChunks } from "./check";
+import { foodUsage, loadInChunks } from "./check";
 
 const recipe = (slug: string, product = false) =>
   ({
@@ -58,5 +58,45 @@ describe("loadInChunks", () => {
     await loadInChunks({} as Db, slugs, defer, load);
 
     expect(defer).not.toHaveBeenCalled();
+  });
+});
+
+describe("foodUsage", () => {
+  const unit = (name: string, standardUnit: string | null = null) => ({
+    id: `u-${name}`,
+    name,
+    abbreviation: "",
+    standardUnit,
+    standardQuantity: standardUnit ? 1 : null,
+  });
+  const line = (
+    quantity: number | null,
+    u: ReturnType<typeof unit> | null
+  ) => ({
+    quantity,
+    unit: u,
+    food: { id: "garlic", name: "garlic" },
+    note: "",
+    display: `${quantity ?? ""} ${u?.name ?? ""} garlic`,
+  });
+
+  it("lists the units with no weight that a food's lines use, once each", () => {
+    const recipes = [
+      {
+        ingredients: [
+          line(2, unit("clove")),
+          line(3, unit("Cloves")),
+          line(1, unit("bulb")),
+          line(1, unit("teaspoon", "teaspoon")),
+          line(null, unit("pinch")),
+          line(1, null),
+        ],
+      },
+    ] as unknown as CachedRecipe[];
+
+    expect(foodUsage(recipes, new Map())[0]!.units).toEqual([
+      { key: "clove", name: "clove" },
+      { key: "bulb", name: "bulb" },
+    ]);
   });
 });
