@@ -2,7 +2,12 @@ import { MACRO_KEYS, type MacroKey, type Macros } from "../mealie/nutrition";
 import type { Ingredient } from "../mealie/recipes";
 
 import { measure } from "./units";
-import { isNegligible, type UsdaFood, type UsdaPortion } from "./usda";
+import {
+  isNegligible,
+  OWN_VALUES,
+  type UsdaFood,
+  type UsdaPortion,
+} from "./usda";
 
 /** A Mealie food's USDA match, with the cached USDA food. */
 export type FoodMatch = {
@@ -103,10 +108,24 @@ export const unitKey = (unit: { name: string }) => canonical(unit.name);
 
 const volumeMl = (p: UsdaPortion) => VOLUME_ML[p.measure.trim().toLowerCase()];
 
+/**
+ * Per 100 g as the app counts it: carbs without fibre, as on UK and EU labels
+ * and in the recipes' own figures. USDA's carbs include fibre; values typed in
+ * from a label already leave it out.
+ */
+export function per100gCounted(food: UsdaFood): Partial<Macros> {
+  const { carbs, fibre } = food.per100g;
+  if (food.dataType === OWN_VALUES || carbs === undefined || !fibre) {
+    return food.per100g;
+  }
+  return { ...food.per100g, carbs: Math.max(0, carbs - fibre) };
+}
+
 function scale(food: UsdaFood, grams: number): Partial<Macros> {
+  const per100g = per100gCounted(food);
   const macros: Partial<Macros> = {};
   for (const key of MACRO_KEYS) {
-    const per100 = food.per100g[key];
+    const per100 = per100g[key];
     if (per100 !== undefined) {
       macros[key] = (grams * per100) / 100;
     }
