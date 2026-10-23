@@ -102,6 +102,9 @@ export default async function NutritionCheckRecipePage({
           <h2 className="font-serif text-lg font-semibold">Missing</h2>
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {check.noServings && <li>The recipe has no servings.</li>}
+            {check.nothingToCount && (
+              <li>None of its ingredients adds anything to count.</li>
+            )}
             {check.unmatchedFoods.length > 0 && (
               <li>
                 Foods to match:{" "}

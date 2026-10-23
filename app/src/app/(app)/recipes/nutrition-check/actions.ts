@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { userAction } from "@/server/action";
@@ -21,7 +22,7 @@ const BASE = "/recipes/nutrition-check";
 export const suggestMatchesAction = userAction(
   z.object({}),
   async (_, user) => {
-    const result = await suggestNext(getDb(), user.id);
+    const result = await suggestNext(getDb(), user.id, after);
     revalidatePath(BASE, "layout");
     return result;
   }
@@ -37,7 +38,7 @@ export const confirmMatchAction = userAction(
   z.object({
     foodId: z.uuid(),
     fdcId: z.number().int().positive(),
-    pieceGrams: z.number().min(0.01).max(10_000).nullable(),
+    pieceGrams: z.number().min(0.001).max(10_000).nullable(),
     pieceLabel: z.string().trim().max(100).nullable(),
   }),
   async (input, user) => {

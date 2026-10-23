@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
 import "server-only";
 
@@ -20,7 +20,15 @@ import { type CachedRecipe, type Defer, loadRecipes } from "../recipe-cache";
 import { whenMealieAnswers } from "../recipe-review";
 
 import { usdaClient } from "./client";
-import { ensureFoods, listMatches, type StoredMatch, saveMatch } from "./foods";
+import {
+  ensureFoods,
+  listMatches,
+  listSuggestMisses,
+  saveMatch,
+  saveSuggestion,
+  saveSuggestMisses,
+  type StoredMatch,
+} from "./foods";
 import { usdaLimits } from "./limits";
 import {
   asRetryable,
@@ -89,9 +97,23 @@ async function loadAllRecipes(db: Db, defer?: Defer): Promise<CachedRecipe[]> {
   );
 }
 
-/** What the cache holds, for actions that mustn't wait on Mealie. */
-async function cachedRecipes(db: Db): Promise<CachedRecipe[]> {
-  return (await db.select().from(recipeCache)).filter((r) => !isProduct(r));
+/** Mealie's name for a food some cached recipe uses; null when none does. */
+export async function cachedFoodName(
+  db: Db,
+  foodId: string
+): Promise<string | null> {
+  const uses = JSON.stringify([{ food: { id: foodId } }]);
+  const rows = await db
+    .select()
+    .from(recipeCache)
+    .where(sql`${recipeCache.ingredients} @> ${uses}::jsonb`);
+  for (const recipe of rows.filter((r) => !isProduct(r))) {
+    const line = recipe.ingredients.find((l) => l.food?.id === foodId);
+    if (line?.food) {
+      return line.food.name;
+    }
+  }
+  return null;
 }
 
 const reviewsFor = async (db: Db, recipeIds: string[]) =>
@@ -177,15 +199,6 @@ function foodUsage(
   );
 }
 
-/** The foods in the cached recipes, most-used first; never calls Mealie. */
-export async function cachedFoods(db: Db): Promise<FoodUsage[]> {
-  const [recipes, matches] = await Promise.all([
-    cachedRecipes(db),
-    listMatches(db),
-  ]);
-  return foodUsage(recipes, matches);
-}
-
 /** Foods the recipes use, most-used first. */
 export async function loadFoods(db: Db, defer?: Defer): Promise<FoodUsage[]> {
   const [recipes, matches] = await Promise.all([
@@ -200,14 +213,16 @@ export async function loadOverview(
   db: Db,
   defer?: Defer
 ): Promise<{ recipes: CheckedRecipe[]; foods: FoodUsage[] }> {
-  const [recipes, matches] = await Promise.all([
+  const [recipes, matches, reviews] = await Promise.all([
     loadAllRecipes(db, defer),
     listMatches(db),
+    // Every review: there are at most as many as recipes, and fetching them
+    // alongside saves waiting on the recipes first.
+    db
+      .select()
+      .from(usdaRecipeReviews)
+      .then((rows) => new Map(rows.map((r) => [r.recipeId, r]))),
   ]);
-  const reviews = await reviewsFor(
-    db,
-    recipes.map((r) => r.mealieId)
-  );
   return {
     recipes: recipes.map((r) => ({
       slug: r.slug,
@@ -283,8 +298,8 @@ export async function confirmMatch(
 ): Promise<void> {
   const client = requireClient();
   usdaLimits.confirm(userId);
-  const food = (await cachedFoods(db)).find((f) => f.id === input.foodId);
-  if (!food) {
+  const foodName = await cachedFoodName(db, input.foodId);
+  if (foodName === null) {
     throw new UserFacingError("No recipe uses that food any more.");
   }
   const cached = await ensureFoods(db, client, [input.fdcId]);
@@ -294,8 +309,8 @@ export async function confirmMatch(
   await saveMatch(
     db,
     {
-      mealieFoodId: food.id,
-      foodName: food.name,
+      mealieFoodId: input.foodId,
+      foodName,
       fdcId: input.fdcId,
       status: "confirmed",
       pieceGrams: input.pieceGrams,
@@ -307,19 +322,25 @@ export async function confirmMatch(
 
 /**
  * Suggests a USDA food for the next foods with no match, most-used first, and
- * saves them as `suggested` for a person to confirm.
+ * saves them as `suggested` for a person to confirm. Foods it finds nothing
+ * for are remembered and not tried again, so each run gets further down the list.
  */
 export async function suggestNext(
   db: Db,
-  userId: string
+  userId: string,
+  defer?: Defer
 ): Promise<{ tried: number; suggested: number }> {
   const client = requireClient();
   const deps = claudeDeps((query, pageSize) => client.search(query, pageSize));
   if (!deps) {
     throw new UserFacingError("Suggesting matches isn't set up.");
   }
-  const foods = (await cachedFoods(db))
-    .filter((f) => !f.match)
+  const [all, misses] = await Promise.all([
+    loadFoods(db, defer),
+    listSuggestMisses(db),
+  ]);
+  const foods = all
+    .filter((f) => !f.match && !misses.has(f.id))
     .slice(0, SUGGEST_BATCH);
   if (foods.length === 0) {
     return { tried: 0, suggested: 0 };
@@ -339,28 +360,29 @@ export async function suggestNext(
     client,
     picks.map((p) => p.hit.fdcId)
   );
-  // Someone may have confirmed a food while Claude was working.
-  const now = await listMatches(db);
+  const found = new Set<string>();
   let suggested = 0;
   for (const { foodId, hit } of picks) {
     const food = foods.find((f) => f.id === foodId);
-    if (!food || now.has(foodId) || !cached.has(hit.fdcId)) {
+    if (!food || !cached.has(hit.fdcId)) {
       continue;
     }
-    await saveMatch(
-      db,
-      {
-        mealieFoodId: foodId,
-        foodName: food.name,
-        fdcId: hit.fdcId,
-        status: "suggested",
-        pieceGrams: null,
-        pieceLabel: null,
-      },
-      userId
-    );
-    suggested += 1;
+    found.add(foodId);
+    // Someone may have matched the food while Claude was working; theirs stays.
+    if (
+      await saveSuggestion(
+        db,
+        { mealieFoodId: foodId, foodName: food.name, fdcId: hit.fdcId },
+        userId
+      )
+    ) {
+      suggested += 1;
+    }
   }
+  await saveSuggestMisses(
+    db,
+    foods.filter((f) => !found.has(f.id)).map((f) => f.id)
+  );
   return { tried: foods.length, suggested };
 }
 

@@ -3,7 +3,7 @@ CREATE TABLE "usda_food_matches" (
 	"food_name" text NOT NULL,
 	"fdc_id" integer NOT NULL,
 	"status" text NOT NULL,
-	"piece_grams" numeric(8, 2),
+	"piece_grams" numeric(8, 3),
 	"piece_label" text,
 	"updated_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -27,6 +27,11 @@ CREATE TABLE "usda_recipe_reviews" (
 	"decided_by" uuid,
 	"decided_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "usda_recipe_reviews_choice" CHECK ("usda_recipe_reviews"."choice" in ('mealie', 'usda', 'edited'))
+);
+--> statement-breakpoint
+CREATE TABLE "usda_suggest_misses" (
+	"mealie_food_id" uuid PRIMARY KEY NOT NULL,
+	"tried_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "usda_food_matches" ADD CONSTRAINT "usda_food_matches_fdc_id_usda_foods_fdc_id_fk" FOREIGN KEY ("fdc_id") REFERENCES "public"."usda_foods"("fdc_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

@@ -313,7 +313,7 @@ export const usdaFoodMatches = pgTable(
     /** What one of it weighs when a line has no unit. */
     pieceGrams: numeric("piece_grams", {
       precision: 8,
-      scale: 2,
+      scale: 3,
       mode: "number",
     }),
     pieceLabel: text("piece_label"),
@@ -329,6 +329,15 @@ export const usdaFoodMatches = pgTable(
     ),
   ]
 );
+
+/**
+ * Foods Claude found no USDA food for, so "Suggest matches" moves on to the
+ * next ones instead of retrying them. A person can still match them by hand.
+ */
+export const usdaSuggestMisses = pgTable("usda_suggest_misses", {
+  mealieFoodId: uuid("mealie_food_id").primaryKey(),
+  triedAt: timestamp("tried_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** The decision made on a recipe's nutrition, against the USDA figures of the moment. */
 export const usdaRecipeReviews = pgTable(

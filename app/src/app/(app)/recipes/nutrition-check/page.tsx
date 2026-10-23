@@ -44,11 +44,14 @@ const GROUPS: Record<
   },
 };
 
-function detail({ check }: CheckedRecipe): string {
+const detail = ({ check }: CheckedRecipe): string => {
   if (check.status === "cantCheck") {
     const parts = [];
     if (check.noServings) {
       parts.push("no servings");
+    }
+    if (check.nothingToCount) {
+      parts.push("no ingredients to count");
     }
     if (check.unmatchedFoods.length > 0) {
       parts.push(
@@ -65,7 +68,7 @@ function detail({ check }: CheckedRecipe): string {
   return check.outside.length > 0
     ? `Outside: ${check.outside.map((m) => MACRO_LABELS[m].toLowerCase()).join(", ")}`
     : "";
-}
+};
 
 export default async function NutritionCheckPage() {
   await requireUser();

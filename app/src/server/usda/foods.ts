@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import "server-only";
 
 import type { Db } from "../db/client";
-import { usdaFoodMatches, usdaFoods } from "../db/schema";
+import { usdaFoodMatches, usdaFoods, usdaSuggestMisses } from "../db/schema";
 import type { UsdaFood } from "../domain/usda";
 import type { FoodMatch } from "../domain/usda-check";
 
@@ -95,8 +95,54 @@ export async function saveMatch(
   userId: string
 ): Promise<void> {
   const values = { ...match, updatedBy: userId };
-  await db.insert(usdaFoodMatches).values(values).onConflictDoUpdate({
-    target: usdaFoodMatches.mealieFoodId,
-    set: values,
-  });
+  // $onUpdate doesn't run for an upsert's update, so updatedAt is set here.
+  await db
+    .insert(usdaFoodMatches)
+    .values(values)
+    .onConflictDoUpdate({
+      target: usdaFoodMatches.mealieFoodId,
+      set: { ...values, updatedAt: new Date() },
+    });
+}
+
+/**
+ * Saves Claude's suggestion for a food unless it has a match by now, so a
+ * match someone confirmed meanwhile is never replaced. True when it was saved.
+ */
+export async function saveSuggestion(
+  db: Db,
+  match: Omit<MatchInput, "status" | "pieceGrams" | "pieceLabel">,
+  userId: string
+): Promise<boolean> {
+  const saved = await db
+    .insert(usdaFoodMatches)
+    .values({
+      ...match,
+      status: "suggested",
+      pieceGrams: null,
+      pieceLabel: null,
+      updatedBy: userId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: usdaFoodMatches.mealieFoodId });
+  return saved.length > 0;
+}
+
+/** Foods Claude has already tried and found nothing for. */
+export async function listSuggestMisses(db: Db): Promise<Set<string>> {
+  const rows = await db.select().from(usdaSuggestMisses);
+  return new Set(rows.map((r) => r.mealieFoodId));
+}
+
+export async function saveSuggestMisses(
+  db: Db,
+  foodIds: string[]
+): Promise<void> {
+  if (foodIds.length === 0) {
+    return;
+  }
+  await db
+    .insert(usdaSuggestMisses)
+    .values(foodIds.map((mealieFoodId) => ({ mealieFoodId })))
+    .onConflictDoNothing();
 }

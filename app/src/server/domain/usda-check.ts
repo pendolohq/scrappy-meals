@@ -175,6 +175,8 @@ export type RecipeCheck = {
   usdaPerServing: Partial<Macros> | null;
   lines: { display: string; result: LineResult }[];
   noServings: boolean;
+  /** Every line is matched and weighed, but none of them weighs anything. */
+  nothingToCount: boolean;
   unmatchedFoods: { id: string; name: string }[];
   needsAmount: { display: string; reason: string }[];
 };
@@ -208,12 +210,14 @@ export function checkRecipe(
   const missingAmount: RecipeCheck["needsAmount"] = [];
   const total: Partial<Macros> = {};
   const unknown = new Set<MacroKey>();
+  let grams = 0;
   for (const { display, result } of lines) {
     if (result.kind === "unmatched") {
       unmatched.set(result.foodId, result.foodName);
     } else if (result.kind === "needsAmount") {
       missingAmount.push({ display, reason: result.reason });
     } else if (result.kind === "counted") {
+      grams += result.grams;
       for (const key of MACRO_KEYS) {
         const value = result.macros[key];
         if (value !== undefined) {
@@ -225,15 +229,25 @@ export function checkRecipe(
     }
   }
 
+  // A total of zero would read as "USDA says 0 kcal", and "Use USDA's" would
+  // write zeros over the recipe.
+  const nothingToCount =
+    grams === 0 && unmatched.size === 0 && missingAmount.length === 0;
   const base = {
     mealie: recipe.perServing,
     lines,
     noServings: recipe.servings === null,
+    nothingToCount,
     unmatchedFoods: [...unmatched].map(([id, name]) => ({ id, name })),
     needsAmount: missingAmount,
   };
   const servings = recipe.servings;
-  if (servings === null || unmatched.size > 0 || missingAmount.length > 0) {
+  if (
+    servings === null ||
+    nothingToCount ||
+    unmatched.size > 0 ||
+    missingAmount.length > 0
+  ) {
     return {
       ...base,
       status: "cantCheck",

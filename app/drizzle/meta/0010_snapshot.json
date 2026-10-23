@@ -1,5 +1,5 @@
 {
-  "id": "f886e224-301a-46cf-8ee0-87e8951bf824",
+  "id": "66b0ffd7-a92e-41a6-88d7-f987cf7dffac",
   "prevId": "14483462-a92b-4586-8616-155cfae2a4ea",
   "version": "7",
   "dialect": "postgresql",
@@ -827,7 +827,7 @@
         },
         "piece_grams": {
           "name": "piece_grams",
-          "type": "numeric(8, 2)",
+          "type": "numeric(8, 3)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1009,6 +1009,32 @@
           "value": "\"usda_recipe_reviews\".\"choice\" in ('mealie', 'usda', 'edited')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.usda_suggest_misses": {
+      "name": "usda_suggest_misses",
+      "schema": "",
+      "columns": {
+        "mealie_food_id": {
+          "name": "mealie_food_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tried_at": {
+          "name": "tried_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.users": {

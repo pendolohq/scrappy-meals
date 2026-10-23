@@ -6,7 +6,7 @@ import { recipeCache, usdaRecipeReviews } from "../db/schema";
 import { UserFacingError } from "../errors";
 import { createUser } from "../users";
 
-import { cachedFoods, saveDecision } from "./check";
+import { cachedFoodName, saveDecision } from "./check";
 
 type Deps = NonNullable<Parameters<typeof saveDecision>[3]>;
 type Raw = NonNullable<Awaited<ReturnType<NonNullable<Deps["getRecipe"]>>>>;
@@ -269,42 +269,43 @@ describe.skipIf(!testDbUrl)("saveDecision (Postgres)", () => {
   });
 });
 
-describe.skipIf(!testDbUrl)("cachedFoods (Postgres)", () => {
-  const db = useTestDb();
+const line = (id: string, name: string, display: string) => ({
+  quantity: 1,
+  food: { id, name },
+  unit: null,
+  note: "",
+  display,
+});
+const row = (slug: string, ingredients: object[], product = null) => ({
+  slug,
+  mealieId: crypto.randomUUID(),
+  name: slug,
+  nutrition: { perServing: {}, missing: [], status: "missing" as const },
+  ingredients: ingredients as never,
+  product,
+});
 
-  it("counts the foods in cached recipes, most-used first, without Mealie", async () => {
-    const line = (id: string, name: string, display: string) => ({
-      quantity: 1,
-      food: { id, name },
-      unit: null,
-      note: "",
-      display,
-    });
-    const row = (slug: string, ingredients: object[], product = null) => ({
-      slug,
-      mealieId: crypto.randomUUID(),
-      name: slug,
-      nutrition: { perServing: {}, missing: [], status: "missing" as const },
-      ingredients: ingredients as never,
-      product,
-    });
+describe.skipIf(!testDbUrl)("cachedFoodName (Postgres)", () => {
+  const db = useTestDb();
+  const OIL = "00000000-0000-4000-8000-0000000000b1";
+  const BAR = "00000000-0000-4000-8000-0000000000b2";
+
+  it("finds the name of a food a cached recipe uses", async () => {
+    await db
+      .insert(recipeCache)
+      .values([row("a", [line(OIL, "olive oil", "1 tbsp olive oil")])]);
+
+    expect(await cachedFoodName(db, OIL)).toBe("olive oil");
+  });
+
+  it("is null for a food no recipe uses, or only a product does", async () => {
     await db
       .insert(recipeCache)
       .values([
-        row("a", [
-          line("f-oil", "olive oil", "1 tbsp olive oil"),
-          line("f-egg", "egg", "2 eggs"),
-        ]),
-        row("b", [line("f-oil", "olive oil", "2 tbsp olive oil")]),
-        row("p", [line("f-bar", "bar", "1 bar")], { barcode: "1" } as never),
+        row("p", [line(BAR, "bar", "1 bar")], { barcode: "1" } as never),
       ]);
 
-    const foods = await cachedFoods(db);
-
-    expect(foods.map((f) => [f.id, f.uses])).toEqual([
-      ["f-oil", 2],
-      ["f-egg", 1],
-    ]);
-    expect(foods[0]!.lines).toEqual(["1 tbsp olive oil", "2 tbsp olive oil"]);
+    expect(await cachedFoodName(db, OIL)).toBeNull();
+    expect(await cachedFoodName(db, BAR)).toBeNull();
   });
 });

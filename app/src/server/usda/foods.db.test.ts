@@ -2,11 +2,19 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../../test/db";
+import { usdaFoodMatches } from "../db/schema";
 import { parseFoodDetails } from "../domain/usda";
 import { createUser } from "../users";
 
 import foodsJson from "./fixtures/foods.json";
-import { ensureFoods, listMatches, saveMatch } from "./foods";
+import {
+  ensureFoods,
+  listMatches,
+  listSuggestMisses,
+  saveMatch,
+  saveSuggestion,
+  saveSuggestMisses,
+} from "./foods";
 
 const fixtures = parseFoodDetails(foodsJson);
 const KIWI = 168153;
@@ -170,6 +178,22 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
       expect(matches.get(FOOD_B)?.fdcId).toBe(EGG);
     });
 
+    it("moves updated_at forward when a match is replaced", async () => {
+      const user = await newUser();
+      await ensureFoods(db, fakeClient(), [KIWI]);
+      await saveMatch(db, base, user.id);
+      const past = new Date("2020-01-01T00:00:00Z");
+      await db
+        .update(usdaFoodMatches)
+        .set({ createdAt: past, updatedAt: past });
+
+      await saveMatch(db, { ...base, status: "confirmed" }, user.id);
+
+      const [after] = await db.select().from(usdaFoodMatches);
+      expect(after!.updatedAt.getTime()).toBeGreaterThan(past.getTime());
+      expect(after!.createdAt).toEqual(past);
+    });
+
     it("lists nothing before anything is matched", async () => {
       expect((await listMatches(db)).size).toBe(0);
     });
@@ -181,6 +205,62 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
         /fdc|cache|foreign|violat/i
       );
       expect((await listMatches(db)).size).toBe(0);
+    });
+  });
+
+  describe("saveSuggestion", () => {
+    const suggestion = { mealieFoodId: FOOD_A, foodName: "Kiwi", fdcId: KIWI };
+
+    it("saves a suggestion for a food with no match", async () => {
+      const user = await newUser();
+      await ensureFoods(db, fakeClient(), [KIWI]);
+
+      expect(await saveSuggestion(db, suggestion, user.id)).toBe(true);
+
+      expect((await listMatches(db)).get(FOOD_A)).toMatchObject({
+        fdcId: KIWI,
+        status: "suggested",
+        pieceGrams: null,
+      });
+    });
+
+    it("never replaces a match someone confirmed meanwhile", async () => {
+      const user = await newUser();
+      await ensureFoods(db, fakeClient(), [KIWI, GARLIC]);
+      await saveMatch(
+        db,
+        {
+          mealieFoodId: FOOD_A,
+          foodName: "Kiwi",
+          fdcId: GARLIC,
+          status: "confirmed",
+          pieceGrams: 5,
+          pieceLabel: "1 clove",
+        },
+        user.id
+      );
+
+      expect(await saveSuggestion(db, suggestion, user.id)).toBe(false);
+
+      expect((await listMatches(db)).get(FOOD_A)).toMatchObject({
+        fdcId: GARLIC,
+        status: "confirmed",
+        pieceGrams: 5,
+        pieceLabel: "1 clove",
+      });
+    });
+  });
+
+  describe("suggest misses", () => {
+    it("remembers the foods tried, once each", async () => {
+      await saveSuggestMisses(db, [FOOD_A]);
+      await saveSuggestMisses(db, [FOOD_A, FOOD_B]);
+      await saveSuggestMisses(db, []);
+
+      expect([...(await listSuggestMisses(db))].toSorted()).toEqual([
+        FOOD_A,
+        FOOD_B,
+      ]);
     });
   });
 });

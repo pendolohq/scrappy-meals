@@ -601,6 +601,48 @@ describe("checkRecipe", () => {
       ]);
     });
 
+    it("can't check a recipe with no ingredients", () => {
+      const check = checkRecipe(recipe({ ingredients: [] }), matches);
+      expect(check).toMatchObject({
+        status: "cantCheck",
+        nothingToCount: true,
+        usdaPerServing: null,
+      });
+    });
+
+    it("can't check a recipe whose lines all weigh nothing", () => {
+      const salt = usdaFood({
+        fdcId: 3,
+        per100g: { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 },
+      });
+      const check = checkRecipe(
+        recipe({
+          ingredients: [
+            grams(null, null, {
+              food: { id: "salt", name: "Salt" },
+              display: "salt",
+            }),
+          ],
+        }),
+        new Map([["salt", match(salt)]])
+      );
+      expect(check).toMatchObject({
+        status: "cantCheck",
+        nothingToCount: true,
+        usdaPerServing: null,
+      });
+    });
+
+    it("doesn't say nothing counts while foods are still to match", () => {
+      const check = checkRecipe(
+        recipe({
+          ingredients: [grams(5, UNITS.g, { food: { id: "x", name: "X" } })],
+        }),
+        matches
+      );
+      expect(check.nothingToCount).toBe(false);
+    });
+
     it("reports everything missing at once", () => {
       const check = checkRecipe(
         recipe({
