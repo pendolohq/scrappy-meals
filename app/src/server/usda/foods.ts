@@ -1,11 +1,12 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import "server-only";
 
 import type { Db } from "../db/client";
 import { usdaFoodMatches, usdaFoods, usdaSuggestMisses } from "../db/schema";
-import type { UsdaFood } from "../domain/usda";
+import type { UsdaFood, UsdaPortion } from "../domain/usda";
 import type { FoodMatch } from "../domain/usda-check";
+import type { Macros } from "../mealie/nutrition";
 
 export type StoredMatch = FoodMatch & {
   foodName: string;
@@ -56,6 +57,48 @@ export async function ensureFoods(
     }
   }
   return found;
+}
+
+/** The data type of a food whose values someone typed in, from a label. */
+export const OWN_VALUES = "Own values";
+
+/**
+ * Saves values typed in by hand as a food alongside the cached USDA ones, with
+ * a negative id so it can never clash with an FDC id. `current` is the food
+ * the match points at now: one of these is updated in place, so each Mealie
+ * food keeps a single row. Returns the food's id.
+ */
+export async function saveOwnFood(
+  db: Db,
+  input: {
+    current: number | null;
+    description: string;
+    per100g: Macros;
+    portions: UsdaPortion[];
+  }
+): Promise<number> {
+  const values = {
+    description: input.description,
+    dataType: OWN_VALUES,
+    per100g: input.per100g,
+    portions: input.portions,
+    fetchedAt: new Date(),
+  };
+  if (input.current !== null && input.current < 0) {
+    await db
+      .update(usdaFoods)
+      .set(values)
+      .where(eq(usdaFoods.fdcId, input.current));
+    return input.current;
+  }
+  const [row] = await db
+    .insert(usdaFoods)
+    .values({
+      ...values,
+      fdcId: sql`least(0, (select coalesce(min(${usdaFoods.fdcId}), 0) from ${usdaFoods})) - 1`,
+    })
+    .returning({ fdcId: usdaFoods.fdcId });
+  return row!.fdcId;
 }
 
 /** Every saved match with its cached USDA food, by Mealie food id. */

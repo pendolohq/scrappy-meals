@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Search } from "lucide-react";
+import { Check, PencilLine, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,14 @@ import { Field, Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { parseDecimal } from "@/server/domain/decimal";
 import type { UsdaHit, UsdaPortion } from "@/server/domain/usda";
+import { MACRO_KEYS, type Macros } from "@/server/mealie/nutrition";
 
-import { confirmMatchAction, searchUsdaAction } from "../actions";
+import {
+  confirmMatchAction,
+  saveOwnValuesAction,
+  searchUsdaAction,
+} from "../actions";
+import { MACRO_LABELS } from "../labels";
 
 type Match = {
   status: "suggested" | "confirmed";
@@ -19,6 +25,7 @@ type Match = {
   description: string;
   dataType: string;
   kcalPer100g: number | null;
+  per100g: Partial<Macros>;
   portions: UsdaPortion[];
   pieceGrams: number | null;
   pieceLabel: string | null;
@@ -53,6 +60,20 @@ export const FoodRow = ({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [searching, setSearching] = useState(false);
+  const own = match?.dataType === "Own values";
+  const [entering, setEntering] = useState(false);
+  const [ownText, setOwnText] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      MACRO_KEYS.map((m) => {
+        const v = own ? match.per100g[m] : undefined;
+        return [m, v === undefined ? "" : String(v)];
+      })
+    )
+  );
+  const [tbspText, setTbspText] = useState(() => {
+    const tbsp = own ? match.portions.find((p) => p.measure === "tbsp") : null;
+    return tbsp ? grams(tbsp.grams) : "";
+  });
   const [query, setQuery] = useState(food.name);
   const [hits, setHits] = useState<UsdaHit[]>();
   const [pieceText, setPieceText] = useState(
@@ -104,6 +125,43 @@ export const FoodRow = ({
       }
       setSearching(false);
       setHits(undefined);
+      router.refresh();
+    });
+  };
+
+  const saveOwn = () => {
+    const per100g = Object.fromEntries(
+      MACRO_KEYS.map((m) => [m, parseDecimal(ownText[m] ?? "", "refuse")])
+    );
+    const tbsp =
+      tbspText.trim() === "" ? null : parseDecimal(tbspText, "refuse");
+    if (
+      MACRO_KEYS.some((m) => per100g[m] === null) ||
+      (tbspText.trim() !== "" && tbsp === null) ||
+      pieceInvalid ||
+      unitValues.some((u) => u.invalid)
+    ) {
+      setError("Each value must be a number.");
+      return;
+    }
+    setError(undefined);
+    startTransition(async () => {
+      const result = await saveOwnValuesAction({
+        foodId: food.id,
+        per100g: per100g as Macros,
+        gramsPerTbsp: tbsp,
+        pieceGrams: piece,
+        unitGrams: Object.fromEntries(
+          unitValues.flatMap((u) =>
+            u.value === null ? [] : [[u.key, u.value]]
+          )
+        ),
+      });
+      if (result.error !== undefined) {
+        setError(result.error);
+        return;
+      }
+      setEntering(false);
       router.refresh();
     });
   };
@@ -228,7 +286,58 @@ export const FoodRow = ({
           <Search className="size-4" aria-hidden />
           {match ? "Search another" : "Search USDA"}
         </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setEntering((e) => !e)}
+          aria-expanded={entering}
+        >
+          <PencilLine className="size-4" aria-hidden />
+          {own ? "Edit values" : "Enter values"}
+        </Button>
       </div>
+
+      {entering && (
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveOwn();
+          }}
+        >
+          <p className="text-sm text-muted">
+            For a food USDA doesn&rsquo;t have: copy the values per 100 g from
+            its label.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {MACRO_KEYS.map((m) => (
+              <Field
+                key={m}
+                label={`${MACRO_LABELS[m]} per 100 g (${m === "kcal" ? "kcal" : "g"})`}
+              >
+                <Input
+                  inputMode="decimal"
+                  value={ownText[m] ?? ""}
+                  onChange={(e) =>
+                    setOwnText((t) => ({ ...t, [m]: e.target.value }))
+                  }
+                />
+              </Field>
+            ))}
+            <Field label="Weight of 1 tbsp (g)">
+              <Input
+                inputMode="decimal"
+                value={tbspText}
+                onChange={(e) => setTbspText(e.target.value)}
+              />
+            </Field>
+          </div>
+          <Button type="submit" size="sm" disabled={pending}>
+            <Check className="size-4" aria-hidden />
+            Save values
+          </Button>
+        </form>
+      )}
 
       {searching && (
         <div className="space-y-3">

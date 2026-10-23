@@ -9,6 +9,7 @@ import { recipeSlug } from "@/server/domain/recipe-slug";
 import {
   confirmMatch,
   saveDecision,
+  saveOwnValues,
   searchUsda,
   suggestNext,
 } from "@/server/usda/check";
@@ -51,6 +52,36 @@ export const confirmMatchAction = userAction(
     return { saved: true as const };
   },
   { invalid: () => "Each weight must be a number of grams above 0." }
+);
+
+// Per 100 g, so no macro can weigh more than the 100 g it's part of.
+const per100g = z.number().min(0).max(100);
+
+export const saveOwnValuesAction = userAction(
+  z.object({
+    foodId: z.uuid(),
+    per100g: z.object({
+      kcal: z.number().min(0).max(900),
+      protein: per100g,
+      carbs: per100g,
+      fat: per100g,
+      fibre: per100g,
+    }),
+    gramsPerTbsp: z.number().min(0.1).max(100).nullable(),
+    pieceGrams: weight.nullable(),
+    unitGrams: z
+      .record(z.string().trim().min(1).max(40), weight)
+      .refine((r) => Object.keys(r).length <= 20),
+  }),
+  async (input, user) => {
+    await saveOwnValues(getDb(), input, user.id);
+    revalidatePath(BASE, "layout");
+    return { saved: true as const };
+  },
+  {
+    invalid: () =>
+      "Enter every value per 100 g: calories up to 900, the rest up to 100 g.",
+  }
 );
 
 const macro = z.number().min(0).max(100_000);
