@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 
 import { buttonClass } from "@/components/ui/button";
 import { RecipeImage } from "@/components/ui/recipe-image";
+import { getDb } from "@/server/db/client";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { estimatingEnabled } from "@/server/nutrition-estimate";
 import { loadReview } from "@/server/recipe-review";
 import { requireUser } from "@/server/session";
+import { loadReviewUsda } from "@/server/usda/check";
+import { usdaEnabled } from "@/server/usda/client";
 
 import { ReviewForm } from "./review-form";
 
@@ -24,6 +27,13 @@ export default async function ReviewPage({
   if (!draft) {
     notFound();
   }
+  // A failed check shouldn't stop anyone reviewing the recipe.
+  const usda = usdaEnabled()
+    ? await loadReviewUsda(getDb(), slug).catch((err) => {
+        console.warn(`recipe ${slug}: USDA check for the review failed`, err);
+        return null;
+      })
+    : null;
 
   return (
     <section className="space-y-6 pb-8">
@@ -66,7 +76,7 @@ export default async function ReviewPage({
           )}
         </p>
       </div>
-      <ReviewForm draft={draft} canEstimate={estimatingEnabled()} />
+      <ReviewForm draft={draft} canEstimate={estimatingEnabled()} usda={usda} />
     </section>
   );
 }

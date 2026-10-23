@@ -281,6 +281,43 @@ export async function loadBreakdown(
   };
 }
 
+/** What the import review shows of a recipe's USDA check. */
+export type ReviewUsda = {
+  /** The servings the figures are per serving of. */
+  servings: number | null;
+  /** Per serving; null when the recipe can't be checked yet. */
+  perServing: Partial<Macros> | null;
+  unmatchedFoods: string[];
+  /** Lines that can't be weighed yet ("2 bunches basil"). */
+  unweighed: number;
+  notCounted: number;
+  assumed: number;
+};
+
+/**
+ * The USDA check of a recipe as Mealie has it now, for the import review;
+ * null when it's a product or doesn't exist. Fetches the recipe fresh, since
+ * it was likely just imported or edited.
+ */
+export async function loadReviewUsda(
+  db: Db,
+  slug: string
+): Promise<ReviewUsda | null> {
+  const breakdown = await loadBreakdown(db, slug, { force: true });
+  if (!breakdown) {
+    return null;
+  }
+  const { check } = breakdown;
+  return {
+    servings: breakdown.servings,
+    perServing: check.usdaPerServing,
+    unmatchedFoods: check.unmatchedFoods.map((f) => f.name),
+    unweighed: check.needsAmount.length,
+    notCounted: check.notCounted.length,
+    assumed: check.assumed.length,
+  };
+}
+
 export async function searchUsda(
   query: string,
   userId: string
