@@ -3,6 +3,7 @@ import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { CopyLastWeek } from "@/components/plan/copy-last-week";
+import { FitPortions } from "@/components/plan/fit-portions";
 import { PlanDay } from "@/components/plan/plan-day";
 import { UndoChange } from "@/components/plan/undo-change";
 import { WeekGrid } from "@/components/plan/week-grid";
@@ -42,6 +43,14 @@ export default async function PlanPage({
         </Link>
       </WeekHeader>
       {lastWeekHasMeals && <CopyLastWeek weekStart={weekStart} />}
+      {/* Only meals already planned get fitted, and past days stay as they were. */}
+      {plan.days.some((d) => d.date >= now && d.meals.length > 0) && (
+        <FitPortions
+          weekStart={weekStart}
+          today={now}
+          latestChangeId={change?.id ?? null}
+        />
+      )}
       {change && (
         <UndoChange
           key={change.id}
