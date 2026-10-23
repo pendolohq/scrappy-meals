@@ -120,6 +120,30 @@ third-party pages, so the reply is held to a JSON schema of numbers and
 checked for plausibility before anything is written; nothing in it is run or
 shown as text.
 
+Suggesting USDA matches (`src/server/usda/suggest.ts`) uses the same key, from
+`suggestMatchesAction`, a `userAction` limited to 10 runs an hour per person and
+15 foods a run. It sends Mealie food names and up to three ingredient lines per
+food, both from third-party pages, so the system prompt calls them data only.
+Both replies are held to a JSON schema; a query only becomes a USDA search, and
+a pick is kept only if it is one of that food's own search hits, so nothing Claude
+writes is stored or shown except a real USDA food.
+
+## Outbound requests to USDA FoodData Central
+
+Checking nutrition (`src/server/usda/client.ts`) is off unless `USDA_FDC_API_KEY`
+is set; the three `/recipes/nutrition-check` pages answer 404 without it. The key is
+read only in that file and sent in the `X-Api-Key` header, never in a URL, so it
+stays out of logs. Requests go to `api.nal.usda.gov` only, with a 15 s timeout, and
+carry search words (typed, or written by Claude from food names) and FDC ids,
+nothing about people. They run only from `userAction`s (search, confirm a match,
+suggest matches); a page load reads the Postgres cache and never calls FDC.
+Hand searches and confirmed matches are each limited to 120 an hour per person
+(`src/server/usda/limits.ts`), next to the 10 suggest runs an hour, so one person
+can't use up the key's roughly 1,000 requests an hour. "Use USDA's" writes the
+figures the server computed, never numbers from the browser; only an edit sends values.
+Matches and cached foods are household-wide, like plan edits, so any signed-in
+person may confirm a match or decide a recipe.
+
 ## Tests
 
 `src/server/access.test.ts` finds every `"use server"` file, route handler and

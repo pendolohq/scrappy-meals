@@ -79,7 +79,7 @@ lives in a doc; the trigger for reading each one is below.
 - The server's `.env` is documented in `.env.example`; the app reads `DATABASE_URL`,
   `AUTH_SECRET`, `AUTH_URL`, `MEALIE_URL`, `MEALIE_API_TOKEN` and `MEALIE_PUBLIC_URL`,
   plus the optional `OFF_USER_ID` and `OFF_PASSWORD` (contributing to Open Food Facts) and
-  `ANTHROPIC_API_KEY` (estimating nutrition).
+  `ANTHROPIC_API_KEY` (estimating nutrition) and `USDA_FDC_API_KEY` (checking nutrition against USDA).
 - A new variable goes into `.env.example` (with a comment), `docker-compose.yml` and
   `docs/deploy.md` in the same change. Read it only in server-only modules.
 

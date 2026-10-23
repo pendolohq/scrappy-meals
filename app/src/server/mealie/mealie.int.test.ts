@@ -19,16 +19,23 @@ import {
   findOrCreateUnit,
   findRecipeBySourceUrl,
   getAiSettings,
+  getRawRecipe,
   importRecipeFromUrl,
   parseIngredients,
   patchRecipe,
 } from "./import";
+import { withImportState } from "./import-state";
 import {
   createProductRecipe,
   findProductByBarcode,
   setRecipeImageFromUrl,
 } from "./products";
-import { discoverRecipes, getRecipe, listOrganizers } from "./recipes";
+import {
+  discoverRecipes,
+  getRecipe,
+  listAllRecipes,
+  listOrganizers,
+} from "./recipes";
 
 const baseUrl = process.env.MEALIE_TEST_URL;
 const run = randomUUID().slice(0, 8);
@@ -635,6 +642,44 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       expect(r.sourceUrl).toBe(sourceUrl);
       expect(r.nutrition.perServing.kcal).toBe(320);
       expect(r.ingredients).toHaveLength(2);
+    });
+
+    it("writes the five macros back as strings, keeping the other nutrition fields", async () => {
+      const raw = (await getRawRecipe(slug, { client }))!;
+      await patchRecipe(
+        slug,
+        {
+          nutrition: {
+            ...raw.nutrition,
+            calories: "410",
+            proteinContent: "18.5",
+            carbohydrateContent: "52",
+            fatContent: "12",
+            fiberContent: "6.5",
+          },
+          extras: withImportState(raw.extras, {
+            review: "done",
+            nutrition: "reviewed",
+          }),
+        },
+        { client }
+      );
+      const r = (await getRecipe(slug, { client }))!;
+      expect(r.nutrition.perServing).toEqual({
+        kcal: 410,
+        protein: 18.5,
+        carbs: 52,
+        fat: 12,
+        fibre: 6.5,
+      });
+      expect(r.importState).toEqual({ review: "done", nutrition: "reviewed" });
+      expect(r.ingredients).toHaveLength(2);
+    });
+
+    it("lists every recipe in one request, products left out", async () => {
+      const all = await listAllRecipes({ client });
+      expect(all.map((r) => r.slug)).toContain(slug);
+      expect(all.some((r) => r.isProduct)).toBe(false);
     });
   });
 
