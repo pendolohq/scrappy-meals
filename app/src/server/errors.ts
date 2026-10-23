@@ -10,3 +10,8 @@ export class UserFacingError extends Error {
 export class RetryableError extends UserFacingError {
   name = "RetryableError";
 }
+
+/** A plan edit that can't be made as asked. */
+export class PlanError extends UserFacingError {
+  name = "PlanError";
+}

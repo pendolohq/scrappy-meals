@@ -28,12 +28,12 @@ import {
   moveMeal,
   PlanError,
   removeMeal,
-  removeMeals,
   setAdherence,
   setBaseServings,
   setFasting,
   setPortion,
 } from "@/server/plan";
+import { undoChange } from "@/server/plan-changes";
 import {
   loadKnownProduct,
   lookupProduct,
@@ -333,13 +333,12 @@ export const copyLastWeekAction = userAction(
   }
 );
 
-// A week holds a few dozen meals at most; the cap only bounds the input.
-export const undoCopyAction = userAction(
-  z.object({ mealIds: z.array(id).min(1).max(500) }),
-  async ({ mealIds }) => {
-    const day = await mealDate(getDb(), mealIds[0]);
-    await removeMeals(getDb(), mealIds);
-    return refreshWeek(day);
+/** Reverts a week's latest change; household-wide like every plan edit. */
+export const undoChangeAction = userAction(
+  z.object({ changeId: id }),
+  async ({ changeId }) => {
+    const { weekStart } = await undoChange(getDb(), changeId);
+    return refreshWeek(weekStart);
   }
 );
 
