@@ -71,6 +71,13 @@
       "when": 1792597631991,
       "tag": "0009_off-contributions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792743746855,
+      "tag": "0010_usda-nutrition-check",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,270 @@
+{
+  "totalHits": 1704,
+  "currentPage": 1,
+  "totalPages": 341,
+  "foods": [
+    {
+      "fdcId": 2709239,
+      "description": "Kiwi fruit, raw",
+      "dataType": "Survey (FNDDS)",
+      "foodCategory": "Other fruits and fruit salads",
+      "foodMeasures": [
+        {
+          "disseminationText": "1 cup",
+          "gramWeight": 180,
+          "rank": 3,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "1 slice",
+          "gramWeight": 7,
+          "rank": 2,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "1 fruit",
+          "gramWeight": 75,
+          "rank": 1,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "Quantity not specified",
+          "gramWeight": 75,
+          "rank": 4,
+          "measureUnitName": "undetermined"
+        }
+      ],
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientName": "Protein",
+          "unitName": "G",
+          "value": 1.06
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientName": "Total lipid (fat)",
+          "unitName": "G",
+          "value": 0.44
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientName": "Carbohydrate, by difference",
+          "unitName": "G",
+          "value": 14
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientName": "Energy",
+          "unitName": "KCAL",
+          "value": 64
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientName": "Fiber, total dietary",
+          "unitName": "G",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "fdcId": 2710831,
+      "description": "Kiwifruit (kiwi), green, peeled, raw",
+      "dataType": "Foundation",
+      "foodCategory": "Fruits and Fruit Juices",
+      "foodMeasures": [],
+      "foodNutrients": [
+        {
+          "nutrientId": 1004,
+          "nutrientName": "Total lipid (fat)",
+          "unitName": "G",
+          "value": 0.64
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientName": "Fiber, total dietary",
+          "unitName": "G",
+          "value": 2.13
+        },
+        {
+          "nutrientId": 1003,
+          "nutrientName": "Protein",
+          "unitName": "G",
+          "value": 1.01
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientName": "Carbohydrate, by difference",
+          "unitName": "G",
+          "value": 13.8
+        },
+        {
+          "nutrientId": 2047,
+          "nutrientName": "Energy (Atwater General Factors)",
+          "unitName": "KCAL",
+          "value": 65.1
+        },
+        {
+          "nutrientId": 2048,
+          "nutrientName": "Energy (Atwater Specific Factors)",
+          "unitName": "KCAL",
+          "value": 58.5
+        }
+      ]
+    },
+    {
+      "fdcId": 174111,
+      "description": "Beverages, Kiwi Strawberry Juice Drink",
+      "dataType": "SR Legacy",
+      "foodCategory": "Beverages",
+      "foodMeasures": [],
+      "foodNutrients": [
+        {
+          "nutrientId": 1062,
+          "nutrientName": "Energy",
+          "unitName": "kJ",
+          "value": 195
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientName": "Fiber, total dietary",
+          "unitName": "G",
+          "value": 0.0
+        },
+        {
+          "nutrientId": 1003,
+          "nutrientName": "Protein",
+          "unitName": "G",
+          "value": 0.0
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientName": "Total lipid (fat)",
+          "unitName": "G",
+          "value": 0.0
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientName": "Carbohydrate, by difference",
+          "unitName": "G",
+          "value": 12.3
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientName": "Energy",
+          "unitName": "KCAL",
+          "value": 47.0
+        }
+      ]
+    },
+    {
+      "fdcId": 2709164,
+      "description": "Clementine, raw",
+      "dataType": "Survey (FNDDS)",
+      "foodCategory": "Citrus fruits",
+      "foodMeasures": [
+        {
+          "disseminationText": "Quantity not specified",
+          "gramWeight": 85,
+          "rank": 4,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "1 cup",
+          "gramWeight": 200,
+          "rank": 3,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "1 section/slice",
+          "gramWeight": 8,
+          "rank": 2,
+          "measureUnitName": "undetermined"
+        },
+        {
+          "disseminationText": "1 fruit",
+          "gramWeight": 85,
+          "rank": 1,
+          "measureUnitName": "undetermined"
+        }
+      ],
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientName": "Protein",
+          "unitName": "G",
+          "value": 0.81
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientName": "Total lipid (fat)",
+          "unitName": "G",
+          "value": 0.31
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientName": "Carbohydrate, by difference",
+          "unitName": "G",
+          "value": 13.34
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientName": "Energy",
+          "unitName": "KCAL",
+          "value": 53
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientName": "Fiber, total dietary",
+          "unitName": "G",
+          "value": 1.8
+        }
+      ]
+    },
+    {
+      "fdcId": 167782,
+      "description": "Abiyuch, raw",
+      "dataType": "SR Legacy",
+      "foodCategory": "Fruits and Fruit Juices",
+      "foodMeasures": [],
+      "foodNutrients": [
+        {
+          "nutrientId": 1062,
+          "nutrientName": "Energy",
+          "unitName": "kJ",
+          "value": 290
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientName": "Carbohydrate, by difference",
+          "unitName": "G",
+          "value": 17.6
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientName": "Energy",
+          "unitName": "KCAL",
+          "value": 69.0
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientName": "Total lipid (fat)",
+          "unitName": "G",
+          "value": 0.1
+        },
+        {
+          "nutrientId": 1003,
+          "nutrientName": "Protein",
+          "unitName": "G",
+          "value": 1.5
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientName": "Fiber, total dietary",
+          "unitName": "G",
+          "value": 5.3
+        }
+      ]
+    }
+  ]
+}

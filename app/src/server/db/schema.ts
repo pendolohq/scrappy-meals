@@ -25,8 +25,9 @@ import {
   SLOT_TYPES,
 } from "../domain/slots";
 import type { Organizer } from "../domain/taxonomy";
+import type { UsdaPortion } from "../domain/usda";
 import type { ImportState } from "../mealie/import-state";
-import type { RecipeNutrition } from "../mealie/nutrition";
+import type { Macros, RecipeNutrition } from "../mealie/nutrition";
 import type { Ingredient, RecipeNote, RecipeStep } from "../mealie/recipes";
 
 const timestamps = {
@@ -282,6 +283,82 @@ export const offContributions = pgTable(
     check(
       "off_contributions_status",
       sql`${t.status} in ('pending', 'sent', 'nothing', 'failed')`
+    ),
+  ]
+);
+
+/** USDA FoodData Central foods we've fetched. FDC publishes twice a year, so a row never expires. */
+export const usdaFoods = pgTable("usda_foods", {
+  fdcId: integer("fdc_id").primaryKey(),
+  description: text("description").notNull(),
+  dataType: text("data_type").notNull(),
+  per100g: jsonb("per_100g").$type<Partial<Macros>>().notNull(),
+  portions: jsonb("portions").$type<UsdaPortion[]>().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Which USDA food a Mealie food is, household-wide. */
+export const usdaFoodMatches = pgTable(
+  "usda_food_matches",
+  {
+    mealieFoodId: uuid("mealie_food_id").primaryKey(),
+    /** Mealie's name for the food when saved, for display. */
+    foodName: text("food_name").notNull(),
+    fdcId: integer("fdc_id")
+      .notNull()
+      .references(() => usdaFoods.fdcId),
+    status: text("status").$type<"suggested" | "confirmed">().notNull(),
+    /** What one of it weighs when a line has no unit. */
+    pieceGrams: numeric("piece_grams", {
+      precision: 8,
+      scale: 3,
+      mode: "number",
+    }),
+    pieceLabel: text("piece_label"),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (t) => [
+    check(
+      "usda_food_matches_status",
+      sql`${t.status} in ('suggested', 'confirmed')`
+    ),
+  ]
+);
+
+/**
+ * Foods Claude found no USDA food for, so "Suggest matches" moves on to the
+ * next ones instead of retrying them. A person can still match them by hand.
+ */
+export const usdaSuggestMisses = pgTable("usda_suggest_misses", {
+  mealieFoodId: uuid("mealie_food_id").primaryKey(),
+  triedAt: timestamp("tried_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** The decision made on a recipe's nutrition, against the USDA figures of the moment. */
+export const usdaRecipeReviews = pgTable(
+  "usda_recipe_reviews",
+  {
+    recipeId: uuid("recipe_id").primaryKey(),
+    usdaPerServing: jsonb("usda_per_serving")
+      .$type<Partial<Macros>>()
+      .notNull(),
+    choice: text("choice").$type<"mealie" | "usda" | "edited">().notNull(),
+    decidedBy: uuid("decided_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "usda_recipe_reviews_choice",
+      sql`${t.choice} in ('mealie', 'usda', 'edited')`
     ),
   ]
 );

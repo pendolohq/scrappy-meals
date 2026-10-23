@@ -211,6 +211,25 @@ export async function listProducts(
   return { items: page.items.map(toListItem).filter((r) => r.isProduct) };
 }
 
+/** Every recipe in Mealie, products left out; perPage -1 is Mealie's "everything". */
+export async function listAllRecipes(
+  opts: { client?: MealieClient } = {}
+): Promise<RecipeListItem[]> {
+  const client = opts.client ?? mealie();
+  const result = unwrap(
+    await client.GET("/api/recipes", {
+      params: {
+        query: {
+          perPage: -1,
+          orderBy: "name",
+          orderDirection: "asc" as const,
+        },
+      },
+    })
+  );
+  return result.items.map(toListItem).filter((r) => !r.isProduct);
+}
+
 export type OrganizerCount = Organizer & { recipeCount: number };
 
 /** Every tag and category in Mealie, with how many recipes carry each. */

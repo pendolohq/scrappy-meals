@@ -11,6 +11,7 @@ import {
 } from "@/server/domain/discover";
 import { discoverRecipes, listOrganizers } from "@/server/mealie/recipes";
 import { requireUser } from "@/server/session";
+import { usdaEnabled } from "@/server/usda/client";
 
 import { RecipeGrid } from "./recipe-grid";
 
@@ -50,6 +51,16 @@ export default async function DiscoverPage({
       <PageHeader
         title="Recipes"
         description="Browse by meal, diet and time, then open one to plan it."
+        actions={
+          usdaEnabled() && (
+            <Link
+              href="/recipes/nutrition-check"
+              className={buttonClass({ variant: "ghost", size: "sm" })}
+            >
+              Check against USDA
+            </Link>
+          )
+        }
       />
 
       <div className="space-y-4" data-testid="discover-filters">

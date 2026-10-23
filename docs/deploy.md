@@ -70,6 +70,7 @@ the database passwords end up inside a `postgres://` URL):
 - `OFF_USER_ID`, `OFF_PASSWORD` (optional: leave empty unless you set up
   contributing to Open Food Facts, section 5)
 - `ANTHROPIC_API_KEY` (optional: estimating missing nutrition, section 5)
+- `USDA_FDC_API_KEY` (optional: checking nutrition against USDA, section 5)
 - `APP_IMAGE=ghcr.io/<owner>/scrappy-meals`, `APP_TAG=<version>` (see section 7) or `latest`
 
 Leave `MEALIE_API_TOKEN` empty for now. Keep comments on their own lines:
@@ -221,6 +222,21 @@ until someone fills it in.
 What goes out: the recipe's name, servings and ingredient lines, nothing about
 who plans or eats it. One estimate is one request to `claude-opus-5-5`, a
 fraction of a cent; the review button allows 30 an hour per person.
+
+### Checking nutrition against USDA (optional)
+
+With `USDA_FDC_API_KEY` set, Recipes gets a "Check against USDA" link. The page
+adds up each recipe's ingredients in USDA FoodData Central and compares the
+result with the nutrition in Mealie, and you choose which values to keep. Get a
+free key at [fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup)
+(about 1,000 requests an hour), put it in `.env` and `docker compose up -d`.
+Without it the pages answer 404.
+
+If `ANTHROPIC_API_KEY` is set too, "Suggest matches" asks `claude-sonnet-5-5` to
+pick a USDA food for the next 15 unmatched ingredients (10 runs an hour per
+person); otherwise search USDA by hand. What goes out: ingredient food names and
+up to three of their lines each, to Claude and (as search words) to USDA; nothing
+about who plans or eats.
 
 ## 6. Backups
 

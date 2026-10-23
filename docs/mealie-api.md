@@ -78,6 +78,31 @@ until every place names the same version (`mealie-version.test.ts`).
   each person's log too: a skipped meal counts as nothing, a partly eaten one
   as half, a swapped one as planned (a stand-in for whatever replaced it).
 
+### Checking against USDA
+
+`/recipes/nutrition-check` (on when `USDA_FDC_API_KEY` is set; design in
+`docs/plans/usda-nutrition-check.md`) recalculates each recipe's per-serving
+calories and macros from its ingredient lines and USDA FoodData Central, and
+compares them with the values above.
+
+- **Reads:** every recipe, products left out, from `GET /api/recipes?perPage=-1`,
+  then the recipe cache in chunks of 20 (`loadRecipes` with `defer`). Mealie's
+  foods have no USDA link of their own, so the match lives in Postgres
+  (`usda_food_matches`, keyed by the food's id).
+- **Grams:** a weight unit is taken as it is; a volume uses the food's
+  `scrappyGramsPerMl` extra, else a USDA volume portion; any other unit needs a
+  USDA portion of that name; no unit uses the match's piece weight. Anything
+  else makes the recipe "can't check yet" rather than guessing.
+- **Outside:** Mealie and USDA differ by more than the larger of 10 % and 20 kcal
+  (3 g for a macro).
+- **Writing back:** "Use USDA's" and "Edit" send one
+  `PATCH /api/recipes/{slug}` with the whole `nutrition` object (the other
+  fields as Mealie had them, the five macros as strings) and `extras` through
+  `withImportState` with nutrition `reviewed`. "Keep Mealie's" patches `extras`
+  only. The decision is recorded in `usda_recipe_reviews` after Mealie accepts
+  the write, against the USDA figures of that moment, so the recipe is flagged
+  again when the ingredients or a match change them.
+
 ## Tags, categories and total time
 
 The Discover page (`/recipes`) filters on Mealie's own tags and categories,

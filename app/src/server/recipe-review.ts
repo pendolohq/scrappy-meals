@@ -145,7 +145,7 @@ const originalOf = (i: RawIngredient) =>
   i.originalText || i.note || i.display || i.food?.name || "";
 
 /** Mealie down: callers that queue changes keep them and try again. */
-async function whenMealieAnswers<T>(work: () => Promise<T>): Promise<T> {
+export async function whenMealieAnswers<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (err) {

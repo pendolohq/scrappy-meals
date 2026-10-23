@@ -1,0 +1,707 @@
+[
+  {
+    "fdcId": 2710831,
+    "description": "Kiwifruit (kiwi), green, peeled, raw",
+    "dataType": "Foundation",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 2047,
+          "name": "Energy (Atwater General Factors)",
+          "unitName": "kcal"
+        },
+        "amount": 65.0648
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 2048,
+          "name": "Energy (Atwater Specific Factors)",
+          "unitName": "kcal"
+        },
+        "amount": 58.48917
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 1.008125
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 0.64
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 13.818075
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 2.129
+      }
+    ],
+    "foodPortions": [
+      {
+        "amount": 1.0,
+        "gramWeight": 140.0,
+        "measureUnit": {
+          "id": 1121,
+          "name": "RACC",
+          "abbreviation": "RACC"
+        },
+        "sequenceNumber": 1
+      }
+    ]
+  },
+  {
+    "fdcId": 168153,
+    "description": "Kiwifruit, green, raw",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 61.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1062,
+          "name": "Energy",
+          "unitName": "kJ"
+        },
+        "amount": 255.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 1.14
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 0.52
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 14.66
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 3.0
+      }
+    ],
+    "foodPortions": [
+      {
+        "amount": 1.0,
+        "modifier": "fruit (2\" dia)",
+        "gramWeight": 69.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 2
+      },
+      {
+        "amount": 1.0,
+        "modifier": "NLEA serving",
+        "gramWeight": 148.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 3
+      },
+      {
+        "amount": 1.0,
+        "modifier": "cup, sliced",
+        "gramWeight": 180.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 1
+      }
+    ]
+  },
+  {
+    "fdcId": 2709239,
+    "description": "Kiwi fruit, raw",
+    "dataType": "Survey (FNDDS)",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 1.06
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 0.44
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 14.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 64.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 3.0
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "10205",
+        "portionDescription": "1 cup",
+        "gramWeight": 180,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 3
+      },
+      {
+        "modifier": "61935",
+        "portionDescription": "1 slice",
+        "gramWeight": 7,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 2
+      },
+      {
+        "modifier": "60813",
+        "portionDescription": "1 fruit",
+        "gramWeight": 75,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 1
+      },
+      {
+        "modifier": "90000",
+        "portionDescription": "Quantity not specified",
+        "gramWeight": 75,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 4
+      }
+    ]
+  },
+  {
+    "fdcId": 2710472,
+    "description": "Coffee, Cappuccino",
+    "dataType": "Survey (FNDDS)",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 1.71
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 0.99
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 2.75
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 27.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 0.0
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "30000",
+        "portionDescription": "1 fl oz",
+        "gramWeight": 30,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 1
+      },
+      {
+        "modifier": "10215",
+        "portionDescription": "1 cup (8 fl oz)",
+        "gramWeight": 240,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 5
+      },
+      {
+        "modifier": "90000",
+        "portionDescription": "Quantity not specified",
+        "gramWeight": 360,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 4
+      },
+      {
+        "modifier": "62015",
+        "portionDescription": "1 small",
+        "gramWeight": 360,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 6
+      },
+      {
+        "modifier": "61238",
+        "portionDescription": "1 medium",
+        "gramWeight": 480,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 7
+      },
+      {
+        "modifier": "60919",
+        "portionDescription": "1 large",
+        "gramWeight": 600,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 8
+      }
+    ]
+  },
+  {
+    "fdcId": 171705,
+    "description": "Avocados, raw, all commercial varieties",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 160.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1062,
+          "name": "Energy",
+          "unitName": "kJ"
+        },
+        "amount": 670.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 2.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 14.66
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 8.53
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 6.7
+      }
+    ],
+    "foodPortions": [
+      {
+        "amount": 1.0,
+        "modifier": "cup, pureed",
+        "gramWeight": 230.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 2
+      },
+      {
+        "amount": 1.0,
+        "modifier": "cup, cubes",
+        "gramWeight": 150.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 1
+      },
+      {
+        "amount": 1.0,
+        "modifier": "cup, sliced",
+        "gramWeight": 146.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 3
+      },
+      {
+        "amount": 1.0,
+        "modifier": "NLEA Serving",
+        "gramWeight": 50.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 5
+      },
+      {
+        "amount": 1.0,
+        "modifier": "avocado, NS as to Florida or California",
+        "gramWeight": 201.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 4
+      }
+    ]
+  },
+  {
+    "fdcId": 169230,
+    "description": "Garlic, raw",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 149.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1062,
+          "name": "Energy",
+          "unitName": "kJ"
+        },
+        "amount": 623.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 6.36
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 0.5
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 33.06
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 2.1
+      }
+    ],
+    "foodPortions": [
+      {
+        "amount": 1.0,
+        "modifier": "tsp",
+        "gramWeight": 2.8,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 2
+      },
+      {
+        "amount": 1.0,
+        "modifier": "clove",
+        "gramWeight": 3.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 3
+      },
+      {
+        "amount": 3.0,
+        "modifier": "cloves",
+        "gramWeight": 9.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 4
+      },
+      {
+        "amount": 1.0,
+        "modifier": "cup",
+        "gramWeight": 136.0,
+        "measureUnit": {
+          "id": 9999,
+          "name": "undetermined",
+          "abbreviation": "undetermined"
+        },
+        "sequenceNumber": 1
+      }
+    ]
+  },
+  {
+    "fdcId": 748967,
+    "description": "Eggs, Grade A, Large, egg whole",
+    "dataType": "Foundation",
+    "foodNutrients": [
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1008,
+          "name": "Energy",
+          "unitName": "kcal"
+        },
+        "amount": 148.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1062,
+          "name": "Energy",
+          "unitName": "kJ"
+        },
+        "amount": 617.0
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1003,
+          "name": "Protein",
+          "unitName": "g"
+        },
+        "amount": 12.4
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1004,
+          "name": "Total lipid (fat)",
+          "unitName": "g"
+        },
+        "amount": 9.96
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1005,
+          "name": "Carbohydrate, by difference",
+          "unitName": "g"
+        },
+        "amount": 0.96
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1050,
+          "name": "Carbohydrate, by summation",
+          "unitName": "g"
+        },
+        "amount": 0.2
+      },
+      {
+        "type": "FoodNutrient",
+        "nutrient": {
+          "id": 1079,
+          "name": "Fiber, total dietary",
+          "unitName": "g"
+        },
+        "amount": 0.0
+      }
+    ],
+    "foodPortions": [
+      {
+        "amount": 1.0,
+        "modifier": "whole without shell",
+        "gramWeight": 50.3,
+        "measureUnit": {
+          "id": 1099,
+          "name": "egg",
+          "abbreviation": "egg"
+        },
+        "sequenceNumber": 1
+      },
+      {
+        "amount": 1.0,
+        "gramWeight": 50.0,
+        "measureUnit": {
+          "id": 1121,
+          "name": "RACC",
+          "abbreviation": "RACC"
+        },
+        "sequenceNumber": 1
+      }
+    ]
+  }
+]
