@@ -297,7 +297,9 @@ export const FoodRow = ({
         {match && (
           <Button
             size="sm"
-            onClick={() => confirm(match.fdcId)}
+            // A food with its own values isn't a USDA food: its weights are
+            // saved with those values.
+            onClick={() => (own ? saveOwn() : confirm(match.fdcId))}
             disabled={pending}
           >
             <Check className="size-4" aria-hidden />
