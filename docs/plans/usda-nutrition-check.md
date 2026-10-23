@@ -52,7 +52,9 @@ The food match is household-wide, like plan edits: anyone signed in may confirm 
 For each recipe ingredient (the cached `Ingredient`), in order:
 
 1. A heading or blank line (no food, empty text): skipped.
-2. No food but some text (unparsed): **needs an amount**, "not parsed".
+2. No food but some text (unparsed): **not counted**, "not parsed", and listed. These are
+   mostly serving suggestions or other recipes ("½ batch", "carb source of choice"), so
+   they don't stop the recipe from being checked.
 3. No quantity ("olive oil, to taste"): a confirmed food that is negligible (≤ 5 kcal and
    every macro ≤ 0.5 g per 100 g: salt, water) counts as 0 g silently; a confirmed food with
    a default amount (`default_grams`, set on the Foods page, e.g. olive oil 10 g) counts that

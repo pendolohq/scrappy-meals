@@ -92,13 +92,13 @@ describe("lineResult", () => {
       ).toEqual({ kind: "skipped" });
     });
 
-    it("asks for an amount when a line with text has no food", () => {
+    it("leaves out a line Mealie couldn't parse, and says so", () => {
       expect(
         lineResult(
-          line({ food: null, quantity: null, display: "a handful of basil" }),
+          line({ food: null, quantity: null, display: "½ batch" }),
           undefined
         )
-      ).toEqual({ kind: "needsAmount", reason: "not parsed" });
+      ).toEqual({ kind: "notCounted", reason: "not parsed" });
     });
   });
 
@@ -122,6 +122,7 @@ describe("lineResult", () => {
     it("doesn't need a match for a line with no amount", () => {
       expect(lineResult(grams(null, null), undefined)).toEqual({
         kind: "notCounted",
+        reason: "no amount",
       });
     });
   });
@@ -155,12 +156,13 @@ describe("lineResult", () => {
           line({ quantity: null }),
           match(usdaFood(), { status: "suggested", defaultGrams: 10 })
         )
-      ).toEqual({ kind: "notCounted" });
+      ).toEqual({ kind: "notCounted", reason: "no amount" });
     });
 
     it("leaves any other food out of the total", () => {
       expect(lineResult(line({ quantity: null }), match(usdaFood()))).toEqual({
         kind: "notCounted",
+        reason: "no amount",
       });
     });
   });
@@ -656,7 +658,6 @@ describe("checkRecipe", () => {
               food: { id: "flour", name: "Flour" },
               display: "2 bunches flour",
             }),
-            line({ food: null, quantity: null, display: "a handful of basil" }),
           ],
         }),
         matches
@@ -664,7 +665,6 @@ describe("checkRecipe", () => {
       expect(check.status).toBe("cantCheck");
       expect(check.needsAmount).toEqual([
         { display: "2 bunches flour", reason: "no weight for bunch" },
-        { display: "a handful of basil", reason: "not parsed" },
       ]);
     });
 
@@ -751,7 +751,10 @@ describe("checkRecipe", () => {
       );
       expect(check).toMatchObject({
         status: "match",
-        notCounted: ["olive oil, to drizzle", "black pepper, to taste"],
+        notCounted: [
+          { display: "olive oil, to drizzle", reason: "no amount" },
+          { display: "black pepper, to taste", reason: "no amount" },
+        ],
         unmatchedFoods: [],
       });
       expect(check.usdaPerServing).toEqual(
@@ -772,12 +775,29 @@ describe("checkRecipe", () => {
       expect(check.usdaPerServing?.kcal).toBe(53);
     });
 
+    it("checks a recipe with a line Mealie couldn't parse, and lists it", () => {
+      const check = checkRecipe(
+        recipe({
+          ingredients: [
+            flourLine,
+            line({ food: null, quantity: null, display: "Side of greens" }),
+          ],
+        }),
+        matches
+      );
+      expect(check).toMatchObject({
+        status: "match",
+        needsAmount: [],
+        notCounted: [{ display: "Side of greens", reason: "not parsed" }],
+      });
+    });
+
     it("can't check a recipe that has nothing but them", () => {
       const check = checkRecipe(recipe({ ingredients: [oil] }), matches);
       expect(check).toMatchObject({
         status: "cantCheck",
         nothingToCount: true,
-        notCounted: ["olive oil, to drizzle"],
+        notCounted: [{ display: "olive oil, to drizzle", reason: "no amount" }],
       });
     });
   });
