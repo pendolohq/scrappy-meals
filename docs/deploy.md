@@ -268,7 +268,7 @@ only for release tags:
 
 | Event | Tags | Used by |
 | --- | --- | --- |
-| Pull request | none (built and smoke-tested only when the PR touches the image) | |
+| Pull request | none (built and smoke-tested only when the PR changes how the image is built) | |
 | Push to `main` | none (always built and smoke-tested) | |
 | Tag `vX.Y.Z` | `:X.Y.Z`, `:X.Y`, `:latest` | the server |
 | Tag `vX.Y.Z-rc.N` | `:X.Y.Z-rc.N` | trying a build before releasing it |

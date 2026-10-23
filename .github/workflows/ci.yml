@@ -264,9 +264,11 @@ jobs:
       - name: Backup and restore round trip
         run: scripts/test-backup-restore.sh
 
-  # Pull requests and main: build and smoke-test only, never push.
-  # v* tags:                 publish :X.Y.Z, :X.Y and :latest. Only a release moves
-  #                          :latest, which is what the server runs by default (APP_TAG).
+  # Pull requests: only when they touch .github/image-paths. Build and
+  # smoke-test only, never push.
+  # main: always built and smoke-tested, never pushed.
+  # v* tags: publish :X.Y.Z, :X.Y and :latest. Only a release moves
+  #          :latest, which is what the server runs by default (APP_TAG).
   image:
     needs: [changes, check, test-services, e2e, secrets]
     if: needs.changes.outputs.image == 'true'
