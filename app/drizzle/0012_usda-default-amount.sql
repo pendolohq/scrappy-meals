@@ -1,0 +1,1 @@
+ALTER TABLE "usda_food_matches" ADD COLUMN "default_grams" numeric(8, 3);

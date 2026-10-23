@@ -46,6 +46,7 @@ const Group = ({
               uses: food.uses,
               lines: food.lines,
               units: food.units,
+              unmeasured: food.unmeasured,
             }}
             match={
               food.match && {
@@ -59,6 +60,7 @@ const Group = ({
                 pieceGrams: food.match.pieceGrams,
                 pieceLabel: food.match.pieceLabel,
                 unitGrams: food.match.unitGrams,
+                defaultGrams: food.match.defaultGrams,
               }
             }
           />

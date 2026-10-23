@@ -30,6 +30,7 @@ const match = (
   status: "confirmed",
   pieceGrams: null,
   unitGrams: {},
+  defaultGrams: null,
   food,
   ...over,
 });
@@ -135,6 +136,24 @@ describe("lineResult", () => {
         grams: 0,
         macros: { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 },
       });
+    });
+
+    it("counts the food's default amount, and says it's assumed", () => {
+      expect(
+        lineResult(
+          line({ quantity: null }),
+          match(usdaFood(), { defaultGrams: 10 })
+        )
+      ).toMatchObject({ kind: "counted", grams: 10, assumed: true });
+    });
+
+    it("doesn't use a default for a food that's only suggested", () => {
+      expect(
+        lineResult(
+          line({ quantity: null }),
+          match(usdaFood(), { status: "suggested", defaultGrams: 10 })
+        )
+      ).toEqual({ kind: "notCounted" });
     });
 
     it("leaves any other food out of the total", () => {
@@ -712,6 +731,19 @@ describe("checkRecipe", () => {
       expect(check.usdaPerServing).toEqual(
         checkRecipe(recipe(), matches).usdaPerServing
       );
+    });
+
+    it("counts and lists a line at its food's default amount", () => {
+      const check = checkRecipe(
+        recipe({ ingredients: [flourLine, oil] }),
+        new Map([...matches, ["oil", match(flour, { defaultGrams: 10 })]])
+      );
+      expect(check.assumed).toEqual([
+        { display: "olive oil, to drizzle", grams: 10 },
+      ]);
+      expect(check.notCounted).toEqual([]);
+      // 210 g at 50 kcal per 100 g, over 2 servings.
+      expect(check.usdaPerServing?.kcal).toBe(53);
     });
 
     it("can't check a recipe that has nothing but them", () => {

@@ -70,6 +70,11 @@ const detail = ({ check }: CheckedRecipe): string => {
       `Outside: ${check.outside.map((m) => MACRO_LABELS[m].toLowerCase()).join(", ")}`
     );
   }
+  if (check.assumed.length > 0) {
+    parts.push(
+      `${check.assumed.length} ${check.assumed.length === 1 ? "amount" : "amounts"} assumed`
+    );
+  }
   if (check.notCounted.length > 0) {
     parts.push(
       `${check.notCounted.length} ${check.notCounted.length === 1 ? "line" : "lines"} not counted`

@@ -317,6 +317,12 @@ export const usdaFoodMatches = pgTable(
       mode: "number",
     }),
     pieceLabel: text("piece_label"),
+    /** Grams counted for a line that gives no amount ("olive oil, to drizzle"). */
+    defaultGrams: numeric("default_grams", {
+      precision: 8,
+      scale: 3,
+      mode: "number",
+    }),
     /** What one clove, bunch, pinch… of it weighs, by unit (see `unitKey`). */
     unitGrams: jsonb("unit_grams")
       .$type<Record<string, number>>()

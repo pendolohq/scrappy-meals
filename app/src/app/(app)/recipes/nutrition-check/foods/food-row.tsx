@@ -30,6 +30,7 @@ type Match = {
   pieceGrams: number | null;
   pieceLabel: string | null;
   unitGrams: Record<string, number>;
+  defaultGrams: number | null;
 };
 
 type Unit = { key: string; name: string };
@@ -53,6 +54,7 @@ export const FoodRow = ({
     uses: number;
     lines: string[];
     units: Unit[];
+    unmeasured: number;
   };
   match: Match | null;
 }) => {
@@ -91,6 +93,13 @@ export const FoodRow = ({
     )
   );
 
+  const [defaultText, setDefaultText] = useState(
+    match?.defaultGrams ? grams(match.defaultGrams) : ""
+  );
+  const defaultGrams =
+    defaultText.trim() === "" ? null : parseDecimal(defaultText, "refuse");
+  const defaultInvalid = defaultText.trim() !== "" && defaultGrams === null;
+
   const piece =
     pieceText.trim() === "" ? null : parseDecimal(pieceText, "refuse");
   const pieceInvalid = pieceText.trim() !== "" && piece === null;
@@ -101,7 +110,7 @@ export const FoodRow = ({
   });
 
   const confirm = (fdcId: number) => {
-    if (pieceInvalid || unitValues.some((u) => u.invalid)) {
+    if (pieceInvalid || defaultInvalid || unitValues.some((u) => u.invalid)) {
       setError("Each weight must be a number of grams.");
       return;
     }
@@ -118,6 +127,7 @@ export const FoodRow = ({
         pieceGrams: carry ? piece : null,
         pieceLabel: carry && piece !== null ? pieceLabel : null,
         unitGrams,
+        defaultGrams,
       });
       if (result.error !== undefined) {
         setError(result.error);
@@ -139,6 +149,7 @@ export const FoodRow = ({
       MACRO_KEYS.some((m) => per100g[m] === null) ||
       (tbspText.trim() !== "" && tbsp === null) ||
       pieceInvalid ||
+      defaultInvalid ||
       unitValues.some((u) => u.invalid)
     ) {
       setError("Each value must be a number.");
@@ -151,6 +162,7 @@ export const FoodRow = ({
         per100g: per100g as Macros,
         gramsPerTbsp: tbsp,
         pieceGrams: piece,
+        defaultGrams,
         unitGrams: Object.fromEntries(
           unitValues.flatMap((u) =>
             u.value === null ? [] : [[u.key, u.value]]
@@ -241,6 +253,17 @@ export const FoodRow = ({
           <p className="text-xs text-muted">
             Used for lines with no unit, like &ldquo;2 kiwis&rdquo;.
           </p>
+          {food.unmeasured > 0 && (
+            <Field label="Amount when a line gives none (g)">
+              <Input
+                inputMode="decimal"
+                value={defaultText}
+                placeholder="Not counted"
+                aria-invalid={defaultInvalid || undefined}
+                onChange={(e) => setDefaultText(e.target.value)}
+              />
+            </Field>
+          )}
           {unitValues.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2">
               {unitValues.map((u) => {

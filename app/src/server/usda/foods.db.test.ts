@@ -96,6 +96,7 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
       pieceGrams: null,
       pieceLabel: null,
       unitGrams: {},
+      defaultGrams: null,
     };
 
     it("saves a match and lists it with its USDA food, ready to use in any recipe", async () => {
@@ -131,6 +132,15 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
         clove: 4,
         bulb: 40,
       });
+    });
+
+    it("keeps the amount to count when a line gives none", async () => {
+      const user = await newUser();
+      await ensureFoods(db, fakeClient(), [KIWI]);
+
+      await saveMatch(db, { ...base, defaultGrams: 10 }, user.id);
+
+      expect((await listMatches(db)).get(FOOD_A)?.defaultGrams).toBe(10);
     });
 
     it("keeps the piece weight and what it was picked from", async () => {
@@ -256,6 +266,7 @@ describe.skipIf(!testDbUrl)("USDA foods and matches (Postgres)", () => {
           pieceGrams: 5,
           pieceLabel: "1 clove",
           unitGrams: { clove: 4 },
+          defaultGrams: null,
         },
         user.id
       );

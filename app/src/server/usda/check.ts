@@ -159,6 +159,8 @@ export type FoodUsage = {
   lines: string[];
   /** Units its lines use that are neither a weight nor a volume, by `unitKey`. */
   units: { key: string; name: string }[];
+  /** Lines that give no amount ("to taste"). */
+  unmeasured: number;
   match: StoredMatch | null;
 };
 
@@ -178,10 +180,14 @@ export function foodUsage(
         uses: 0,
         lines: [],
         units: [],
+        unmeasured: 0,
         match: matches.get(line.food.id) ?? null,
       };
       food.uses += 1;
       const { quantity, unit } = line;
+      if (quantity === null) {
+        food.unmeasured += 1;
+      }
       if (quantity !== null && unit && !measure(quantity, unit)) {
         const key = unitKey(unit);
         if (key && !food.units.some((u) => u.key === key)) {
@@ -297,6 +303,7 @@ export async function confirmMatch(
     pieceGrams: number | null;
     pieceLabel: string | null;
     unitGrams: Record<string, number>;
+    defaultGrams: number | null;
   },
   userId: string
 ): Promise<void> {
@@ -320,6 +327,7 @@ export async function confirmMatch(
       pieceGrams: input.pieceGrams,
       pieceLabel: input.pieceLabel,
       unitGrams: input.unitGrams,
+      defaultGrams: input.defaultGrams,
     },
     userId
   );
@@ -338,6 +346,7 @@ export async function saveOwnValues(
     gramsPerTbsp: number | null;
     pieceGrams: number | null;
     unitGrams: Record<string, number>;
+    defaultGrams: number | null;
   },
   userId: string
 ): Promise<void> {
@@ -366,6 +375,7 @@ export async function saveOwnValues(
       pieceGrams: input.pieceGrams,
       pieceLabel: null,
       unitGrams: input.unitGrams,
+      defaultGrams: input.defaultGrams,
     },
     userId
   );
