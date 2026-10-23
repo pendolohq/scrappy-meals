@@ -313,8 +313,9 @@ recipe by `createFoodRecipe` (`src/server/mealie/food-recipes.ts`): `POST
   match is saved, so the check lists the food under "Can't check yet" until it
   is matched on the foods page.
 - **Saving again reuses the recipe:** a food recipe with the same name (Mealie
-  names a second one "Kiwi (1)"), food, serving and nutrition is found through
-  `GET /api/recipes?tags=food&search=` and planned instead of a new one, so a
+  names a second one "Kiwi (1)"), food, serving, nutrition and
+  `scrappyNutrition` is found through
+  `GET /api/recipes?tags=food&search=&perPage=-1` and planned instead of a new one, so a
   retry after a failed add doesn't leave duplicates. The recipe is created
   before the match is saved, and deleted if saving the match fails.
 - A food whose match is values typed in from a label (a negative id) is counted

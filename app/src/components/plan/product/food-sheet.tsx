@@ -311,6 +311,17 @@ export const FoodSheet = ({
     source.food.fdcId !== confirmed.match!.fdcId
       ? confirmed.name
       : null;
+  // The same USDA food with another piece weight than the one it has.
+  const repiecing =
+    confirmed &&
+    !replacing &&
+    source?.kind === "usda" &&
+    unit === "piece" &&
+    confirmed.match!.pieceGrams !== null &&
+    piece !== null &&
+    piece !== confirmed.match!.pieceGrams
+      ? confirmed.name
+      : null;
 
   const exact = found?.foods.some(
     (f) => f.name.trim().toLowerCase() === found.name.toLowerCase()
@@ -512,6 +523,9 @@ export const FoodSheet = ({
 
           {replacing && (
             <Notice>{`Saving changes the USDA match of ${replacing} for every recipe that uses it.`}</Notice>
+          )}
+          {repiecing && (
+            <Notice>{`Saving changes what one ${repiecing} weighs for every recipe that uses it.`}</Notice>
           )}
 
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">

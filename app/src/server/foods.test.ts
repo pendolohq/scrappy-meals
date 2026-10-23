@@ -370,7 +370,8 @@ describe("saveFood from USDA", () => {
     expect(findRecipe).toHaveBeenCalledWith(
       "Kiwi",
       { foodId: kiwi.id, amount: 1, unit: "piece", grams: 69 },
-      { kcal: 42, protein: 0.8, carbs: 8, fat: 0.4, fibre: 2.1 }
+      { kcal: 42, protein: 0.8, carbs: 8, fat: 0.4, fibre: 2.1 },
+      "source"
     );
     expect(d.create).not.toHaveBeenCalled();
     expect(d.saveMatch).toHaveBeenCalled();

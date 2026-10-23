@@ -687,7 +687,9 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
       } as const;
       const values = { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 };
       expect(
-        await findFoodRecipe(`${name} PIECE`, state, values, { client })
+        await findFoodRecipe(`${name} PIECE`, state, values, "source", {
+          client,
+        })
       ).toBe(slugs.piece);
       // Mealie names a second recipe of the same name "… (1)".
       const again = await createFoodRecipe(
@@ -711,6 +713,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           `${name} piece`,
           { ...state, grams: 140 },
           values,
+          "source",
           { client }
         )
       ).toBe(again);
@@ -719,9 +722,8 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           `${name} piece`,
           { ...state, grams: 150 },
           values,
-          {
-            client,
-          }
+          "source",
+          { client }
         )
       ).toBeNull();
       expect(
@@ -729,8 +731,15 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           `${name} piece`,
           state,
           { ...values, kcal: 90 },
+          "source",
           { client }
         )
+      ).toBeNull();
+      // The same figures typed in aren't the recipe counted from USDA.
+      expect(
+        await findFoodRecipe(`${name} piece`, state, values, "reviewed", {
+          client,
+        })
       ).toBeNull();
     });
 

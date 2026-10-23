@@ -92,7 +92,8 @@ type Deps = {
   findRecipe: (
     name: string,
     state: FoodState,
-    perServing: Partial<Macros>
+    perServing: Partial<Macros>,
+    nutrition: FoodRecipeInput["nutrition"]
   ) => Promise<string | null>;
   create: (input: FoodRecipeInput) => Promise<string>;
   deleteRecipe: (slug: string) => Promise<void>;
@@ -116,8 +117,8 @@ const defaults = (): Deps => ({
   findOrCreateFood: (name) => findOrCreateFood(name),
   getRawRecipe: (slug) => getRawRecipe(slug),
   lineUnit: (unit) => findLineUnit(unit),
-  findRecipe: (name, state, perServing) =>
-    findFoodRecipe(name, state, perServing),
+  findRecipe: (name, state, perServing, nutrition) =>
+    findFoodRecipe(name, state, perServing, nutrition),
   create: (input) => createFoodRecipe(input),
   deleteRecipe: (slug) => deleteRecipe(slug),
   matchesFor: (foodIds) => listMatches(getDb(), foodIds),
@@ -335,7 +336,8 @@ export async function saveFood(
     const existing = await d.findRecipe(
       input.name,
       { ...recipe.serving, foodId: food.id },
-      recipe.perServing
+      recipe.perServing,
+      recipe.nutrition
     );
     const slug =
       existing ??

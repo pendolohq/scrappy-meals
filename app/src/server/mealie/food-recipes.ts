@@ -11,7 +11,7 @@ import { FOOD_TAG } from "../domain/taxonomy";
 import { type MealieClient, mealie, unwrap } from "./client";
 import { type FoodState, readFoodState, withFoodState } from "./food-state";
 import { getRawRecipe, patchRecipe } from "./import";
-import { withImportState } from "./import-state";
+import { readImportState, withImportState } from "./import-state";
 import {
   MACRO_KEYS,
   type Macros,
@@ -124,21 +124,24 @@ const baseName = (name: string) =>
 
 /**
  * A single food recipe named `name` (any case, or as Mealie renames a second
- * one: "Kiwi (2)") with this serving of this food
- * and this nutrition per serving; its slug, or null. Saving the same food
+ * one: "Kiwi (2)") with this serving of this food and this nutrition per
+ * serving, from the same source; its slug, or null. Saving the same food
  * again reuses it, so a retry or a second add doesn't make "Kiwi (1)".
  */
 export async function findFoodRecipe(
   name: string,
   state: FoodState,
   perServing: Partial<Macros>,
+  nutrition: FoodRecipeInput["nutrition"],
   opts: { client?: MealieClient } = {}
 ): Promise<string | null> {
   const client = opts.client ?? mealie();
   const wanted = baseName(name);
+  // Every match: Mealie's search is fuzzy, so the one saved before may rank
+  // below other foods with a similar name.
   const { items } = await listFoodRecipes({
     search: name,
-    perPage: 10,
+    perPage: -1,
     client,
   });
   for (const item of items) {
@@ -150,6 +153,7 @@ export async function findFoodRecipe(
     const values = normaliseNutrition(raw?.nutrition).perServing;
     if (
       found &&
+      readImportState(raw?.extras).nutrition === nutrition &&
       MACRO_KEYS.every((m) => values[m] === perServing[m]) &&
       found.foodId === state.foodId &&
       found.unit === state.unit &&
