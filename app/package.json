@@ -15,7 +15,7 @@
     "test:integration": "vitest run --project integration",
     "test:db": "vitest run --project db",
     "cli": "tsx --conditions=react-server src/cli/index.ts",
-    "mealie:types": "node scripts/mealie-types.mjs",
+    "mealie:types": "bun install --cwd scripts/mealie-types --frozen-lockfile && node scripts/mealie-types/generate.mjs",
     "test:e2e": "NODE_OPTIONS=--conditions=react-server playwright test",
     "skills:update": "cd .. && skills update --project --yes",
     "update-packages": "tsx scripts/update-packages.mts"
@@ -46,14 +46,13 @@
     "agent-browser": "0.39.2",
     "drizzle-kit": "0.31.11",
     "esbuild": "0.28.2",
-    "openapi-typescript": "7.13.0",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
     "sharp": "0.35.5",
     "skills": "1.7.4",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "5.0.5"
   },
   "packageManager": "bun@1.4.3"

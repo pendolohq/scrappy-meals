@@ -16,7 +16,7 @@ export type WorkerReply =
 
 const ready = prepareZXingModule({
   overrides: {
-    locateFile: (path, prefix) =>
+    locateFile: (path: string, prefix: string) =>
       path.endsWith(".wasm")
         ? new URL(wasmUrl(ZXING_WASM_VERSION), self.location.origin).href
         : prefix + path,
