@@ -28,6 +28,7 @@ export async function weekShoppingList(
               servings: r.servings,
               ingredients: r.ingredients,
               product: r.product,
+              noShopping: r.noShopping,
             }
           : null,
       };

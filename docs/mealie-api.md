@@ -420,6 +420,14 @@ Mealie food, whatever units the recipes use:
   Produce", "Health Foods", …) and labels named like an aisle. Unlabelled foods
   and other labels go under "Other", so a new food needs a label in Mealie to
   find its aisle. The checklist groups by it.
+- **Left off the list:** a recipe whose `extras` has `scrappyNoShopping: "true"`
+  (a cappuccino from the café, a snack bought at work) adds nothing, products
+  included. It's cached as `recipe_cache.no_shopping`; rows cached before the
+  column read as on the list until refreshed. The recipe page's "Don't add to
+  the shopping list" sets it (`setNoShopping`: the extras through
+  `withNoShopping`, then the cache refreshed). Foods added by name have it on by
+  default; it's unticked for fruit. Saving a food again applies the sheet's tick
+  to the recipe it reuses.
 - Near-duplicate foods ("onion", "onions") are separate lines: combine them
   on Mealie's Foods page (or add an alias) rather than matching names in code.
 - Rows in `recipe_cache` from before labels and unit standards were kept

@@ -92,6 +92,13 @@
       "when": 1792757716023,
       "tag": "0012_usda-default-amount",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792768837860,
+      "tag": "0013_foods-no-shopping",
+      "breakpoints": true
     }
   ]
 }

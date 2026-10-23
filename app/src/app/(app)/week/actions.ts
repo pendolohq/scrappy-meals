@@ -229,6 +229,7 @@ export const saveFoodAction = userAction(
     }),
     pieceGrams: grams.nullable(),
     pieceLabel: z.string().trim().max(100).nullable(),
+    noShopping: z.boolean(),
     nutrition: z.discriminatedUnion("from", [
       // A food's match to values typed in from a label has a negative id.
       z.object({

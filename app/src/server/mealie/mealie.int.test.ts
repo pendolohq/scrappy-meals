@@ -620,6 +620,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
             serving: servings[unit],
             perServing: { kcal: 84, protein: 1.6, carbs: 16.1, fat: 0.7 },
             nutrition: unit === "ml" ? "estimated" : "source",
+            noShopping: unit === "ml",
           },
           { client }
         );
@@ -671,6 +672,9 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         amount: 200,
       });
       expect(millilitres?.importState.nutrition).toBe("estimated");
+      // Kept off the shopping list; the others aren't.
+      expect(millilitres?.noShopping).toBe(true);
+      expect(grams?.noShopping).toBe(false);
       const raw = await getRawRecipe(slugs.ml, { client });
       expect(readFoodState(raw?.extras)?.grams).toBeNull();
     });
@@ -698,7 +702,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         await findFoodRecipe(`${name} PIECE`, state, values, "source", {
           client,
         })
-      ).toBe(slugs.piece);
+      ).toEqual({ slug: slugs.piece, noShopping: false });
       // Mealie names a second recipe of the same name "… (1)".
       const again = await createFoodRecipe(
         {
@@ -708,6 +712,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           serving: { ...state, grams: 140 },
           perServing: values,
           nutrition: "source",
+          noShopping: false,
         },
         { client }
       );
@@ -725,7 +730,7 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
           "source",
           { client }
         )
-      ).toBe(again);
+      ).toEqual({ slug: again, noShopping: false });
       expect(
         await findFoodRecipe(
           `${name} piece`,

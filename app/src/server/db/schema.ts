@@ -237,6 +237,8 @@ export const recipeCache = pgTable(
     // Set for a packaged product; null for recipes and for rows cached
     // before the column.
     product: jsonb("product").$type<ProductInfo>(),
+    // Rows cached before the column read as on the list until refreshed.
+    noShopping: boolean("no_shopping").notNull().default(false),
     // Rows cached before imports existed refresh within the hour; until then
     // they read as plain Mealie recipes.
     reviewState: text("review_state")

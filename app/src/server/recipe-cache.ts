@@ -100,6 +100,7 @@ export async function loadRecipes(
         categories: recipe.categories,
         totalMinutes: recipe.totalMinutes,
         product: recipe.product,
+        noShopping: recipe.noShopping,
         reviewState: recipe.importState.review,
         nutritionSource: recipe.importState.nutrition,
         fetchedAt: now,

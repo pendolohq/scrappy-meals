@@ -67,8 +67,12 @@ const dal = {
   ],
 };
 
-type TestRecipe = Omit<NonNullable<MealForShopping["recipe"]>, "product"> & {
+type TestRecipe = Omit<
+  NonNullable<MealForShopping["recipe"]>,
+  "product" | "noShopping"
+> & {
   product?: ProductInfo | null;
+  noShopping?: boolean;
 };
 
 const meal = (
@@ -77,7 +81,7 @@ const meal = (
   baseServings = 1,
   unplanned = false
 ): MealForShopping => ({
-  recipe: recipe && { product: null, ...recipe },
+  recipe: recipe && { product: null, noShopping: false, ...recipe },
   slug: recipe?.id ?? "gone",
   baseServings,
   unplanned,
@@ -118,6 +122,26 @@ const read = (list: WeekIngredients) =>
   list.lines.map((l) => `${l.foodName}: ${formatAmounts(l.amounts)}`);
 
 describe("buildShoppingList", () => {
+  it("leaves out recipes marked not for the shopping list, products too", () => {
+    const cappuccino = {
+      id: "cappuccino",
+      name: "Cappuccino",
+      servings: 1,
+      ingredients: [ing({ quantity: 180, food: lentils, unit: g })],
+      noShopping: true,
+    };
+    const bar = { ...product("bar", "Bar"), noShopping: true };
+    const list = buildShoppingList([
+      meal(cappuccino, { a: 1 }),
+      meal(bar, { a: 1 }),
+      meal(dal, { a: 1, b: 1 }),
+    ]);
+    expect(list.products).toEqual([]);
+    expect(list.lines.map((l) => l.recipes.map((r) => r.id))).toEqual([
+      ["dal"],
+    ]);
+  });
+
   it("scales by everyone's servings and merges a food across recipes and units", () => {
     // Soup: 1.5 + 0.5 = 2 of 4 servings -> half. Dal: 1 of 2 servings -> half.
     const list = buildShoppingList([
