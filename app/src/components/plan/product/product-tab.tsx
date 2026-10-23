@@ -17,7 +17,7 @@ import { attempt, failureText } from "../attempt";
 import { BarcodeScanner } from "../barcode-scanner";
 import { useRecipeList } from "../use-recipe-list";
 
-import { FoodSheet } from "./food-sheet";
+import { FoodSheet } from "./food/food-sheet";
 import { KnownFoodSheet } from "./known-food-sheet";
 import { ProductSheet } from "./product-sheet";
 import type { Slot } from "./sheet-props";
