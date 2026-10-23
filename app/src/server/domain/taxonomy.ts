@@ -17,6 +17,11 @@ export const RECIPE_TAGS = [
   { name: "Dessert", slug: "dessert" },
   { name: "Meal prep", slug: "meal-prep" },
   { name: "High protein", slug: "high-protein" },
+  /**
+   * A veg side planned as a second entry next to a lunch or dinner. Only
+   * picked by hand: nothing in `classifyTags` assigns it.
+   */
+  { name: "Side", slug: "side" },
 ] as const satisfies Organizer[];
 
 /**
