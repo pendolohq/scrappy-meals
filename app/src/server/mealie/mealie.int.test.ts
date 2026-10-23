@@ -3,7 +3,15 @@
 //
 //   MEALIE_TEST_URL=http://localhost:9000 bun run test:integration
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 import { measure } from "../domain/units";
 import { attachProductPhoto } from "../products";
@@ -703,11 +711,12 @@ describe.skipIf(!baseUrl)("Mealie client (live)", () => {
         },
         { client }
       );
-      cleanup.push(() =>
-        admin.DELETE("/api/recipes/{slug}", {
+      // Gone before the next test, which lists the suite's food recipes.
+      onTestFinished(async () => {
+        await admin.DELETE("/api/recipes/{slug}", {
           params: { path: { slug: again } },
-        })
-      );
+        });
+      });
       expect(
         await findFoodRecipe(
           `${name} piece`,
