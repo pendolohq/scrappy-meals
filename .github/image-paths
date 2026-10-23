@@ -1,0 +1,13 @@
+# Changes to how the image is built and run, which the other CI jobs don't
+# exercise (e2e runs the app from a plain `bun run build`). A pull request that
+# touches one also builds and smoke-tests the image; any other doesn't. Read by
+# the `changes` job in ci.yml: one extended regex per line, matched from the
+# start of each changed path. Pushes to main always build it.
+app/Dockerfile
+app/\.dockerignore
+app/docker/
+app/next\.config\.ts
+app/scripts/build-cli\.mjs
+app/scripts/copy-wasm\.mjs
+\.github/workflows/
+\.github/image-paths

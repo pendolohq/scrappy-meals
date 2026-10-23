@@ -185,14 +185,15 @@ jobs:
             app/server.log
           retention-days: 7
 
-  # Decides whether a PR can affect the server stack (compose, Caddy,
-  # backups); pushes to main and tags always check it.
+  # Decides whether a PR can affect the image or the server stack (compose,
+  # Caddy, backups); pushes to main and tags always run both.
   changes:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: .
     outputs:
+      image: ${{ steps.diff.outputs.image }}
       stack: ${{ steps.diff.outputs.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -205,6 +206,8 @@ jobs:
           # What the stack job checks.
           STACK_PATTERN: '^(backup/|scripts/|postgres/|docker-compose\.yml|Caddyfile|\.env\.example|\.github/workflows/)'
         run: |
+          # .github/image-paths: one regex per line, comments and blanks ignored.
+          IMAGE_PATTERN="^($(grep -v -e '^#' -e '^$' .github/image-paths 2>/dev/null | paste -sd'|' -))"
           check() {
             if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
               echo "$1=true" >> "$GITHUB_OUTPUT"
@@ -215,6 +218,7 @@ jobs:
               echo "$1=false" >> "$GITHUB_OUTPUT"
             fi
           }
+          check image "$IMAGE_PATTERN"
           check stack "$STACK_PATTERN"
 
   secrets:
@@ -260,14 +264,14 @@ jobs:
       - name: Backup and restore round trip
         run: scripts/test-backup-restore.sh
 
-  # Never on pull requests: an image build there costs minutes and tells little
-  # that the e2e build doesn't.
-  # main:    build and smoke-test only, never push.
-  # v* tags: publish :X.Y.Z, :X.Y and :latest. Only a release moves :latest,
-  #          which is what the server runs by default (APP_TAG).
+  # Pull requests: only when they touch .github/image-paths. Build and
+  # smoke-test only, never push.
+  # main: always built and smoke-tested, never pushed.
+  # v* tags: publish :X.Y.Z, :X.Y and :latest. Only a release moves
+  #          :latest, which is what the server runs by default (APP_TAG).
   image:
-    needs: [check, test-services, e2e, secrets]
-    if: github.event_name == 'push'
+    needs: [changes, check, test-services, e2e, secrets]
+    if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
