@@ -23,8 +23,13 @@ export const SuggestButton = ({ canSuggest }: { canSuggest: boolean }) => {
         setMessage({ text: result.error, error: true });
         return;
       }
+      // Foods Claude already found nothing for aren't tried again, so a run
+      // can have nothing left to try while foods still wait to be matched.
       setMessage({
-        text: `Suggested ${result.suggested} of ${result.tried}.`,
+        text:
+          result.tried === 0
+            ? "There's nothing left to suggest. Match the rest by hand."
+            : `Suggested ${result.suggested} of ${result.tried}.`,
         error: false,
       });
       router.refresh();
