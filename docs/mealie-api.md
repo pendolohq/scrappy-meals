@@ -43,6 +43,8 @@ until every place names the same version (`mealie-version.test.ts`).
 | Product photo | `POST /api/recipes/{slug}/image` `{ url, includeTags: false }`: Mealie downloads the image itself (see "Products") |
 | Find a product by barcode | `GET /api/recipes?queryFilter=extras.value = "<barcode>"`, then the detail of each hit |
 | Latest products | `GET /api/recipes?tags=product&orderBy=dateAdded&orderDirection=desc` |
+| Single foods by name | `GET /api/recipes?tags=food&search=` |
+| Search foods / one food | `GET /api/foods?search=`, `GET /api/foods/{id}` (404 when gone) |
 | Find by source URL | `GET /api/recipes?queryFilter=orgURL = "..."` |
 | Parse ingredients | `POST /api/parser/ingredients` (`parser: nlp`) |
 | Change some fields | `PATCH /api/recipes/{slug}` (fields left out are kept) |
@@ -267,13 +269,59 @@ keeps the first whose `extras.scrappyProduct` is the barcode. The barcode is
 digits only (asserted), as the filter syntax has no escape for quotes.
 
 **Discover and the add-meal picker** (both go through `discoverRecipes`). With
-no tag chosen and no search text, the query adds `tags.slug NOT IN ["product"]`
-to `queryFilter` (in brackets, joined to the quick filter with `AND`), so the
+no tag chosen and no search text, the query adds
+`tags.slug NOT IN ["product", "food"]` to `queryFilter` (in brackets, joined to the quick filter with `AND`), so the
 grid isn't buried in snack bars; recipes with no tags at all still match it.
 Choosing the Product tag lists them, and so does any search text, so a product
 is found by name. Products carry no meal tags, so the picker lifts the slot's
 default meal tag while a search is typed. `/api/recipes/search?products=1`
 returns the latest products for the Product tab.
+
+## Single foods
+
+A food with no barcode (a kiwi, a glass of milk, a cappuccino) is added by name
+from the Product tab ("No barcode? Add it by name") and saved as a one-line
+recipe by `createFoodRecipe` (`src/server/mealie/food-recipes.ts`): `POST
+/api/recipes` `{ name }`, then one `PATCH`.
+
+- One `recipeIngredient`: the Mealie food, the amount and a unit. Pieces have
+  **no unit** ("2 kiwi"), so the USDA check weighs them with the food's match's
+  piece weight and the shopping list counts them like any "2 kiwis". Grams and
+  millilitres use a Mealie unit whose standard is exactly 1 `gram` /
+  `milliliter` (`GET /api/units?perPage=-1`, the one abbreviated `g` / `ml`
+  first), else one created as `gram` / `milliliter`. The serving is counted
+  with that very unit, so the check weighs the line the same way.
+- `recipeServings: 1`, `recipeYield: "1 serving (1 piece (69 g))"`, nutrition
+  per that serving. A food counted by the piece is saved as one piece and
+  planned as that many servings.
+- `tags: [{ name: "Food" }]` (slug `food`, `FOOD_TAG`), outside `RECIPE_TAGS`
+  like Product. Discover and the add-meal picker leave it out the same way
+  (`tags.slug NOT IN ["product", "food"]`) until the tag is chosen or a search
+  is typed. The USDA check still counts these recipes.
+- `extras` (`food-state.ts`): `scrappyFood` (the Mealie food's id),
+  `scrappyFoodAmount`, `scrappyFoodUnit` (`piece` | `g` | `ml`),
+  `scrappyFoodGrams` (left out for millilitres of a food with no density),
+  plus `scrappyReview: done` and `scrappyNutrition`.
+- **Nutrition from USDA** (`source`): the server counts the line with the food's
+  USDA match exactly as the check does (`servingNutrition`), so the recipe
+  checks as a match. Saving confirms the match for the Mealie food, with the
+  piece weight picked from USDA's portions or typed, for every recipe that uses
+  it. Millilitres are weighed with the food's `scrappyGramsPerMl`, else a USDA
+  volume portion; with neither, the sheet asks for grams.
+- **Without a USDA match** (no `USDA_FDC_API_KEY`, or nothing fits): Claude's
+  estimate for the serving (`estimated`), or values typed in (`reviewed`). No
+  match is saved, so the check lists the food under "Can't check yet" until it
+  is matched on the foods page.
+- **Saving again reuses the recipe:** a food recipe with the same name (Mealie
+  names a second one "Kiwi (1)"), food, serving, nutrition and
+  `scrappyNutrition` is found through
+  `GET /api/recipes?tags=food&search=&perPage=-1` and planned instead of a new one, so a
+  retry after a failed add doesn't leave duplicates. The recipe is created
+  before the match is saved, and deleted if saving the match fails.
+- A food whose match is values typed in from a label (a negative id) is counted
+  from that stored match, with no USDA call; so is any food already matched,
+  which works without `USDA_FDC_API_KEY`.
+- In the plan, a single food is the adder's alone, like a product.
 
 ## Reviewing a recipe
 

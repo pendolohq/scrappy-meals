@@ -13,6 +13,7 @@ import {
 import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { slotRank, type SlotType } from "./domain/slots";
+import { isFoodRecipe } from "./domain/taxonomy";
 import { addDays, isoWeekday, weekDays } from "./domain/week";
 import { UserFacingError } from "./errors";
 import { getSnackSlots } from "./household";
@@ -65,6 +66,7 @@ export type PlannedMeal = {
     | "reviewState"
     | "nutritionSource"
     | "product"
+    | "tags"
   > | null;
 };
 
@@ -186,6 +188,7 @@ export async function getWeekPlan(
             reviewState: r.reviewState,
             nutritionSource: r.nutritionSource,
             product: r.product,
+            tags: r.tags,
           }
         : null,
     };
@@ -436,8 +439,8 @@ type NewMeal = {
  * Adds a recipe to a day's slot: a portion of 1 for every member, 0 for anyone
  * fasting that day. Anything already eaten off-plan is one person's: 1 for
  * whoever added it (even on a fast, since they ate it) and 0 for everyone else.
- * A planned product is the adder's snack: 1 for them unless they fast that day,
- * 0 for everyone else.
+ * A planned product or single food is the adder's: 1 for them unless they fast
+ * that day, 0 for everyone else.
  *
  * `unplanned` marks something already eaten off-plan, so it needs `today` (the
  * viewer's) and can't be a later day.
@@ -477,6 +480,8 @@ export async function addCheckedMeal(
     throw new PlanError(`Recipe "${input.slug}" was not found in Mealie`);
   }
 
+  const forOne = recipe.product !== null || isFoodRecipe(recipe.tags);
+
   const members = await db
     .select({ id: users.id, days: users.defaultFastingDays })
     .from(users);
@@ -509,7 +514,7 @@ export async function addCheckedMeal(
           const fasting = isFasting(m.days, input.date, override.get(m.id));
           const eats = unplanned
             ? m.id === input.createdBy
-            : recipe.product
+            : forOne
               ? m.id === input.createdBy && !fasting
               : !fasting;
           return {

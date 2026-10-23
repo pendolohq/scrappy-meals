@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { toRecipe } from "./recipes";
+import { createMealieClient } from "./client";
+import { discoverRecipes, toRecipe } from "./recipes";
 
 const base = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -125,5 +126,36 @@ describe("toRecipe", () => {
       standardQuantity: 1,
       standardUnit: "cup",
     });
+  });
+});
+
+describe("discoverRecipes", () => {
+  const filterOf = async (filters: Parameters<typeof discoverRecipes>[0]) => {
+    const urls: URL[] = [];
+    const client = createMealieClient({
+      baseUrl: "http://mealie.test",
+      token: "t",
+      fetch: async (input) => {
+        urls.push(
+          new URL(input instanceof Request ? input.url : String(input))
+        );
+        return Response.json({ items: [], total: 0 });
+      },
+    });
+    await discoverRecipes(filters, { client });
+    return urls[0]!.searchParams.get("queryFilter");
+  };
+  const none = { tags: [], categories: [], quick: false };
+
+  it("leaves products and single foods out when nothing is chosen", async () => {
+    expect(await filterOf(none)).toBe('tags.slug NOT IN ["product", "food"]');
+    expect(await filterOf({ ...none, quick: true })).toBe(
+      '(totalTimeSeconds > 0 AND totalTimeSeconds <= 1800) AND (tags.slug NOT IN ["product", "food"])'
+    );
+  });
+
+  it("brings them back with a tag or a search", async () => {
+    expect(await filterOf({ ...none, tags: ["food"] })).toBeNull();
+    expect(await filterOf({ ...none, search: "kiwi" })).toBeNull();
   });
 });

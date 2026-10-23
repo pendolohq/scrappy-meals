@@ -389,6 +389,37 @@ describe("lineResult", () => {
       });
     });
   });
+
+  describe("pieces", () => {
+    it("weighs a piece unit (or pezzi) with the match's piece weight", () => {
+      const kiwi = match(usdaFood(), { pieceGrams: 69 });
+      expect(lineResult(grams(2, unit("pieces")), kiwi)).toMatchObject({
+        kind: "counted",
+        grams: 138,
+      });
+      expect(lineResult(grams(3, unit("pezzi")), kiwi)).toMatchObject({
+        kind: "counted",
+        grams: 207,
+      });
+    });
+
+    it("prefers the food's own weight for the unit", () => {
+      const kiwi = match(usdaFood(), {
+        pieceGrams: 69,
+        unitGrams: { piece: 80 },
+      });
+      expect(lineResult(grams(1, unit("piece")), kiwi)).toMatchObject({
+        grams: 80,
+      });
+    });
+
+    it("needs an amount without a piece weight", () => {
+      expect(lineResult(grams(1, unit("piece")), match(usdaFood()))).toEqual({
+        kind: "needsAmount",
+        reason: "no weight for piece",
+      });
+    });
+  });
 });
 
 describe("isOutside", () => {

@@ -10,24 +10,29 @@ import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/input";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { parseBarcode } from "@/server/domain/barcode";
+import type { KnownFood } from "@/server/foods";
 import type { ProductLookup } from "@/server/products";
 
 import { attempt, failureText } from "../attempt";
 import { BarcodeScanner } from "../barcode-scanner";
 import { useRecipeList } from "../use-recipe-list";
 
+import { FoodSheet } from "./food/food-sheet";
+import { KnownFoodSheet } from "./known-food-sheet";
 import { ProductSheet } from "./product-sheet";
 import type { Slot } from "./sheet-props";
 
 /**
  * The Add dialog's Product mode: type a barcode, or tap one of the latest
- * products. A barcode opens the sheet to check and add it.
+ * products. A barcode opens the sheet to check and add it. A food with no
+ * barcode (a kiwi, a cappuccino) is added by name instead.
  */
 export const ProductTab = ({
   at,
   future,
   onAdded,
   initial,
+  initialFood,
 }: {
   at: Slot;
   /** The day is after today, so nothing can have been eaten yet. */
@@ -35,20 +40,25 @@ export const ProductTab = ({
   onAdded: () => void;
   /** A product picked elsewhere (recipe search): open its sheet straight away. */
   initial?: ProductLookup;
+  /** A single food picked elsewhere (recipe search): open its sheet straight away. */
+  initialFood?: KnownFood;
 }) => {
   const [barcode, setBarcode] = useState("");
   const [lookup, setLookup] = useState(initial);
+  const [byName, setByName] = useState(false);
+  const [food, setFood] = useState(initialFood);
   const [problem, setProblem] = useState<string>();
   const [pending, startTransition] = useTransition();
   const field = useRef<HTMLInputElement>(null);
-  const recent = useRecipeList("products=1", !lookup);
+  const sheetOpen = Boolean(lookup || byName || food);
+  const recent = useRecipeList("products=1", !sheetOpen);
 
   // Back from a sheet, the field is there again for the next barcode.
   useEffect(() => {
-    if (!lookup) {
+    if (!sheetOpen) {
       field.current?.focus();
     }
-  }, [lookup]);
+  }, [sheetOpen]);
 
   const find = (code = barcode) => {
     setProblem(undefined);
@@ -78,6 +88,34 @@ export const ProductTab = ({
         setProblem(failureText(res));
       }
     });
+
+  if (food) {
+    return (
+      <div className="p-4">
+        <KnownFoodSheet
+          food={food}
+          at={at}
+          future={future}
+          onAdded={onAdded}
+          onBack={() => setFood(undefined)}
+        />
+      </div>
+    );
+  }
+
+  if (byName) {
+    return (
+      <div className="p-4">
+        <FoodSheet
+          at={at}
+          future={future}
+          onAdded={onAdded}
+          onBack={() => setByName(false)}
+          onKnown={setFood}
+        />
+      </div>
+    );
+  }
 
   if (lookup) {
     return (
@@ -137,6 +175,9 @@ export const ProductTab = ({
           </p>
         )}
       </form>
+      <Button variant="ghost" block onClick={() => setByName(true)}>
+        No barcode? Add it by name
+      </Button>
 
       {recent.items.length > 0 && (
         <section className="space-y-1" aria-label="Recent products">

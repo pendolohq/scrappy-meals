@@ -8,9 +8,16 @@ import { userAction } from "@/server/action";
 import { getDb } from "@/server/db/client";
 import { ADHERENCE_STATUSES } from "@/server/domain/adherence";
 import { parseBarcode } from "@/server/domain/barcode";
+import { FOOD_UNITS } from "@/server/domain/food";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
 import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
+import {
+  findFoods,
+  loadKnownFood,
+  loadUsdaFood,
+  saveFood,
+} from "@/server/foods";
 import { contributeProduct } from "@/server/off-contribute";
 import {
   addCheckedMeal,
@@ -182,6 +189,97 @@ export const saveProductAction = userAction(
     }
     refreshWeek(date);
     return { slug };
+  }
+);
+
+/** Foods added before and Mealie's foods for a name typed on the food sheet. */
+export const findFoodsAction = userAction(
+  z.object({ name: z.string().trim().min(1).max(120) }),
+  ({ name }) => findFoods(name)
+);
+
+/** A food added before, picked by slug from search or the food sheet. */
+export const loadFoodAction = userAction(
+  z.object({ slug: recipeSlug }),
+  ({ slug }) => loadKnownFood(slug)
+);
+
+/** A USDA food with its portions, to weigh a serving on the food sheet. */
+export const usdaFoodAction = userAction(
+  z.object({ fdcId: z.number().int().positive() }),
+  async ({ fdcId }, user) => ({ food: await loadUsdaFood(fdcId, user.id) })
+);
+
+const grams = z.number().min(0.1).max(5000);
+
+/**
+ * Saves a single food in Mealie and adds it to the day in one go. Matches
+ * and foods are household-wide, like plan edits.
+ */
+export const saveFoodAction = userAction(
+  z.object({
+    name: z.string().trim().min(1).max(120),
+    food: z.union([
+      z.object({ id: z.uuid() }),
+      z.object({ create: z.string().trim().min(1).max(120) }),
+    ]),
+    serving: z.object({
+      amount: z.number().min(0.01).max(5000),
+      unit: z.enum(FOOD_UNITS),
+    }),
+    pieceGrams: grams.nullable(),
+    pieceLabel: z.string().trim().max(100).nullable(),
+    nutrition: z.discriminatedUnion("from", [
+      // A food's match to values typed in from a label has a negative id.
+      z.object({
+        from: z.literal("usda"),
+        fdcId: z
+          .number()
+          .int()
+          .refine((n) => n !== 0),
+      }),
+      z.object({
+        from: z.literal("own"),
+        perServing: z.object({
+          kcal: z.number().min(0).max(5000),
+          protein: macroAmount(500),
+          carbs: macroAmount(500),
+          fat: macroAmount(500),
+          fibre: macroAmount(500),
+        }),
+        estimated: z.boolean(),
+      }),
+    ]),
+    date,
+    slot,
+    snackIndex,
+    baseServings,
+    alreadyHad: z.boolean(),
+  }),
+  async (
+    { date, slot, snackIndex, baseServings, alreadyHad, ...food },
+    user
+  ) => {
+    const meal = {
+      date,
+      slot,
+      snackIndex,
+      baseServings,
+      unplanned: alreadyHad,
+      today: await viewerToday(),
+    };
+    // Before anything is created in Mealie.
+    await checkNewMeal(getDb(), meal);
+    const slug = await saveFood(food, user.id);
+    await addCheckedMeal(getDb(), { ...meal, slug, createdBy: user.id });
+    // Saving from USDA confirms the food's match, which the checks count with.
+    revalidatePath("/recipes/nutrition-check", "layout");
+    refreshWeek(date);
+    return { slug };
+  },
+  {
+    invalid: () =>
+      "Amounts must be numbers above 0, and the calories are needed.",
   }
 );
 

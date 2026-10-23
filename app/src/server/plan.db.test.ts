@@ -910,6 +910,30 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       expect(soup.portions).toEqual({ [a.id]: 1, [b.id]: 1 });
     });
 
+    it("gives a single food to whoever added it, like a product", async () => {
+      const { a, b } = await twoUsers();
+      const fetch = vi.fn<RecipeFetcher>(async (slug: string) => ({
+        ...recipe(slug),
+        tags: [{ name: "Food", slug: "food" }],
+      }));
+      await addMeal(
+        db,
+        {
+          date: today,
+          slot: "breakfast",
+          slug: "kiwi",
+          createdBy: b.id,
+          today,
+        },
+        { fetch }
+      );
+
+      const plan = await getWeekPlan(db, "2026-10-19", { fetch });
+      const [kiwi] = plan.days.flatMap((d) => d.meals);
+      expect(kiwi.portions).toEqual({ [a.id]: 0, [b.id]: 1 });
+      expect(kiwi.recipe?.tags).toEqual([{ name: "Food", slug: "food" }]);
+    });
+
     it("gives an unplanned recipe to whoever added it alone", async () => {
       const { a, b } = await twoUsers();
       await add(a.id, { slug: "soup", unplanned: true });

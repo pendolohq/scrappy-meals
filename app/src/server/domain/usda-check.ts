@@ -115,10 +115,14 @@ const canonical = (name: string) => {
   return UNIT_ALIASES[n] ?? n;
 };
 
+const PIECE = "piece";
+
 /** How a unit is stored in `unitGrams`: "Cloves" and "spicchi" are both "clove". */
 export const unitKey = (unit: { name: string }) => canonical(unit.name);
 
-const volumeMl = (p: UsdaPortion) => VOLUME_ML[p.measure.trim().toLowerCase()];
+/** Millilitres in one of the portion's measure; undefined when it isn't a volume. */
+export const volumeMl = (p: UsdaPortion): number | undefined =>
+  VOLUME_ML[p.measure.trim().toLowerCase()];
 
 /**
  * Per 100 g as the app counts it: carbs without fibre, as on UK and EU labels
@@ -218,9 +222,14 @@ export function lineResult(
     const portion = usda.portions.find((p) =>
       names.includes(canonical(p.measure))
     );
-    return portion
-      ? counted(quantity * portion.grams)
-      : needsAmount(`no weight for ${unit.name.trim()}`);
+    if (portion) {
+      return counted(quantity * portion.grams);
+    }
+    // "2 pieces kiwi" is "2 kiwis" written with a unit.
+    if (names.includes(PIECE) && match.pieceGrams) {
+      return counted(quantity * match.pieceGrams);
+    }
+    return needsAmount(`no weight for ${unit.name.trim()}`);
   }
   return match.pieceGrams
     ? counted(quantity * match.pieceGrams)
@@ -248,7 +257,8 @@ export type RecipeCheck = {
   needsAmount: { display: string; reason: string }[];
 };
 
-const round = (macro: MacroKey, value: number) =>
+/** How the check rounds a macro: whole kcal, grams to one decimal. */
+export const roundMacro = (macro: MacroKey, value: number) =>
   macro === "kcal" ? Math.round(value) : Math.round(value * 10) / 10;
 
 const sameFigures = (a: Partial<Macros>, b: Partial<Macros>) =>
@@ -335,7 +345,7 @@ export function checkRecipe(
   const usdaPerServing: Partial<Macros> = {};
   for (const key of MACRO_KEYS) {
     if (!unknown.has(key)) {
-      usdaPerServing[key] = round(key, (total[key] ?? 0) / servings);
+      usdaPerServing[key] = roundMacro(key, (total[key] ?? 0) / servings);
     }
   }
   const outside = MACRO_KEYS.filter((key) => {

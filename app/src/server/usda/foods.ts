@@ -98,12 +98,24 @@ export async function saveOwnFood(
   return row!.fdcId;
 }
 
-/** Every saved match with its cached USDA food, by Mealie food id. */
-export async function listMatches(db: Db): Promise<Map<string, StoredMatch>> {
+/**
+ * Every saved match with its cached USDA food, by Mealie food id; only those
+ * of `foodIds` when given.
+ */
+export async function listMatches(
+  db: Db,
+  foodIds?: string[]
+): Promise<Map<string, StoredMatch>> {
+  if (foodIds?.length === 0) {
+    return new Map();
+  }
   const rows = await db
     .select()
     .from(usdaFoodMatches)
-    .innerJoin(usdaFoods, eq(usdaFoodMatches.fdcId, usdaFoods.fdcId));
+    .innerJoin(usdaFoods, eq(usdaFoodMatches.fdcId, usdaFoods.fdcId))
+    .where(
+      foodIds ? inArray(usdaFoodMatches.mealieFoodId, foodIds) : undefined
+    );
   return new Map(
     rows.map(({ usda_food_matches: m, usda_foods: f }) => [
       m.mealieFoodId,
