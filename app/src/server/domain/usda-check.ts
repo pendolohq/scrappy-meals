@@ -20,6 +20,8 @@ export type FoodMatch = {
    * units that are neither a weight nor a volume.
    */
   unitGrams: Record<string, number>;
+  /** Grams to count for a line with no amount; null leaves such lines out. */
+  defaultGrams: number | null;
   food: UsdaFood;
 };
 
@@ -29,7 +31,13 @@ export type LineResult =
   | { kind: "notCounted" }
   | { kind: "needsAmount"; reason: string }
   | { kind: "unmatched"; foodId: string; foodName: string }
-  | { kind: "counted"; grams: number; macros: Partial<Macros> };
+  | {
+      kind: "counted";
+      grams: number;
+      macros: Partial<Macros>;
+      /** The line gave no amount: `grams` is the food's default. */
+      assumed?: true;
+    };
 
 /** A macro is outside when Mealie and USDA differ by more than the larger of these. */
 export const CHECK_THRESHOLD = {
@@ -154,11 +162,23 @@ export function lineResult(
       : needsAmount("not parsed");
   }
   const { quantity, unit } = line;
-  // Matched or not, there's nothing to weigh; a food with next to no
-  // nutrients (salt, water) isn't worth listing.
+  // Nothing to weigh: a food with next to no nutrients (salt, water) counts
+  // as 0 g, a food with a default amount counts that and says so, and any
+  // other line is left out, matched or not.
   if (quantity === null) {
-    return match?.status === "confirmed" && isNegligible(match.food.per100g)
-      ? { kind: "counted", grams: 0, macros: scale(match.food, 0) }
+    if (match?.status !== "confirmed") {
+      return { kind: "notCounted" };
+    }
+    if (isNegligible(match.food.per100g)) {
+      return { kind: "counted", grams: 0, macros: scale(match.food, 0) };
+    }
+    return match.defaultGrams
+      ? {
+          kind: "counted",
+          grams: match.defaultGrams,
+          macros: scale(match.food, match.defaultGrams),
+          assumed: true,
+        }
       : { kind: "notCounted" };
   }
   if (match?.status !== "confirmed") {
@@ -217,6 +237,8 @@ export type RecipeCheck = {
   nothingToCount: boolean;
   /** Lines with no amount, left out of the total. */
   notCounted: string[];
+  /** Lines with no amount, counted at their food's default amount. */
+  assumed: { display: string; grams: number }[];
   unmatchedFoods: { id: string; name: string }[];
   needsAmount: { display: string; reason: string }[];
 };
@@ -249,6 +271,7 @@ export function checkRecipe(
   const unmatched = new Map<string, string>();
   const missingAmount: RecipeCheck["needsAmount"] = [];
   const notCounted: string[] = [];
+  const assumed: RecipeCheck["assumed"] = [];
   const total: Partial<Macros> = {};
   const unknown = new Set<MacroKey>();
   let grams = 0;
@@ -261,6 +284,9 @@ export function checkRecipe(
       missingAmount.push({ display, reason: result.reason });
     } else if (result.kind === "counted") {
       grams += result.grams;
+      if (result.assumed) {
+        assumed.push({ display, grams: result.grams });
+      }
       for (const key of MACRO_KEYS) {
         const value = result.macros[key];
         if (value !== undefined) {
@@ -282,6 +308,7 @@ export function checkRecipe(
     noServings: recipe.servings === null,
     nothingToCount,
     notCounted,
+    assumed,
     unmatchedFoods: [...unmatched].map(([id, name]) => ({ id, name })),
     needsAmount: missingAmount,
   };

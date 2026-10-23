@@ -37,7 +37,9 @@ const Outcome = ({ result }: { result: LineResult }) => {
     case "counted":
       return (
         <span className="text-sm text-muted">
-          {Math.round(result.grams * 10) / 10} g{" · "}
+          {Math.round(result.grams * 10) / 10} g
+          {result.assumed && " (no amount given, assumed)"}
+          {" · "}
           {MACRO_KEYS.filter((m) => result.macros[m] !== undefined)
             .map((m) => showMacro(m, result.macros[m]))
             .join(" · ")}
@@ -165,6 +167,15 @@ export default async function NutritionCheckRecipePage({
               ))}
             </tbody>
           </table>
+          {check.assumed.length > 0 && (
+            <p className="text-sm text-muted">
+              Assumed, as they give no amount:{" "}
+              {check.assumed
+                .map((a) => `${a.display} (${Math.round(a.grams * 10) / 10} g)`)
+                .join(", ")}
+              .
+            </p>
+          )}
           {check.notCounted.length > 0 && (
             <p className="text-sm text-muted">
               Not counted, as they have no amount: {check.notCounted.join(", ")}

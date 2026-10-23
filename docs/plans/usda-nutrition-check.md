@@ -53,9 +53,11 @@ For each recipe ingredient (the cached `Ingredient`), in order:
 
 1. A heading or blank line (no food, empty text): skipped.
 2. No food but some text (unparsed): **needs an amount**, "not parsed".
-3. No quantity ("olive oil, to taste"): matched or not, **not counted**. The recipe is
-   still checked and lists the line, except for a confirmed food that is negligible (≤ 5
-   kcal and every macro ≤ 0.5 g per 100 g: salt, water), which counts as 0 g silently.
+3. No quantity ("olive oil, to taste"): a confirmed food that is negligible (≤ 5 kcal and
+   every macro ≤ 0.5 g per 100 g: salt, water) counts as 0 g silently; a confirmed food with
+   a default amount (`default_grams`, set on the Foods page, e.g. olive oil 10 g) counts that
+   and the recipe lists it as **assumed**; anything else, matched or not, is **not counted**
+   and listed. None of these stop the recipe from being checked.
 4. A food with no confirmed match: listed under the recipe's **unmatched foods**.
 5. A weight unit (`measure()` in `domain/units.ts` gives g): those grams.
 6. A volume unit (`measure()` gives ml): × the food's `gramsPerMl` (Mealie extra), else ×

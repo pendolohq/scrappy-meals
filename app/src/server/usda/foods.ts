@@ -113,6 +113,7 @@ export async function listMatches(db: Db): Promise<Map<string, StoredMatch>> {
         pieceGrams: m.pieceGrams,
         pieceLabel: m.pieceLabel,
         unitGrams: m.unitGrams,
+        defaultGrams: m.defaultGrams,
         foodName: m.foodName,
         food: toFood(f),
       },
@@ -128,6 +129,7 @@ export type MatchInput = {
   pieceGrams: number | null;
   pieceLabel: string | null;
   unitGrams: Record<string, number>;
+  defaultGrams: number | null;
 };
 
 /** Saves the match for a food, replacing the one it had. The USDA food must be cached. */
@@ -153,7 +155,10 @@ export async function saveMatch(
  */
 export async function saveSuggestion(
   db: Db,
-  match: Omit<MatchInput, "status" | "pieceGrams" | "pieceLabel" | "unitGrams">,
+  match: Omit<
+    MatchInput,
+    "status" | "pieceGrams" | "pieceLabel" | "unitGrams" | "defaultGrams"
+  >,
   userId: string
 ): Promise<boolean> {
   const saved = await db

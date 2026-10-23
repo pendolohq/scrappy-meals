@@ -328,6 +328,7 @@ describe.skipIf(!testDbUrl)("saveOwnValues (Postgres)", () => {
     gramsPerTbsp: 5,
     pieceGrams: null,
     unitGrams: {},
+    defaultGrams: null,
     ...over,
   });
 

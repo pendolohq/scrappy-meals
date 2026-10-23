@@ -45,6 +45,7 @@ export const confirmMatchAction = userAction(
     unitGrams: z
       .record(z.string().trim().min(1).max(40), weight)
       .refine((r) => Object.keys(r).length <= 20),
+    defaultGrams: weight.nullable(),
   }),
   async (input, user) => {
     await confirmMatch(getDb(), input, user.id);
@@ -72,6 +73,7 @@ export const saveOwnValuesAction = userAction(
     unitGrams: z
       .record(z.string().trim().min(1).max(40), weight)
       .refine((r) => Object.keys(r).length <= 20),
+    defaultGrams: weight.nullable(),
   }),
   async (input, user) => {
     await saveOwnValues(getDb(), input, user.id);
