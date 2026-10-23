@@ -84,6 +84,9 @@ function deps(over: Partial<Deps> = {}) {
     .fn<(slug: string) => Promise<void>>()
     .mockResolvedValue();
   const takeUsdaLookup = vi.fn<(userId: string) => void>();
+  const setNoShopping = vi
+    .fn<(slug: string, on: boolean) => Promise<void>>()
+    .mockResolvedValue();
   const takeUsdaMatch = vi.fn<(userId: string) => void>();
   const usdaFood = vi
     .fn<Deps["usdaFood"]>()
@@ -102,6 +105,7 @@ function deps(over: Partial<Deps> = {}) {
     getRawRecipe: async () => null,
     lineUnit: async (unit) => (unit === "g" ? GRAM : ML),
     findRecipe: async () => null,
+    setNoShopping,
     create,
     deleteRecipe,
     matchesFor,
@@ -118,6 +122,7 @@ function deps(over: Partial<Deps> = {}) {
     create,
     saveMatch,
     deleteRecipe,
+    setNoShopping,
     takeUsdaLookup,
     takeUsdaMatch,
     usdaFood,
@@ -136,6 +141,7 @@ const fromUsda = (over: Partial<SaveFoodInput> = {}): SaveFoodInput => ({
   pieceGrams: null,
   pieceLabel: null,
   nutrition: { from: "usda", fdcId: usdaKiwi.fdcId },
+  noShopping: false,
   ...over,
 });
 
@@ -251,6 +257,7 @@ describe("saveFood from USDA", () => {
       serving: { amount: 1, unit: "piece", grams: 69 },
       perServing: { kcal: 42, protein: 0.8, carbs: 8, fat: 0.4, fibre: 2.1 },
       nutrition: "source",
+      noShopping: false,
     });
   });
 
@@ -364,9 +371,12 @@ describe("saveFood from USDA", () => {
   });
 
   it("reuses the same food saved before instead of making another", async () => {
-    const findRecipe = vi.fn<Deps["findRecipe"]>().mockResolvedValue("kiwi-1");
+    const findRecipe = vi
+      .fn<Deps["findRecipe"]>()
+      .mockResolvedValue({ slug: "kiwi-1", noShopping: false });
     const d = deps({ matchesFor: matched(stored()), findRecipe });
     await expect(saveFood(fromUsda(), USER, d.all)).resolves.toBe("kiwi-1");
+    expect(d.setNoShopping).not.toHaveBeenCalled();
     expect(findRecipe).toHaveBeenCalledWith(
       "Kiwi",
       { foodId: kiwi.id, amount: 1, unit: "piece", grams: 69 },
@@ -375,6 +385,15 @@ describe("saveFood from USDA", () => {
     );
     expect(d.create).not.toHaveBeenCalled();
     expect(d.saveMatch).toHaveBeenCalled();
+  });
+
+  it("applies the shopping tick to a food reused from before", async () => {
+    const d = deps({
+      matchesFor: matched(stored()),
+      findRecipe: async () => ({ slug: "kiwi-1", noShopping: false }),
+    });
+    await saveFood(fromUsda({ noShopping: true }), USER, d.all);
+    expect(d.setNoShopping).toHaveBeenCalledWith("kiwi-1", true);
   });
 
   it("creates the recipe before saving the match, and removes it if that fails", async () => {
@@ -427,6 +446,7 @@ describe("saveFood from USDA", () => {
 describe("saveFood with its own values", () => {
   const own = (over: Partial<SaveFoodInput> = {}): SaveFoodInput => ({
     name: "Oat flat white",
+    noShopping: true,
     food: { create: "oat flat white" },
     serving: { amount: 180, unit: "ml" },
     pieceGrams: null,
@@ -448,6 +468,7 @@ describe("saveFood with its own values", () => {
         serving: { amount: 180, unit: "ml", grams: null },
         perServing: { kcal: 110, protein: 1.5, carbs: 13, fat: 5.5 },
         nutrition: "estimated",
+        noShopping: true,
       })
     );
     expect(d.takeUsdaMatch).not.toHaveBeenCalled();

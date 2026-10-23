@@ -10,6 +10,7 @@ import type { KnownFood } from "@/server/foods";
 
 import { attempt } from "../../attempt";
 import { AlreadyHad } from "../already-had";
+import { NoShopping } from "../no-shopping";
 import { Notice } from "../notice";
 import { nutritionLine } from "../nutrition";
 import type { SheetProps } from "../sheet-props";
@@ -50,6 +51,8 @@ export const FoodSheet = ({
   const form = useServingForm();
   const choice = useFoodChoice({ work, onKnown, onUsda: form.startPiece });
   const [alreadyHad, setAlreadyHad] = useState(!future);
+  // Most foods added by name are bought out; fruit is unticked.
+  const [noShopping, setNoShopping] = useState(true);
 
   const { found, picked, source } = choice;
   const { pending } = work;
@@ -105,6 +108,7 @@ export const FoodSheet = ({
           pieceGrams: pieces ? piece : null,
           pieceLabel: pieces ? form.pieceLabel : null,
           nutrition,
+          noShopping,
           baseServings: pieces ? serving.amount : 1,
           alreadyHad: alreadyHad && !future,
         })
@@ -187,6 +191,7 @@ export const FoodSheet = ({
             />
           )}
 
+          <NoShopping checked={noShopping} onChange={setNoShopping} />
           <AlreadyHad
             checked={alreadyHad}
             future={future}

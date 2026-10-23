@@ -20,6 +20,7 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   categories: [],
   totalMinutes: null,
   product: null,
+  noShopping: false,
   nutrition: { perServing: {}, missing: [], status: "missing" },
   ...over,
 });

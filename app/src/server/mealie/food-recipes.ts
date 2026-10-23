@@ -19,6 +19,7 @@ import {
   NUTRITION_FIELDS,
 } from "./nutrition";
 import { foodDensity, type Ingredient, listFoodRecipes } from "./recipes";
+import { readNoShopping, withNoShopping } from "./shopping-state";
 
 export type FoodRecipeInput = {
   name: string;
@@ -30,6 +31,8 @@ export type FoodRecipeInput = {
   perServing: Partial<Macros>;
   /** `source` when counted from USDA; `estimated` by Claude; `reviewed` when typed or edited. */
   nutrition: "source" | "estimated" | "reviewed";
+  /** Leave it off the shopping list (a cappuccino from the café). */
+  noShopping: boolean;
 };
 
 const toFood = (f: {
@@ -134,7 +137,7 @@ export async function findFoodRecipe(
   perServing: Partial<Macros>,
   nutrition: FoodRecipeInput["nutrition"],
   opts: { client?: MealieClient } = {}
-): Promise<string | null> {
+): Promise<{ slug: string; noShopping: boolean } | null> {
   const client = opts.client ?? mealie();
   const wanted = baseName(name);
   // Every match: Mealie's search is fuzzy, so the one saved before may rank
@@ -160,7 +163,7 @@ export async function findFoodRecipe(
       found.amount === state.amount &&
       found.grams === state.grams
     ) {
-      return item.slug;
+      return { slug: item.slug, noShopping: readNoShopping(raw?.extras) };
     }
   }
   return null;
@@ -216,7 +219,10 @@ export async function createFoodRecipe(
         ),
         tags: [{ name: FOOD_TAG.name }],
         extras: withImportState(
-          withFoodState({}, { ...input.serving, foodId: input.food.id }),
+          withNoShopping(
+            withFoodState({}, { ...input.serving, foodId: input.food.id }),
+            input.noShopping
+          ),
           { review: "done", nutrition: input.nutrition }
         ),
       },

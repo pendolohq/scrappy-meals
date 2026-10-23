@@ -1,0 +1,1 @@
+ALTER TABLE "recipe_cache" ADD COLUMN "no_shopping" boolean DEFAULT false NOT NULL;

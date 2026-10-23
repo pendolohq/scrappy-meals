@@ -31,6 +31,7 @@ import {
 } from "./mealie/recipes";
 import { estimatingEnabled } from "./nutrition-estimate";
 import { whenMealieAnswers } from "./recipe-review";
+import { setNoShopping } from "./recipe-shopping";
 import { usdaClient, usdaEnabled } from "./usda/client";
 import {
   ensureFoods,
@@ -78,6 +79,8 @@ export type SaveFoodInput = {
   nutrition:
     | { from: "usda"; fdcId: number }
     | { from: "own"; perServing: Partial<Macros>; estimated: boolean };
+  /** Leave it off the shopping list: on for a coffee at the café, off for fruit. */
+  noShopping: boolean;
 };
 
 type Deps = {
@@ -94,7 +97,9 @@ type Deps = {
     state: FoodState,
     perServing: Partial<Macros>,
     nutrition: FoodRecipeInput["nutrition"]
-  ) => Promise<string | null>;
+  ) => Promise<{ slug: string; noShopping: boolean } | null>;
+  /** Keeps a recipe off the shopping list, or puts it back. */
+  setNoShopping: (slug: string, on: boolean) => Promise<void>;
   create: (input: FoodRecipeInput) => Promise<string>;
   deleteRecipe: (slug: string) => Promise<void>;
   /** The saved matches of these Mealie foods, by food id. */
@@ -119,6 +124,7 @@ const defaults = (): Deps => ({
   lineUnit: (unit) => findLineUnit(unit),
   findRecipe: (name, state, perServing, nutrition) =>
     findFoodRecipe(name, state, perServing, nutrition),
+  setNoShopping: (slug, on) => setNoShopping(slug, on),
   create: (input) => createFoodRecipe(input),
   deleteRecipe: (slug) => deleteRecipe(slug),
   matchesFor: (foodIds) => listMatches(getDb(), foodIds),
@@ -268,7 +274,7 @@ export async function saveFood(
     }
 
     let match: MatchInput | null = null;
-    let recipe: Omit<FoodRecipeInput, "name" | "food" | "unit">;
+    let recipe: Omit<FoodRecipeInput, "name" | "food" | "unit" | "noShopping">;
     if (nutrition.from === "usda") {
       const current = (await d.matchesFor([food.id])).get(food.id);
       const same = current?.fdcId === nutrition.fdcId;
@@ -339,12 +345,17 @@ export async function saveFood(
       recipe.perServing,
       recipe.nutrition
     );
+    // The tick on the sheet is the latest word on whether it's bought.
+    if (existing && existing.noShopping !== input.noShopping) {
+      await d.setNoShopping(existing.slug, input.noShopping);
+    }
     const slug =
-      existing ??
+      existing?.slug ??
       (await d.create({
         name: input.name,
         food: { id: food.id, name: food.name },
         unit,
+        noShopping: input.noShopping,
         ...recipe,
       }));
     if (match) {

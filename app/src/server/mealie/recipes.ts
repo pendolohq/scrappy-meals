@@ -17,6 +17,7 @@ import { type ImportState, readImportState } from "./import-state";
 import { normaliseNutrition, type RecipeNutrition } from "./nutrition";
 import { readProductState } from "./product-state";
 import type { components } from "./schema";
+import { readNoShopping } from "./shopping-state";
 
 type MealieRecipe = components["schemas"]["Recipe-Output"];
 type MealieSummary = components["schemas"]["RecipeSummary"];
@@ -102,6 +103,8 @@ export type Recipe = RecipeSummaryFields & {
   categories: Organizer[];
   /** Set for a packaged product: its barcode and what one serving is. */
   product: ProductInfo | null;
+  /** The shopping list leaves it out (`scrappyNoShopping`). */
+  noShopping: boolean;
 };
 
 export type RecipePage = { items: RecipeListItem[] };
@@ -324,6 +327,7 @@ export function toRecipe(r: MealieRecipe): Recipe {
     tags: (r.tags ?? []).map(toOrganizer),
     categories: (r.recipeCategory ?? []).map(toOrganizer),
     product: readProductState(r.extras),
+    noShopping: readNoShopping(r.extras),
   };
 }
 

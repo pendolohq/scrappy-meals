@@ -21,6 +21,7 @@ const fetch = async (slug: string): Promise<Recipe> => ({
   categories: [],
   totalMinutes: null,
   product: null,
+  noShopping: false,
   nutrition: {
     perServing: {},
     missing: ["kcal", "protein", "carbs", "fat", "fibre"],

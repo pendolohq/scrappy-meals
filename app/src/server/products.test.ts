@@ -55,6 +55,7 @@ const productRecipe = (): Recipe => ({
     status: "partial",
   },
   product: info,
+  noShopping: false,
 });
 
 const offFound = (fixture: "snickers" | "grenade-multipack") =>

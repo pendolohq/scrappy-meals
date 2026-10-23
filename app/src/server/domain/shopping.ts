@@ -14,6 +14,8 @@ export type MealForShopping = {
     ingredients: Ingredient[];
     /** Set for a packaged product, which is bought as itself, not as ingredients. */
     product: ProductInfo | null;
+    /** Not bought for home (a cappuccino at the café): left off the list. */
+    noShopping: boolean;
   } | null;
   slug: string;
   baseServings: number;
@@ -114,6 +116,9 @@ export function buildShoppingList(meals: MealForShopping[]): WeekIngredients {
       continue;
     }
     const { recipe } = meal;
+    if (recipe.noShopping) {
+      continue;
+    }
     if (recipe.product) {
       const total = products.get(recipe.id) ?? {
         id: recipe.id,

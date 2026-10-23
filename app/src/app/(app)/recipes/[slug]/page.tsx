@@ -12,6 +12,7 @@ import {
   RecipeFacts,
   RecipeNotes,
 } from "@/components/recipe/recipe-details";
+import { ShoppingToggle } from "@/components/recipe/shopping-toggle";
 import { RecipeImage } from "@/components/ui/recipe-image";
 import { formatPortion } from "@/lib/format";
 import { getDb } from "@/server/db/client";
@@ -115,6 +116,7 @@ export default async function RecipePage({
           slots={slots}
           suggested={suggested}
         />
+        <ShoppingToggle slug={recipe.slug} noShopping={recipe.noShopping} />
       </header>
 
       <RecipeCooking

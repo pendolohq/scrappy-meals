@@ -58,6 +58,7 @@ const soup: Recipe = {
   totalMinutes: null,
   nutrition: { perServing: {}, missing: [], status: "missing" },
   product: null,
+  noShopping: false,
 };
 
 const uuid = (n: number) =>
@@ -110,6 +111,37 @@ describe.skipIf(!testDbUrl)("shop list (Postgres)", () => {
       [parsley, "plan", false],
     ]);
     expect(items[0]).toMatchObject({ text: "lentils", amount: "400 g" });
+  });
+
+  it("leaves out a recipe kept off the shopping list, through the cache", async () => {
+    const user = await planned();
+    const cappuccino: Recipe = {
+      ...soup,
+      id: uuid(9),
+      slug: "cappuccino",
+      name: "Cappuccino",
+      ingredients: [ing({ quantity: 180, food: lentils, unit: g })],
+      noShopping: true,
+    };
+    const both = vi.fn<RecipeFetcher>(async (slug) =>
+      slug === "cappuccino" ? cappuccino : soup
+    );
+    await addMeal(
+      db,
+      {
+        date: "2026-10-21",
+        slot: "breakfast",
+        slug: "cappuccino",
+        createdBy: user.id,
+      },
+      { fetch: both }
+    );
+
+    const { plan } = await weekShopList(db, WEEK, { fetch: both });
+    // Only the soup's 400 g: the cappuccino's 180 g aren't added on.
+    expect(plan.lines.find((l) => l.key === "f-lentils")?.amounts).toEqual([
+      { quantity: 400, unit: "g", standard: "gram" },
+    ]);
   });
 
   it("is empty for a week with nothing planned", async () => {
