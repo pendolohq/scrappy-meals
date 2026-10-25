@@ -90,7 +90,7 @@ test("plans, logs and shops a meal, and keeps the week readable offline", async 
   const moveDay = addDays(nextWeek, copyDay === nextWeek ? 1 : 0);
   await page.goto(`/plan/${nextWeek}`);
   await page.getByRole("button", { name: "Copy last week" }).click();
-  await expect(page.getByText("Copied 1 meal.")).toBeVisible();
+  await expect(page.getByText("Copied 1 meal from last week")).toBeVisible();
   await page.goto(`/week/${nextWeek}#${copyDay}`);
   await expect(
     page

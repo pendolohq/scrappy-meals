@@ -4,11 +4,13 @@ import { after } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { CopyLastWeek } from "@/components/plan/copy-last-week";
 import { PlanDay } from "@/components/plan/plan-day";
+import { UndoChange } from "@/components/plan/undo-change";
 import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
 import { addDays } from "@/server/domain/week";
 import { getWeekPlan, hasMeals } from "@/server/plan";
+import { latestChange } from "@/server/plan-changes";
 import { requireUser } from "@/server/session";
 import { viewerToday } from "@/server/today";
 
@@ -24,9 +26,10 @@ export default async function PlanPage({
 }) {
   const user = await requireUser();
   const weekStart = canonicalWeek((await params).weekStart, "", "/plan");
-  const [plan, lastWeekHasMeals] = await Promise.all([
+  const [plan, lastWeekHasMeals, change] = await Promise.all([
     getWeekPlan(getDb(), weekStart, { defer: after }),
     hasMeals(getDb(), addDays(weekStart, -7)),
+    latestChange(getDb(), weekStart),
   ]);
   const now = await viewerToday();
 
@@ -39,6 +42,7 @@ export default async function PlanPage({
         </Link>
       </WeekHeader>
       {lastWeekHasMeals && <CopyLastWeek weekStart={weekStart} />}
+      <UndoChange change={change} />
 
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>

@@ -15,9 +15,10 @@ import { isFasting } from "./domain/fasting";
 import { slotRank, type SlotType } from "./domain/slots";
 import { isFoodRecipe } from "./domain/taxonomy";
 import { addDays, isoWeekday, weekDays } from "./domain/week";
-import { UserFacingError } from "./errors";
+import { PlanError } from "./errors";
 import { getSnackSlots } from "./household";
 import { isMealieUnavailable } from "./mealie/client";
+import { lockWeek, recordChange } from "./plan-changes";
 import {
   type CachedRecipe,
   type Defer,
@@ -25,9 +26,7 @@ import {
   type RecipeFetcher,
 } from "./recipe-cache";
 
-export class PlanError extends UserFacingError {
-  name = "PlanError";
-}
+export { PlanError };
 
 export type Member = {
   id: string;
@@ -620,10 +619,12 @@ const inWeek = (weekStart: string) =>
   );
 
 export type CopyResult = {
-  /** The new meals' ids, to undo the copy. */
+  /** The new meals' ids. */
   copied: string[];
   /** Meals left out because their slot already had something planned. */
   skipped: number;
+  /** The change-log entry that undoes the copy; null when nothing was copied. */
+  changeId: string | null;
 };
 
 /**
@@ -644,6 +645,7 @@ export async function copyWeek(
   const sameWeekday = (date: string) => addDays(to, isoWeekday(date) - 1);
 
   return db.transaction(async (tx) => {
+    await lockWeek(tx, to);
     // One after another: a transaction runs on a single connection.
     const source = await tx
       .select()
@@ -684,7 +686,7 @@ export async function copyWeek(
       (m) => !filled.has(slotKey(sameWeekday(m.date), m.slot, m.snackIndex))
     );
     if (copying.length === 0) {
-      return { copied: [], skipped: source.length };
+      return { copied: [], skipped: source.length, changeId: null };
     }
 
     const portions = await tx
@@ -741,21 +743,16 @@ export async function copyWeek(
     if (newPortions.length > 0) {
       await tx.insert(slotPortions).values(newPortions);
     }
-    return {
-      copied: rows.map((r) => r.meal.id),
-      skipped: source.length - copying.length,
-    };
+    const copied = rows.map((r) => r.meal.id);
+    const changeId = await recordChange(tx, {
+      weekStart: to,
+      userId: createdBy,
+      kind: "copy",
+      summary: `Copied ${copied.length} meal${copied.length === 1 ? "" : "s"} from last week`,
+      before: { added: copied, portions: [] },
+    });
+    return { copied, skipped: source.length - copying.length, changeId };
   });
-}
-
-/** Removes several meals at once: undoing a copy. */
-export async function removeMeals(
-  db: Db,
-  mealSlotIds: string[]
-): Promise<void> {
-  if (mealSlotIds.length > 0) {
-    await db.delete(mealSlots).where(inArray(mealSlots.id, mealSlotIds));
-  }
 }
 
 /** The date a slot belongs to, for revalidating the right week. */

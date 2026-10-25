@@ -18,6 +18,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { OffFields } from "../domain/off-contribution";
+import type { PlanChangeSnapshot } from "../domain/plan-change";
 import type { ProductInfo } from "../domain/product";
 import {
   DEFAULT_SNACK_SLOTS,
@@ -47,6 +48,8 @@ export const adherenceStatus = pgEnum("adherence_status", [
   "skipped",
   "swapped",
 ]);
+
+export const planChangeKind = pgEnum("plan_change_kind", ["fit", "copy"]);
 
 export const users = pgTable(
   "users",
@@ -436,6 +439,29 @@ export const shoppingExtras = pgTable(
       .defaultNow(),
   },
   (t) => [index("shopping_extras_week_idx").on(t.weekStart)]
+);
+
+/** What each change to a week's plan was, with what it needs to be undone. */
+export const planChanges = pgTable(
+  "plan_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** The Monday of the week changed. */
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    kind: planChangeKind("kind").notNull(),
+    summary: text("summary").notNull(),
+    before: jsonb("before").$type<PlanChangeSnapshot>().notNull(),
+    // The time of the insert, not of the transaction's start (`now()`): undo
+    // goes latest first, so two changes in one transaction must still differ.
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+  },
+  (t) => [index("plan_changes_week_idx").on(t.weekStart, t.createdAt)]
 );
 
 export type User = typeof users.$inferSelect;

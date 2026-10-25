@@ -19,7 +19,6 @@ import {
   moveMeal,
   PlanError,
   removeMeal,
-  removeMeals,
   setAdherence,
   setBaseServings,
   setFasting,
@@ -622,6 +621,7 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
 
       expect(result).toMatchObject({ skipped: 0 });
       expect(result.copied).toHaveLength(3);
+      expect(result.changeId).toEqual(expect.any(String));
       expect(await placed(thisWeek)).toEqual([
         {
           date: "2026-10-19",
@@ -691,6 +691,7 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
       expect(await copyWeek(db, lastWeek, thisWeek, a.id)).toEqual({
         copied: [],
         skipped: 1,
+        changeId: null,
       });
       expect(await placed(thisWeek)).toHaveLength(1);
     });
@@ -723,17 +724,6 @@ describe.skipIf(!testDbUrl)("plan (Postgres)", () => {
 
       const [copy] = (await getWeekPlan(db, thisWeek, { fetch })).days[3].meals;
       expect(copy.portions).toEqual({ [a.id]: 1, [b.id]: 0 });
-    });
-
-    it("can be undone by removing the copied meals", async () => {
-      const { a } = await twoUsers();
-      await plan(a.id, "2026-10-12", "dinner", "stew");
-      await plan(a.id, "2026-10-19", "lunch", "pizza");
-      const { copied } = await copyWeek(db, lastWeek, thisWeek, a.id);
-
-      await removeMeals(db, copied);
-
-      expect((await placed(thisWeek)).map((m) => m.slug)).toEqual(["pizza"]);
     });
   });
 
