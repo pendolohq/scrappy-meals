@@ -1,5 +1,5 @@
 {
-  "id": "751c32a4-5885-4f11-aa2b-b9829ce7b17e",
+  "id": "faa3140e-ad85-45bf-8d37-0272a899f7c5",
   "prevId": "b221c417-007b-4e5a-a4da-909bff7044a9",
   "version": "7",
   "dialect": "postgresql",
@@ -1301,9 +1301,7 @@
       "schema": "public",
       "values": [
         "fit",
-        "copy",
-        "draft",
-        "chat"
+        "copy"
       ]
     }
   },

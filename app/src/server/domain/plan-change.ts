@@ -1,24 +1,16 @@
-import type { SlotType } from "./slots";
-
 /** What undoing a plan change needs: kept as jsonb on its `plan_changes` row. */
 export type PlanChangeSnapshot = {
-  /** Meals the change created: undo removes the ones still there. */
+  /** Meals the change created: undo removes the ones still in the week. */
   added: string[];
-  /** Meals the change removed, with their portions: undo puts them back. */
-  removed: {
-    meal: {
-      id: string;
-      date: string;
-      slot: SlotType;
-      snackIndex: number;
-      position: number;
-      slug: string;
-      baseServings: number;
-      unplanned: boolean;
-      createdBy: string | null;
-    };
-    portions: { userId: string; multiplier: number }[];
+  /**
+   * Portions the change overwrote: `before` is what undo puts back, `after`
+   * what the change wrote (as stored, to 2 decimals). A portion edited since
+   * no longer equals `after` and is left alone.
+   */
+  portions: {
+    mealSlotId: string;
+    userId: string;
+    before: number;
+    after: number;
   }[];
-  /** Portion values the change overwrote, as they were before. */
-  portions: { mealSlotId: string; userId: string; multiplier: number }[];
 };

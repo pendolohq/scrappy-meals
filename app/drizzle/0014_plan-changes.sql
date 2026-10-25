@@ -1,4 +1,4 @@
-CREATE TYPE "public"."plan_change_kind" AS ENUM('fit', 'copy', 'draft', 'chat');--> statement-breakpoint
+CREATE TYPE "public"."plan_change_kind" AS ENUM('fit', 'copy');--> statement-breakpoint
 CREATE TABLE "plan_changes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"week_start" date NOT NULL,

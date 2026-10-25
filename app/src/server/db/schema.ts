@@ -49,12 +49,7 @@ export const adherenceStatus = pgEnum("adherence_status", [
   "swapped",
 ]);
 
-export const planChangeKind = pgEnum("plan_change_kind", [
-  "fit",
-  "copy",
-  "draft",
-  "chat",
-]);
+export const planChangeKind = pgEnum("plan_change_kind", ["fit", "copy"]);
 
 export const users = pgTable(
   "users",

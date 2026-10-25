@@ -10,7 +10,7 @@ import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
 import { addDays } from "@/server/domain/week";
 import { getWeekPlan, hasMeals } from "@/server/plan";
-import { recentChange } from "@/server/plan-changes";
+import { latestChange } from "@/server/plan-changes";
 import { requireUser } from "@/server/session";
 import { viewerToday } from "@/server/today";
 
@@ -29,7 +29,7 @@ export default async function PlanPage({
   const [plan, lastWeekHasMeals, change] = await Promise.all([
     getWeekPlan(getDb(), weekStart, { defer: after }),
     hasMeals(getDb(), addDays(weekStart, -7)),
-    recentChange(getDb(), weekStart),
+    latestChange(getDb(), weekStart),
   ]);
   const now = await viewerToday();
 
@@ -42,14 +42,7 @@ export default async function PlanPage({
         </Link>
       </WeekHeader>
       {lastWeekHasMeals && <CopyLastWeek weekStart={weekStart} />}
-      {change && (
-        <UndoChange
-          key={change.id}
-          changeId={change.id}
-          summary={change.summary}
-          byName={change.byName}
-        />
-      )}
+      <UndoChange change={change} />
 
       {plan.members.length === 0 && (
         <p className="text-sm text-muted">No users yet.</p>

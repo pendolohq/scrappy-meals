@@ -3,15 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
-import { mealSlots, planChanges, slotPortions } from "./db/schema";
+import { planChanges, slotPortions } from "./db/schema";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
   copyWeek,
   getMeal,
   getWeekPlan,
+  moveMeal,
   PlanError,
   removeMeal,
+  setAdherence,
   setPortion,
 } from "./plan";
 import {
@@ -49,7 +51,7 @@ const recipe = (slug: string): Recipe => ({
 const lastWeek = "2026-10-12";
 const thisWeek = "2026-10-19";
 const nextWeek = "2026-10-26";
-const none: PlanChangeSnapshot = { added: [], removed: [], portions: [] };
+const none: PlanChangeSnapshot = { added: [], portions: [] };
 
 describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
   const db = useTestDb();
@@ -81,7 +83,7 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
   const portionRows = (ids: string[]) =>
     db.select().from(slotPortions).where(inArray(slotPortions.mealSlotId, ids));
 
-  /** Records a change that only adds the given meals, as a draft would. */
+  /** Records a change that only adds the given meals, as a copy does. */
   const recordAdded = (
     weekStart: string,
     userId: string | null,
@@ -92,7 +94,7 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
       recordChange(tx, {
         weekStart,
         userId,
-        kind: "draft",
+        kind: "copy",
         summary,
         before: { ...none, added },
       })
@@ -116,7 +118,7 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
         userId: b.id,
         kind: "copy",
         summary: "Copied 3 meals from last week",
-        before: { added: result.copied, removed: [], portions: [] },
+        before: { added: result.copied, portions: [] },
         undoneAt: null,
       },
     ]);
@@ -149,6 +151,7 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
     expect(undone).toEqual({
       weekStart: thisWeek,
       summary: "Copied 1 meal from last week",
+      kept: 0,
     });
     expect(await slugsOf(thisWeek)).toEqual(["pizza"]);
     expect(await portionRows(copied)).toEqual([]);
@@ -171,7 +174,31 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
     expect(await slugsOf(thisWeek)).toEqual([]);
   });
 
-  it("restores overwritten portions, skipping a meal deleted since", async () => {
+  it("leaves a copied meal that was moved to another week", async () => {
+    const { a } = await twoUsers();
+    await plan(a.id, "2026-10-12", "stew");
+    await plan(a.id, "2026-10-13", "soup");
+    const { copied, changeId } = await copyWeek(db, lastWeek, thisWeek, a.id);
+    await moveMeal(db, copied[0], { date: "2026-10-26", slot: "dinner" });
+
+    await undoChange(db, changeId!);
+
+    expect(await slugsOf(thisWeek)).toEqual([]);
+    expect(await slugsOf(nextWeek)).toEqual(["stew"]);
+  });
+
+  it("keeps a copied meal someone logged, and counts it", async () => {
+    const { a, b } = await twoUsers();
+    await plan(a.id, "2026-10-12", "stew");
+    await plan(a.id, "2026-10-13", "soup");
+    const { copied, changeId } = await copyWeek(db, lastWeek, thisWeek, a.id);
+    await setAdherence(db, copied[1], b.id, "stuck");
+
+    expect(await undoChange(db, changeId!)).toMatchObject({ kept: 1 });
+    expect(await slugsOf(thisWeek)).toEqual(["soup"]);
+  });
+
+  it("restores overwritten portions, except ones edited or deleted since", async () => {
     const { a, b } = await twoUsers();
     const kept = await plan(a.id, "2026-10-20", "stew");
     const gone = await plan(a.id, "2026-10-21", "soup");
@@ -191,105 +218,23 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
         before: {
           ...none,
           portions: [
-            { mealSlotId: kept, userId: a.id, multiplier: 1 },
-            { mealSlotId: kept, userId: b.id, multiplier: 0.5 },
-            { mealSlotId: gone, userId: a.id, multiplier: 2 },
+            { mealSlotId: kept, userId: a.id, before: 1, after: 3 },
+            { mealSlotId: kept, userId: b.id, before: 0.5, after: 3 },
+            { mealSlotId: gone, userId: a.id, before: 2, after: 3 },
           ],
         },
       });
     });
+    await setPortion(db, kept, b.id, 1.25);
     await removeMeal(db, gone);
 
     await undoChange(db, id);
 
     expect((await getMeal(db, kept, { fetch }))?.portions).toEqual({
       [a.id]: 1,
-      [b.id]: 0.5,
+      [b.id]: 1.25,
     });
     expect(await getMeal(db, gone, { fetch })).toBeNull();
-  });
-
-  it("puts removed meals back with their id and portions, after one that took their place, and without duplicating one that exists", async () => {
-    const { a, b } = await twoUsers();
-    const original = {
-      date: "2026-10-20",
-      slot: "dinner" as const,
-      snackIndex: 0,
-      position: 0,
-      slug: "stew",
-      baseServings: 2,
-      unplanned: false,
-      createdBy: a.id,
-    };
-    const blocked = { id: crypto.randomUUID(), ...original };
-    const free = {
-      id: crypto.randomUUID(),
-      ...original,
-      date: "2026-10-22",
-      slug: "soup",
-    };
-    const present = await plan(a.id, "2026-10-23", "rice");
-    // `blocked` and `free` were removed; `present` is in the snapshot but never left.
-    const id = await db.transaction((tx) =>
-      recordChange(tx, {
-        weekStart: thisWeek,
-        userId: a.id,
-        kind: "draft",
-        summary: "Replaced meals",
-        before: {
-          ...none,
-          removed: [
-            {
-              meal: blocked,
-              portions: [
-                { userId: a.id, multiplier: 1.5 },
-                { userId: b.id, multiplier: 0 },
-              ],
-            },
-            { meal: free, portions: [{ userId: a.id, multiplier: 1 }] },
-            {
-              meal: {
-                ...original,
-                id: present,
-                date: "2026-10-23",
-                slug: "rice",
-              },
-              portions: [{ userId: a.id, multiplier: 9 }],
-            },
-          ],
-        },
-      })
-    );
-    // Something else now sits where `blocked` was.
-    await plan(a.id, "2026-10-20", "salad");
-
-    await undoChange(db, id);
-
-    const [restored] = await db
-      .select()
-      .from(mealSlots)
-      .where(eq(mealSlots.id, blocked.id));
-    expect(restored).toMatchObject({
-      date: "2026-10-20",
-      mealieRecipeSlug: "stew",
-      baseServings: 2,
-      createdBy: a.id,
-      position: 1,
-    });
-    expect(
-      (await portionRows([blocked.id])).map((p) => [p.userId, p.multiplier])
-    ).toEqual(
-      expect.arrayContaining([
-        [a.id, 1.5],
-        [b.id, 0],
-      ])
-    );
-    expect(await getMeal(db, free.id, { fetch })).toMatchObject({
-      date: "2026-10-22",
-      slug: "soup",
-    });
-    expect(await slugsOf(thisWeek)).toHaveLength(4);
-    expect((await getMeal(db, present, { fetch }))?.portions[a.id]).toBe(1);
   });
 
   it("undoes a week's changes latest first, and other weeks don't interfere", async () => {
@@ -313,7 +258,7 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
     const change = (summary: string) => ({
       weekStart: thisWeek,
       userId: a.id,
-      kind: "chat" as const,
+      kind: "fit" as const,
       summary,
       before: none,
     });
@@ -343,7 +288,13 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
     ]);
   });
 
-  it("finds a week's latest change that isn't undone, honouring since and naming who made it", async () => {
+  const age = (id: string, hours: number) =>
+    db
+      .update(planChanges)
+      .set({ createdAt: new Date(Date.now() - hours * 3600 * 1000) })
+      .where(eq(planChanges.id, id));
+
+  it("finds a week's latest change that isn't undone, naming who made it", async () => {
     const { a } = await twoUsers();
     expect(await latestChange(db, thisWeek)).toBeNull();
     const first = await recordAdded(thisWeek, a.id, [], "First");
@@ -352,25 +303,24 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
 
     expect(await latestChange(db, thisWeek)).toEqual({
       id: second,
-      kind: "draft",
       summary: "Second",
-      createdAt: expect.any(Date),
       byName: "A",
     });
     await undoChange(db, second);
     expect(await latestChange(db, thisWeek)).toMatchObject({ id: first });
-    expect(
-      await latestChange(db, thisWeek, {
-        since: new Date(Date.now() + 60_000),
-      })
-    ).toBeNull();
-    expect(
-      await latestChange(db, thisWeek, {
-        since: new Date(Date.now() - 60_000),
-      })
-    ).toMatchObject({ id: first });
     await undoChange(db, first);
     expect(await latestChange(db, thisWeek)).toBeNull();
+  });
+
+  it("neither offers nor undoes a change more than a day old", async () => {
+    const { a } = await twoUsers();
+    const old = await recordAdded(thisWeek, a.id, []);
+    await age(old, 25);
+
+    expect(await latestChange(db, thisWeek)).toBeNull();
+    await expect(undoChange(db, old)).rejects.toThrow(
+      new PlanError("That change can't be undone any more")
+    );
   });
 
   it("has no name for a change whose user is gone", async () => {
@@ -380,18 +330,12 @@ describe.skipIf(!testDbUrl)("plan change log (Postgres)", () => {
     expect(await latestChange(db, thisWeek)).toMatchObject({ byName: null });
   });
 
-  it("prunes changes older than 30 days when recording a new one", async () => {
+  it("prunes changes too old to undo when recording a new one", async () => {
     const { a } = await twoUsers();
     const old = await recordAdded(thisWeek, a.id, [], "Old");
     const recent = await recordAdded(thisWeek, a.id, [], "Recent");
-    await db
-      .update(planChanges)
-      .set({ createdAt: new Date(Date.now() - 31 * 24 * 3600 * 1000) })
-      .where(eq(planChanges.id, old));
-    await db
-      .update(planChanges)
-      .set({ createdAt: new Date(Date.now() - 29 * 24 * 3600 * 1000) })
-      .where(eq(planChanges.id, recent));
+    await age(old, 25);
+    await age(recent, 23);
 
     const fresh = await recordAdded(nextWeek, a.id, [], "Fresh");
 

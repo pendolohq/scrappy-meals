@@ -19,7 +19,6 @@ import { PlanError } from "./errors";
 import { getSnackSlots } from "./household";
 import { isMealieUnavailable } from "./mealie/client";
 import { lockWeek, recordChange } from "./plan-changes";
-import { nextPosition } from "./plan-slots";
 import {
   type CachedRecipe,
   type Defer,
@@ -368,6 +367,28 @@ async function checkSlot(db: Db, slot: SlotType, snackIndex: number) {
   if (slot === "snack" && snackIndex >= (await getSnackSlots(db))) {
     throw new PlanError("That snack slot is turned off in settings");
   }
+}
+
+/** The position after the last meal already in a day's slot, so a new one goes at the end. */
+async function nextPosition(
+  tx: Pick<Db, "select">,
+  date: string,
+  slot: SlotType,
+  snackIndex: number
+): Promise<number> {
+  const [{ next }] = await tx
+    .select({
+      next: sql<number>`coalesce(max(${mealSlots.position}) + 1, 0)::int`,
+    })
+    .from(mealSlots)
+    .where(
+      and(
+        eq(mealSlots.date, date),
+        eq(mealSlots.slot, slot),
+        eq(mealSlots.snackIndex, snackIndex)
+      )
+    );
+  return next;
 }
 
 /**
@@ -728,7 +749,7 @@ export async function copyWeek(
       userId: createdBy,
       kind: "copy",
       summary: `Copied ${copied.length} meal${copied.length === 1 ? "" : "s"} from last week`,
-      before: { added: copied, removed: [], portions: [] },
+      before: { added: copied, portions: [] },
     });
     return { copied, skipped: source.length - copying.length, changeId };
   });

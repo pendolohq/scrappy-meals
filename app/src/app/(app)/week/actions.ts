@@ -337,8 +337,13 @@ export const copyLastWeekAction = userAction(
 export const undoChangeAction = userAction(
   z.object({ changeId: id }),
   async ({ changeId }) => {
-    const { weekStart } = await undoChange(getDb(), changeId);
-    return refreshWeek(weekStart);
+    const { weekStart, summary, kept } = await undoChange(getDb(), changeId);
+    refreshWeek(weekStart);
+    const logged =
+      kept > 0
+        ? ` Kept ${kept} meal${kept === 1 ? "" : "s"} already logged.`
+        : "";
+    return { message: `Undone: ${summary}.${logged}` };
   }
 );
 
