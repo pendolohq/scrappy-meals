@@ -11,7 +11,7 @@ export class HouseholdError extends UserFacingError {
   name = "HouseholdError";
 }
 
-export async function getSnackSlots(db: Db): Promise<number> {
+export async function getSnackSlots(db: Pick<Db, "select">): Promise<number> {
   const [row] = await db
     .select({ snackSlots: householdSettings.snackSlots })
     .from(householdSettings)

@@ -11,7 +11,13 @@ import { parseBarcode } from "@/server/domain/barcode";
 import { FOOD_UNITS } from "@/server/domain/food";
 import { recipeSlug } from "@/server/domain/recipe-slug";
 import { MAX_SNACK_SLOTS, SLOT_TYPES } from "@/server/domain/slots";
-import { addDays, isIsoDate, weekStartSchema } from "@/server/domain/week";
+import {
+  addDays,
+  isIsoDate,
+  weekDays,
+  weekStartSchema,
+} from "@/server/domain/week";
+import { fitPortions } from "@/server/fit-portions";
 import {
   findFoods,
   loadKnownFood,
@@ -344,6 +350,24 @@ export const undoChangeAction = userAction(
         ? ` Kept ${kept} meal${kept === 1 ? "" : "s"} already logged.`
         : "";
     return { message: `Undone: ${summary}.${logged}` };
+  }
+);
+
+/**
+ * Fits the planned portions to everyone's targets: one day, or with no day
+ * the rest of the week from today. Portions are household-wide, like copying.
+ */
+export const fitPortionsAction = userAction(
+  z.object({ weekStart: weekStartSchema, day: date.optional() }),
+  async ({ weekStart, day }, user) => {
+    const result = await fitPortions(getDb(), {
+      weekStart,
+      dates: day ? [day] : weekDays(weekStart),
+      today: await viewerToday(),
+      userId: user.id,
+    });
+    refreshWeek(weekStart);
+    return result;
   }
 );
 

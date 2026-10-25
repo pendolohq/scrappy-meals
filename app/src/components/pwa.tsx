@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { listenForInstall } from "@/lib/install";
+import { useOnline } from "@/lib/online";
 import { clearAllQueues } from "@/lib/shop-queue-store";
 
 const swEnabled = () =>
@@ -15,21 +16,10 @@ const swEnabled = () =>
  * never takes over an open page by itself: its chunks belong to another build.
  */
 export const Pwa = () => {
-  const [offline, setOffline] = useState(false);
+  const offline = !useOnline();
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
 
   useEffect(() => listenForInstall(), []);
-
-  useEffect(() => {
-    const update = () => setOffline(!navigator.onLine);
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
 
   useEffect(() => {
     if (!swEnabled()) {
