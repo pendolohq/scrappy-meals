@@ -10,6 +10,7 @@ import { WeekGrid } from "@/components/plan/week-grid";
 import { WeekHeader } from "@/components/week-header";
 import { getDb } from "@/server/db/client";
 import { addDays } from "@/server/domain/week";
+import { planKey } from "@/server/fit-portions";
 import { getWeekPlan, hasMeals } from "@/server/plan";
 import { latestChange } from "@/server/plan-changes";
 import { requireUser } from "@/server/session";
@@ -48,7 +49,7 @@ export default async function PlanPage({
         <FitPortions
           weekStart={weekStart}
           today={now}
-          latestChangeId={change?.id ?? null}
+          planKey={planKey(plan, now)}
         />
       )}
       <UndoChange change={change} />

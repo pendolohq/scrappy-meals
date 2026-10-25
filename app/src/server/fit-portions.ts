@@ -1,4 +1,5 @@
-import { inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 
 import { formatDay } from "@/lib/format";
 
@@ -11,7 +12,7 @@ import { isFoodRecipe } from "./domain/taxonomy";
 import { weekDays } from "./domain/week";
 import { PlanError } from "./errors";
 import type { Macros } from "./mealie/nutrition";
-import { getWeekPlan, type PlannedMeal } from "./plan";
+import { getWeekPlan, type PlannedMeal, type WeekPlan } from "./plan";
 import { lockWeek, recordChange } from "./plan-changes";
 import type { Defer, RecipeFetcher } from "./recipe-cache";
 
@@ -20,6 +21,8 @@ export type FitPortionsResult = {
   changeId: string | null;
   /** How many portions changed. */
   changed: number;
+  /** `planKey` of the plan the fit left; once the page's differs, the summary is stale. */
+  planKey: string;
   days: {
     date: string;
     people: ({ userId: string; name: string } & Pick<
@@ -52,6 +55,33 @@ export const fitEntries = (meals: PlannedMeal[]): FitEntry[] =>
   }));
 
 /**
+ * Sums up what a fit's summary depends on from `today` on: meals, servings,
+ * portions, logs, fasting and targets. Any edit to those changes it.
+ */
+export const planKey = (plan: WeekPlan, today: string): string =>
+  createHash("sha1")
+    .update(
+      JSON.stringify([
+        plan.members.map((m) => [m.id, m.targets]),
+        plan.days
+          .filter((d) => d.date >= today)
+          .map((d) => [
+            d.date,
+            plan.members.map((m) => d.fasting[m.id] ?? false),
+            d.meals.map((meal) => [
+              meal.id,
+              meal.baseServings,
+              meal.unplanned,
+              // A missing portion and a 0 are the same to the fit.
+              plan.members.map((m) => meal.portions[m.id] ?? 0),
+              plan.members.map((m) => meal.adherence[m.id]?.status ?? null),
+            ]),
+          ]),
+      ])
+    )
+    .digest("base64url");
+
+/**
  * Fits the portions of the meals already planned on `dates` to everyone's
  * targets, as one change that can be undone. Days before `today` are left
  * alone. Only portions move, never servings or meals.
@@ -75,84 +105,73 @@ export async function fitPortions(
     throw new PlanError("Those days have passed: there's nothing left to fit");
   }
 
-  const plan = await getWeekPlan(db, input.weekStart, opts);
-  const days = plan.days.filter((d) => dates.includes(d.date));
-  const fit = fitWeek(
-    days.map((day) => ({
-      date: day.date,
-      entries: fitEntries(day.meals),
-      people: plan.members.map((m) => ({
-        id: m.id,
-        targets: m.targets,
-        fasting: day.fasting[m.id] ?? false,
-      })),
-    }))
-  );
+  // Recipes may come from Mealie: load them before the lock, so the week's
+  // other edits don't wait on it.
+  const { recipes } = await getWeekPlan(db, input.weekStart, opts);
+  return db.transaction(async (tx) => {
+    await lockWeek(tx, input.weekStart);
+    // Read under the lock: every edit to the week takes it too, so nothing the
+    // fit reads (portions, logs, fasting, servings, meals) changes before it
+    // writes.
+    const plan = await getWeekPlan(tx, input.weekStart, {
+      fetch: opts.fetch,
+      recipes,
+    });
+    const days = plan.days.filter((d) => dates.includes(d.date));
+    const fit = fitWeek(
+      days.map((day) => ({
+        date: day.date,
+        entries: fitEntries(day.meals),
+        people: plan.members.map((m) => ({
+          id: m.id,
+          targets: m.targets,
+          fasting: day.fasting[m.id] ?? false,
+        })),
+      }))
+    );
 
-  const updates: {
-    mealSlotId: string;
-    userId: string;
-    multiplier: number;
-    was: number;
-  }[] = [];
-  days.forEach((day, i) => {
-    const portions = fit.days[i].fit.portions;
-    for (const meal of day.meals) {
-      for (const member of plan.members) {
-        const was = meal.portions[member.id] ?? 0;
-        const multiplier = portions[meal.id][member.id] ?? 0;
-        if (multiplier !== was) {
-          updates.push({
-            mealSlotId: meal.id,
-            userId: member.id,
-            multiplier,
-            was,
-          });
+    const updates: {
+      mealSlotId: string;
+      userId: string;
+      multiplier: number;
+      was: number;
+    }[] = [];
+    days.forEach((day, i) => {
+      const portions = fit.days[i].fit.portions;
+      for (const meal of day.meals) {
+        for (const member of plan.members) {
+          const was = meal.portions[member.id] ?? 0;
+          const multiplier = portions[meal.id][member.id] ?? 0;
+          if (multiplier !== was) {
+            updates.push({
+              mealSlotId: meal.id,
+              userId: member.id,
+              multiplier,
+              was,
+            });
+          }
         }
       }
-    }
-  });
+    });
 
-  let changeId: string | null = null;
-  if (updates.length > 0) {
-    changeId = await db.transaction(async (tx) => {
-      await lockWeek(tx, input.weekStart);
-      // The fit was worked out before the lock: if one of its portions moved
-      // (or its meal went) meanwhile, it would overwrite someone's edit.
-      const now = await tx
-        .select()
-        .from(slotPortions)
-        .where(
-          inArray(slotPortions.mealSlotId, [
-            ...new Set(updates.map((u) => u.mealSlotId)),
-          ])
-        );
-      const current = new Map(
-        now.map((p) => [`${p.mealSlotId}|${p.userId}`, p.multiplier])
-      );
-      if (
-        updates.some(
-          (u) => current.get(`${u.mealSlotId}|${u.userId}`) !== u.was
+    let changeId: string | null = null;
+    if (updates.length > 0) {
+      await tx
+        .insert(slotPortions)
+        .values(
+          updates.map(({ mealSlotId, userId, multiplier }) => ({
+            mealSlotId,
+            userId,
+            multiplier,
+          }))
         )
-      ) {
-        throw new PlanError(
-          "The plan changed while fitting it. Try again in a moment."
-        );
-      }
-      for (const u of updates) {
-        await tx
-          .insert(slotPortions)
-          .values({
-            mealSlotId: u.mealSlotId,
-            userId: u.userId,
-            multiplier: u.multiplier,
-          })
-          .onConflictDoUpdate({
-            target: [slotPortions.mealSlotId, slotPortions.userId],
-            set: { multiplier: u.multiplier },
-          });
-      }
-      return recordChange(tx, {
+        .onConflictDoUpdate({
+          target: [slotPortions.mealSlotId, slotPortions.userId],
+          set: {
+            multiplier: sql.raw(`excluded.${slotPortions.multiplier.name}`),
+          },
+        });
+      changeId = await recordChange(tx, {
         weekStart: input.weekStart,
         userId: input.userId,
         kind: "fit",
@@ -171,26 +190,41 @@ export async function fitPortions(
           })),
         },
       });
-    });
-  }
+    }
 
-  const name = new Map(plan.members.map((m) => [m.id, m.name]));
-  return {
-    changeId,
-    changed: updates.length,
-    days: fit.days.map(({ date, fit: day }) => ({
-      date,
-      people: Object.entries(day.people).map(([userId, p]) => ({
-        userId,
-        name: name.get(userId) ?? "",
-        status: p.status,
-        misses: p.misses,
-        incomplete: p.incomplete,
-        estimated: p.estimated,
+    const fitted = new Map(fit.days.map((d) => [d.date, d.fit.portions]));
+    const after: WeekPlan = {
+      ...plan,
+      days: plan.days.map((day) => {
+        const portions = fitted.get(day.date);
+        return portions
+          ? {
+              ...day,
+              meals: day.meals.map((m) => ({ ...m, portions: portions[m.id] })),
+            }
+          : day;
+      }),
+    };
+
+    const name = new Map(plan.members.map((m) => [m.id, m.name]));
+    return {
+      changeId,
+      changed: updates.length,
+      planKey: planKey(after, input.today),
+      days: fit.days.map(({ date, fit: day }) => ({
+        date,
+        people: Object.entries(day.people).map(([userId, p]) => ({
+          userId,
+          name: name.get(userId) ?? "",
+          status: p.status,
+          misses: p.misses,
+          incomplete: p.incomplete,
+          estimated: p.estimated,
+        })),
       })),
-    })),
-    averages: Object.entries(fit.averages).flatMap(([userId, avg]) =>
-      avg ? [{ userId, name: name.get(userId) ?? "", ...avg }] : []
-    ),
-  };
+      averages: Object.entries(fit.averages).flatMap(([userId, avg]) =>
+        avg ? [{ userId, name: name.get(userId) ?? "", ...avg }] : []
+      ),
+    };
+  });
 }

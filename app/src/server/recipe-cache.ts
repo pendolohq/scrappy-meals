@@ -38,7 +38,7 @@ const QUEUED_FOR_MS = 5 * 60 * 1000;
  *   refreshed at all, for pages that read every recipe at once.
  */
 export async function loadRecipes(
-  db: Db,
+  db: Pick<Db, "select" | "insert" | "update" | "delete">,
   slugs: string[],
   opts: {
     fetch?: RecipeFetcher;

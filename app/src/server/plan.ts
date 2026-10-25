@@ -14,7 +14,7 @@ import type { AdherenceStatus } from "./domain/adherence";
 import { isFasting } from "./domain/fasting";
 import { slotRank, type SlotType } from "./domain/slots";
 import { isFoodRecipe } from "./domain/taxonomy";
-import { addDays, isoWeekday, weekDays } from "./domain/week";
+import { addDays, isoWeekday, weekDays, weekStartOf } from "./domain/week";
 import { PlanError } from "./errors";
 import { getSnackSlots } from "./household";
 import { isMealieUnavailable } from "./mealie/client";
@@ -84,7 +84,7 @@ export type WeekPlan = {
   recipes: Map<string, CachedRecipe | null>;
 };
 
-export async function listMembers(db: Db): Promise<Member[]> {
+export async function listMembers(db: Pick<Db, "select">): Promise<Member[]> {
   const rows = await db.select().from(users).orderBy(asc(users.createdAt));
   return rows.map((u) => ({
     id: u.id,
@@ -100,50 +100,62 @@ export async function listMembers(db: Db): Promise<Member[]> {
   }));
 }
 
+/**
+ * `recipes` reuses recipes already loaded for this week, so reading it again
+ * in a transaction doesn't go back to Mealie for them.
+ */
 export async function getWeekPlan(
-  db: Db,
+  db: Pick<Db, "select" | "insert" | "update" | "delete">,
   weekStart: string,
-  opts: { fetch?: RecipeFetcher; defer?: Defer } = {}
+  opts: {
+    fetch?: RecipeFetcher;
+    defer?: Defer;
+    recipes?: Map<string, CachedRecipe | null>;
+  } = {}
 ): Promise<WeekPlan> {
   const end = addDays(weekStart, 6);
   const inWeek = and(gte(mealSlots.date, weekStart), lte(mealSlots.date, end));
-  const [members, snackSlots, slots, portions, overrides, logs] =
-    await Promise.all([
-      listMembers(db),
-      getSnackSlots(db),
-      db.select().from(mealSlots).where(inWeek),
-      db
-        .select({
-          mealSlotId: slotPortions.mealSlotId,
-          userId: slotPortions.userId,
-          multiplier: slotPortions.multiplier,
-        })
-        .from(slotPortions)
-        .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
-        .where(inWeek),
-      db
-        .select()
-        .from(dayOverrides)
-        .where(
-          and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end))
-        ),
-      db
-        .select({
-          mealSlotId: adherence.mealSlotId,
-          userId: adherence.userId,
-          status: adherence.status,
-          note: adherence.note,
-        })
-        .from(adherence)
-        .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
-        .where(inWeek),
-    ]);
+  // One after another, so this also runs in a transaction: that has a single
+  // connection, and the reads are small.
+  const members = await listMembers(db);
+  const snackSlots = await getSnackSlots(db);
+  const slots = await db.select().from(mealSlots).where(inWeek);
+  const portions = await db
+    .select({
+      mealSlotId: slotPortions.mealSlotId,
+      userId: slotPortions.userId,
+      multiplier: slotPortions.multiplier,
+    })
+    .from(slotPortions)
+    .innerJoin(mealSlots, eq(mealSlots.id, slotPortions.mealSlotId))
+    .where(inWeek);
+  const overrides = await db
+    .select()
+    .from(dayOverrides)
+    .where(and(gte(dayOverrides.date, weekStart), lte(dayOverrides.date, end)));
+  const logs = await db
+    .select({
+      mealSlotId: adherence.mealSlotId,
+      userId: adherence.userId,
+      status: adherence.status,
+      note: adherence.note,
+    })
+    .from(adherence)
+    .innerJoin(mealSlots, eq(mealSlots.id, adherence.mealSlotId))
+    .where(inWeek);
 
+  const slugs = slots.map((s) => s.mealieRecipeSlug);
+  const known = opts.recipes;
   const recipes = await loadRecipes(
     db,
-    slots.map((s) => s.mealieRecipeSlug),
+    slugs.filter((slug) => !known?.has(slug)),
     opts
   );
+  for (const slug of slugs) {
+    if (known?.has(slug)) {
+      recipes.set(slug, known.get(slug) ?? null);
+    }
+  }
   const portionsBySlot = new Map<string, Record<string, number>>();
   for (const p of portions) {
     const entry = portionsBySlot.get(p.mealSlotId) ?? {};
@@ -315,6 +327,7 @@ export async function setFasting(
   fasting: boolean
 ): Promise<number> {
   return db.transaction(async (tx) => {
+    await lockWeek(tx, weekStartOf(date));
     const [user] = await tx
       .select({ days: users.defaultFastingDays })
       .from(users)
@@ -528,6 +541,35 @@ export async function addCheckedMeal(
   });
 }
 
+/**
+ * Takes the lock of the week a meal is in (see `lockWeek`), so an edit to it
+ * waits for a fit or undo running on that week rather than landing halfway
+ * through and being overwritten. Returns the meal's date, or null when it's
+ * gone.
+ */
+async function lockMealWeek(
+  tx: Pick<Db, "select" | "execute">,
+  mealSlotId: string
+): Promise<string | null> {
+  const locked = new Set<string>();
+  for (;;) {
+    const [meal] = await tx
+      .select({ date: mealSlots.date })
+      .from(mealSlots)
+      .where(eq(mealSlots.id, mealSlotId));
+    if (!meal) {
+      return null;
+    }
+    const week = weekStartOf(meal.date);
+    // Read again once locked: the meal may have moved to another week first.
+    if (locked.has(week)) {
+      return meal.date;
+    }
+    await lockWeek(tx, week);
+    locked.add(week);
+  }
+}
+
 export async function setPortion(
   db: Db,
   mealSlotId: string,
@@ -537,13 +579,16 @@ export async function setPortion(
   if (!(multiplier >= 0 && multiplier <= 20)) {
     throw new PlanError("Portion must be between 0 and 20");
   }
-  await db
-    .insert(slotPortions)
-    .values({ mealSlotId, userId, multiplier })
-    .onConflictDoUpdate({
-      target: [slotPortions.mealSlotId, slotPortions.userId],
-      set: { multiplier },
-    });
+  await db.transaction(async (tx) => {
+    await lockMealWeek(tx, mealSlotId);
+    await tx
+      .insert(slotPortions)
+      .values({ mealSlotId, userId, multiplier })
+      .onConflictDoUpdate({
+        target: [slotPortions.mealSlotId, slotPortions.userId],
+        set: { multiplier },
+      });
+  });
 }
 
 export async function setBaseServings(
@@ -554,14 +599,20 @@ export async function setBaseServings(
   if (!(baseServings > 0 && baseServings <= 100)) {
     throw new PlanError("Servings must be between 0 and 100");
   }
-  await db
-    .update(mealSlots)
-    .set({ baseServings })
-    .where(eq(mealSlots.id, mealSlotId));
+  await db.transaction(async (tx) => {
+    await lockMealWeek(tx, mealSlotId);
+    await tx
+      .update(mealSlots)
+      .set({ baseServings })
+      .where(eq(mealSlots.id, mealSlotId));
+  });
 }
 
 export async function removeMeal(db: Db, mealSlotId: string): Promise<void> {
-  await db.delete(mealSlots).where(eq(mealSlots.id, mealSlotId));
+  await db.transaction(async (tx) => {
+    await lockMealWeek(tx, mealSlotId);
+    await tx.delete(mealSlots).where(eq(mealSlots.id, mealSlotId));
+  });
 }
 
 /**
@@ -577,6 +628,8 @@ export async function moveMeal(
   const snackIndex = to.snackIndex ?? 0;
   await checkSlot(db, to.slot, snackIndex);
   return db.transaction(async (tx) => {
+    await lockMealWeek(tx, mealSlotId);
+    await lockWeek(tx, weekStartOf(to.date));
     const [meal] = await tx
       .select()
       .from(mealSlots)
@@ -775,31 +828,37 @@ export async function setAdherence(
   status: AdherenceStatus | null,
   note?: string | null
 ): Promise<void> {
-  if (status === null) {
-    await db
-      .delete(adherence)
-      .where(
-        and(eq(adherence.mealSlotId, mealSlotId), eq(adherence.userId, userId))
-      );
-    return;
-  }
-  const [meal] = await db
-    .select({ unplanned: mealSlots.unplanned })
-    .from(mealSlots)
-    .where(eq(mealSlots.id, mealSlotId));
-  // Eaten off-plan, so there is no plan to have stuck to.
-  if (meal?.unplanned) {
-    throw new PlanError("Something you had off-plan isn't logged");
-  }
-  const clean = note?.trim().slice(0, 500) || null;
-  if (status === "swapped" && !clean) {
-    throw new PlanError("Say what you had instead");
-  }
-  await db
-    .insert(adherence)
-    .values({ mealSlotId, userId, status, note: clean })
-    .onConflictDoUpdate({
-      target: [adherence.mealSlotId, adherence.userId],
-      set: { status, note: clean },
-    });
+  await db.transaction(async (tx) => {
+    await lockMealWeek(tx, mealSlotId);
+    if (status === null) {
+      await tx
+        .delete(adherence)
+        .where(
+          and(
+            eq(adherence.mealSlotId, mealSlotId),
+            eq(adherence.userId, userId)
+          )
+        );
+      return;
+    }
+    const [meal] = await tx
+      .select({ unplanned: mealSlots.unplanned })
+      .from(mealSlots)
+      .where(eq(mealSlots.id, mealSlotId));
+    // Eaten off-plan, so there is no plan to have stuck to.
+    if (meal?.unplanned) {
+      throw new PlanError("Something you had off-plan isn't logged");
+    }
+    const clean = note?.trim().slice(0, 500) || null;
+    if (status === "swapped" && !clean) {
+      throw new PlanError("Say what you had instead");
+    }
+    await tx
+      .insert(adherence)
+      .values({ mealSlotId, userId, status, note: clean })
+      .onConflictDoUpdate({
+        target: [adherence.mealSlotId, adherence.userId],
+        set: { status, note: clean },
+      });
+  });
 }

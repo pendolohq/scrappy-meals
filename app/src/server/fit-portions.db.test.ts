@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import { testDbUrl, useTestDb } from "../../test/db";
 
-import { planChanges, users } from "./db/schema";
-import { fitPortions } from "./fit-portions";
+import { adherence, planChanges, users } from "./db/schema";
+import { fitPortions, planKey } from "./fit-portions";
 import type { Recipe } from "./mealie/recipes";
 import {
   addMeal,
@@ -13,7 +13,7 @@ import {
   setAdherence,
   setPortion,
 } from "./plan";
-import { undoChange } from "./plan-changes";
+import { lockWeek, undoChange } from "./plan-changes";
 import type { RecipeFetcher } from "./recipe-cache";
 import { createUser } from "./users";
 
@@ -197,6 +197,96 @@ describe.skipIf(!testDbUrl)("fitPortions (Postgres)", () => {
 
     expect(await portionsOf(meal)).toEqual({ [a.id]: 1.75 });
     expect(result.days[0].people[0].status).toBe("no-targets");
+  });
+
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+  /**
+   * Takes the week's lock as a fit or an edit would, and holds it until
+   * `release`, then runs `work` before letting go.
+   */
+  const holdWeek = async (
+    work: (tx: Tx) => Promise<unknown> = async () => {}
+  ) => {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const held = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const done = db.transaction(async (tx) => {
+      await lockWeek(tx, week);
+      locked();
+      await released;
+      await work(tx);
+    });
+    await held;
+    return { release, done };
+  };
+
+  /** Resolves once someone is queued behind the week's lock. */
+  const waitingForLock = async () => {
+    for (let i = 0; i < 200; i++) {
+      const [{ waiting }] = (
+        await db.execute<{ waiting: number }>(
+          sql`select count(*)::int as waiting from pg_locks where locktype = 'advisory' and not granted`
+        )
+      ).rows;
+      if (waiting > 0) {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    throw new Error("nobody waited for the week's lock");
+  };
+
+  it("makes a portion edit wait while the week is locked", async () => {
+    const a = await person("A", 1200, 60);
+    const meal = await plan(a.id, monday, "dinner");
+    const lock = await holdWeek();
+
+    const edit = setPortion(db, meal, a.id, 2);
+    await waitingForLock();
+    lock.release();
+    await Promise.all([lock.done, edit]);
+
+    expect(await portionsOf(meal)).toEqual({ [a.id]: 2 });
+  });
+
+  it("fits what the plan holds once it has the lock, not what it read before", async () => {
+    const a = await person("A", 1200, 60);
+    const lunch = await plan(a.id, monday, "lunch");
+    const dinner = await plan(a.id, monday, "dinner");
+    // Someone logs lunch while the fit waits for the lock.
+    const logging = await holdWeek((tx) =>
+      tx
+        .insert(adherence)
+        .values({ mealSlotId: lunch, userId: a.id, status: "stuck" })
+    );
+
+    const fitting = fit(a.id, [monday]);
+    await waitingForLock();
+    logging.release();
+    await Promise.all([logging.done, fitting]);
+
+    // Lunch is logged at 1, so dinner alone makes up the other 800 kcal.
+    expect(await portionsOf(lunch)).toEqual({ [a.id]: 1 });
+    expect(await portionsOf(dinner)).toEqual({ [a.id]: 2 });
+  });
+
+  it("returns the key of the plan it left, which the next edit changes", async () => {
+    const a = await person("A", 1200, 60);
+    const meal = await plan(a.id, monday, "dinner");
+
+    const result = await fit(a.id, [monday]);
+
+    const key = async () =>
+      planKey(await getWeekPlan(db, week, { fetch }), monday);
+    expect(result.planKey).toBe(await key());
+    await setPortion(db, meal, a.id, 1);
+    expect(result.planKey).not.toBe(await key());
   });
 
   it("refuses days that have passed and days outside the week", async () => {

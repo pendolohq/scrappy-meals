@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Scale } from "lucide-react";
 
 import { fitPortionsAction } from "@/app/(app)/week/actions";
+import { attempt, failureText } from "@/components/plan/attempt";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/input";
 import { cx } from "@/lib/cx";
@@ -18,17 +19,18 @@ const REST_OF_WEEK = "";
 /**
  * Fits the portions already planned to everyone's targets, for one day or
  * the rest of the week, then says which days still miss and each person's
- * average. The Undo is the change log's, shown by the page; once that change
- * is undone or another replaces it, the summary goes too.
+ * average. The Undo is the change log's, shown by the page. `planKey` is the
+ * page's plan (see the server's `planKey`): once anything changes it, an undo
+ * or anyone's edit, the summary is stale and goes.
  */
 export const FitPortions = ({
   weekStart,
   today,
-  latestChangeId,
+  planKey,
 }: {
   weekStart: string;
   today: string;
-  latestChangeId: string | null;
+  planKey: string;
 }) => {
   const online = useOnline();
   const [pending, startTransition] = useTransition();
@@ -43,32 +45,37 @@ export const FitPortions = ({
   const fit = () =>
     startTransition(async () => {
       setError(undefined);
-      const res = await fitPortionsAction({
-        weekStart,
-        day: day === REST_OF_WEEK ? undefined : day,
-      });
+      const res = await attempt(() =>
+        fitPortionsAction({
+          weekStart,
+          day: day === REST_OF_WEEK ? undefined : day,
+        })
+      );
       if (res.error !== undefined) {
-        setError(res.error);
+        setError(failureText(res));
         return;
       }
       setResult(res);
     });
 
-  const shown =
-    result && (result.changeId === null || result.changeId === latestChangeId)
-      ? result
-      : undefined;
-  const misses = (shown?.days ?? []).flatMap((d) =>
+  const shown = result?.planKey === planKey ? result : undefined;
+  // Fasting, empty days and people without targets weren't fitted: nothing to report.
+  const fitted = (shown?.days ?? []).flatMap((d) =>
     d.people
-      .filter((p) => p.misses.length > 0 || p.incomplete)
-      .map((p) => ({
-        key: `${d.date}|${p.userId}`,
-        text: `${formatDay(d.date)}, ${p.name}: ${[
-          ...p.misses.map(describeMiss),
-          ...(p.incomplete ? ["some meals lack kcal or protein"] : []),
-        ].join(", ")}`,
-      }))
+      .filter((p) => p.status === "fitted")
+      .map((p) => ({ date: d.date, ...p }))
   );
+  const misses = fitted
+    .filter((p) => p.misses.length > 0 || p.incomplete)
+    .map((p) => ({
+      key: `${p.date}|${p.userId}`,
+      text: `${formatDay(p.date)}, ${p.name}: ${[
+        ...p.misses.map(describeMiss),
+        ...(p.incomplete
+          ? ["some meals lack nutrition, so the totals may be low"]
+          : []),
+      ].join(", ")}`,
+    }));
   const estimated = (shown?.days ?? []).some((d) =>
     d.people.some((p) => p.estimated)
   );
@@ -113,9 +120,12 @@ export const FitPortions = ({
           <>
             <p>
               {shown.changed > 0
-                ? `Changed ${shown.changed} portion${shown.changed === 1 ? "" : "s"}.`
-                : "The portions already fit as well as they can."}{" "}
-              {misses.length === 0 && "Every day lands on target."}
+                ? `Changed ${shown.changed} portion${shown.changed === 1 ? "" : "s"}. `
+                : fitted.length > 0 &&
+                  "The portions already fit as well as they can. "}
+              {fitted.length === 0
+                ? "Nobody was fitted: no one with targets is eating on those days."
+                : misses.length === 0 && "Every day lands on target."}
             </p>
             {misses.length > 0 && (
               <ul className="list-disc pl-5">
