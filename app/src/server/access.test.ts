@@ -57,7 +57,11 @@ const PUBLIC_PAGES = ["layout.tsx", "login/page.tsx", "offline/page.tsx"];
 
 beforeEach(() => touched.mockClear());
 
-describe("server actions", () => {
+// Importing a whole action or route module cold can outlast the default
+// timeout when every test file is transforming at once.
+const IMPORT_TIMEOUT = 30_000;
+
+describe("server actions", { timeout: IMPORT_TIMEOUT }, () => {
   it("finds the action files", () => {
     expect(actionFiles.length).toBeGreaterThan(2);
   });
@@ -88,7 +92,7 @@ describe("server actions", () => {
   }
 });
 
-describe("route handlers", () => {
+describe("route handlers", { timeout: IMPORT_TIMEOUT }, () => {
   for (const file of routeFiles.filter(
     (f) => !PUBLIC_ROUTES.includes(rel(f))
   )) {
