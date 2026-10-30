@@ -18,6 +18,10 @@ fingerprint=$(
 [ "$(cat "$passed" 2>/dev/null)" = "$fingerprint" ] && { rm -f "$blocked"; exit 0; }
 
 cd app
+# Hooks run in a non-interactive shell, where mise's activation hasn't put bun on PATH.
+if ! command -v bun >/dev/null 2>&1 && command -v mise >/dev/null 2>&1; then
+  eval "$(mise env -s bash)"
+fi
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 steps="format:check lint typecheck test"
